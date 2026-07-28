@@ -31,16 +31,7 @@ import {
   getDomCodeByKeycode,
   getKeyDisplayNameByKeycode,
 } from "../lib/keycodeMap";
-import {
-  WHISPER_MODEL_LIST,
-  findLlmModelConfig,
-  findWhisperModelConfig,
-  getModelListByProvider,
-  type LlmModelId,
-  type LlmProviderId,
-  type WhisperModelId,
-} from "../lib/modelRegistry";
-import { LLM_PROVIDER_LIST, findProviderConfig } from "../lib/llmProvider";
+import { DEFAULT_LLM_BASE_URL } from "../lib/llmProvider";
 import {
   LANGUAGE_OPTIONS,
   TRANSCRIPTION_LANGUAGE_OPTIONS,
@@ -67,7 +58,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -82,12 +72,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
-  AtSign,
-  CircleAlert,
-  Facebook,
-  Github,
-  Globe,
-  Instagram,
   Mic,
   RefreshCw,
   Trash2,
@@ -97,7 +81,7 @@ import { useAudioPreview } from "../composables/useAudioPreview";
 import ConnectionTestButton from "../components/ConnectionTestButton.vue";
 import {
   testLlmConnection,
-  testWhisperConnection,
+  testAsrConnection,
 } from "../lib/connectionTest";
 
 const settingsStore = useSettingsStore();
@@ -318,33 +302,15 @@ async function handleTriggerModeChange(newMode: TriggerMode) {
   }
 }
 
-// ── API Key ─────────────────────────────────────────────────
-const apiKeyInput = ref("");
+// ── Doubao ASR Credentials ─────────────────────────────────
+const doubaoAppIdInput = ref("");
+const doubaoAccessKeyInput = ref("");
 const isApiKeyVisible = ref(false);
 const isSubmittingApiKey = ref(false);
 const apiKeyFeedback = useFeedbackMessage();
 
 const isConfirmingDeleteApiKey = ref(false);
 let deleteConfirmTimeoutId: ReturnType<typeof setTimeout> | undefined;
-
-const promptInput = ref("");
-const isSubmittingPrompt = ref(false);
-const promptFeedback = useFeedbackMessage();
-const selectedPromptMode = ref<PromptMode>("minimal");
-const isPresetDirty = ref(false);
-
-const isConfirmingResetPrompt = ref(false);
-
-// Preset 模式下切語言時即時更新 textarea
-watch(
-  [() => settingsStore.selectedLocale, () => settingsStore.selectedTranscriptionLocale],
-  () => {
-    if (selectedPromptMode.value !== "custom" && !isPresetDirty.value) {
-      promptInput.value = settingsStore.getAiPrompt();
-    }
-  },
-);
-let resetPromptConfirmTimeoutId: ReturnType<typeof setTimeout> | undefined;
 
 const apiKeyStatusLabel = computed(() =>
   settingsStore.hasApiKey ? t("settings.apiKey.set") : t("settings.apiKey.notSet"),
@@ -363,8 +329,13 @@ function toggleApiKeyVisibility() {
 async function handleSaveApiKey() {
   try {
     isSubmittingApiKey.value = true;
-    await settingsStore.saveApiKey(apiKeyInput.value);
+    await settingsStore.saveDoubaoCredentials(
+      doubaoAppIdInput.value,
+      doubaoAccessKeyInput.value,
+    );
     isApiKeyVisible.value = false;
+    doubaoAppIdInput.value = "";
+    doubaoAccessKeyInput.value = "";
     apiKeyFeedback.show("success", t("settings.apiKey.saved"));
   } catch (err) {
     apiKeyFeedback.show("error", extractErrorMessage(err));
@@ -390,7 +361,8 @@ async function handleDeleteApiKey() {
   try {
     isSubmittingApiKey.value = true;
     await settingsStore.deleteApiKey();
-    apiKeyInput.value = "";
+    doubaoAppIdInput.value = "";
+    doubaoAccessKeyInput.value = "";
     isApiKeyVisible.value = false;
     apiKeyFeedback.show("success", t("settings.apiKey.deleted"));
   } catch (err) {
@@ -399,6 +371,28 @@ async function handleDeleteApiKey() {
     isSubmittingApiKey.value = false;
   }
 }
+
+const promptInput = ref("");
+const isSubmittingPrompt = ref(false);
+const promptFeedback = useFeedbackMessage();
+const selectedPromptMode = ref<PromptMode>("minimal");
+const isPresetDirty = ref(false);
+
+const isConfirmingResetPrompt = ref(false);
+
+// Preset 模式下切語言時即時更新 textarea
+watch(
+  [() => settingsStore.selectedLocale, () => settingsStore.selectedTranscriptionLocale],
+  () => {
+    if (selectedPromptMode.value !== "custom" && !isPresetDirty.value) {
+      promptInput.value = settingsStore.getAiPrompt();
+    }
+  },
+);
+let resetPromptConfirmTimeoutId: ReturnType<typeof setTimeout> | undefined;
+
+
+
 
 async function handleSavePrompt() {
   const wasModeSwitch = selectedPromptMode.value !== "custom" && isPresetDirty.value;
@@ -508,118 +502,41 @@ async function handleSaveThresholdCharCount() {
   }
 }
 
-// ── 模型選擇 ──────────────────────────────────────────────
+// ── LLM (OpenAI-compatible) ──────────────────────────────
 const modelFeedback = useFeedbackMessage();
-
-const whisperModelDescription = computed(() => {
-  const config = findWhisperModelConfig(settingsStore.selectedWhisperModelId);
-  if (!config) return "";
-  return t("settings.model.costPerHour", { cost: config.costPerHour });
-});
-
-const llmModelDescription = computed(() => {
-  const config = findLlmModelConfig(settingsStore.selectedLlmModelId);
-  if (!config) return "";
-  const tpsInfo = config.speedTps > 0 ? `${config.speedTps} TPS · ` : "";
-  return `${tpsInfo}$${config.inputCostPerMillion}/$${config.outputCostPerMillion} per M tokens`;
-});
-
-const providerModelList = computed(() =>
-  getModelListByProvider(settingsStore.selectedLlmProviderId),
-);
-
-async function handleWhisperModelChange(newId: WhisperModelId) {
-  try {
-    await settingsStore.saveWhisperModel(newId);
-    modelFeedback.show("success", t("settings.model.whisperUpdated"));
-  } catch (err) {
-    modelFeedback.show("error", extractErrorMessage(err));
-  }
-}
-
-async function handleLlmModelChange(newId: LlmModelId) {
-  try {
-    await settingsStore.saveLlmModel(newId);
-    modelFeedback.show("success", t("settings.model.llmUpdated"));
-  } catch (err) {
-    modelFeedback.show("error", extractErrorMessage(err));
-  }
-}
-
-// ── LLM Provider ────────────────────────────────────────────
 const providerFeedback = useFeedbackMessage();
-const openaiApiKeyInput = ref("");
-const anthropicApiKeyInput = ref("");
-const geminiApiKeyInput = ref("");
-const isOpenaiApiKeyVisible = ref(false);
-const isAnthropicApiKeyVisible = ref(false);
-const isGeminiApiKeyVisible = ref(false);
+const llmBaseUrlInput = ref("");
+const llmApiKeyInput = ref("");
+const llmModelInput = ref("");
+const isLlmApiKeyVisible = ref(false);
 
-async function handleProviderChange(providerId: LlmProviderId) {
+async function handleSaveLlmConfig() {
   try {
-    await settingsStore.saveLlmProvider(providerId);
-    providerFeedback.show("success", t("settings.model.llmUpdated"));
-  } catch (err) {
-    providerFeedback.show("error", extractErrorMessage(err));
-  }
-}
-
-async function handleSaveOpenaiApiKey() {
-  try {
-    await settingsStore.saveOpenaiApiKey(openaiApiKeyInput.value);
-    openaiApiKeyInput.value = "";
+    if (llmBaseUrlInput.value.trim()) {
+      await settingsStore.saveLlmBaseUrl(llmBaseUrlInput.value);
+    }
+    if (llmModelInput.value.trim()) {
+      await settingsStore.saveLlmModel(llmModelInput.value.trim());
+    }
+    if (llmApiKeyInput.value.trim()) {
+      await settingsStore.saveLlmApiKeyValue(llmApiKeyInput.value);
+      llmApiKeyInput.value = "";
+    }
     providerFeedback.show("success", t("settings.apiKey.saved"));
   } catch (err) {
     providerFeedback.show("error", extractErrorMessage(err));
   }
 }
 
-async function handleDeleteOpenaiApiKey() {
+async function handleDeleteLlmApiKey() {
   try {
-    await settingsStore.deleteOpenaiApiKey();
+    await settingsStore.deleteLlmApiKeyValue();
     providerFeedback.show("success", t("settings.apiKey.deleted"));
   } catch (err) {
     providerFeedback.show("error", extractErrorMessage(err));
   }
 }
 
-async function handleSaveAnthropicApiKey() {
-  try {
-    await settingsStore.saveAnthropicApiKey(anthropicApiKeyInput.value);
-    anthropicApiKeyInput.value = "";
-    providerFeedback.show("success", t("settings.apiKey.saved"));
-  } catch (err) {
-    providerFeedback.show("error", extractErrorMessage(err));
-  }
-}
-
-async function handleDeleteAnthropicApiKey() {
-  try {
-    await settingsStore.deleteAnthropicApiKey();
-    providerFeedback.show("success", t("settings.apiKey.deleted"));
-  } catch (err) {
-    providerFeedback.show("error", extractErrorMessage(err));
-  }
-}
-
-async function handleSaveGeminiApiKey() {
-  try {
-    await settingsStore.saveGeminiApiKey(geminiApiKeyInput.value);
-    geminiApiKeyInput.value = "";
-    providerFeedback.show("success", t("settings.apiKey.saved"));
-  } catch (err) {
-    providerFeedback.show("error", extractErrorMessage(err));
-  }
-}
-
-async function handleDeleteGeminiApiKey() {
-  try {
-    await settingsStore.deleteGeminiApiKey();
-    providerFeedback.show("success", t("settings.apiKey.deleted"));
-  } catch (err) {
-    providerFeedback.show("error", extractErrorMessage(err));
-  }
-}
 
 // ── 錄音自動靜音 ──────────────────────────────────────────────
 const muteOnRecordingFeedback = useFeedbackMessage();
@@ -867,8 +784,11 @@ onMounted(async () => {
   isPresetDirty.value = false;
 
   if (settingsStore.hasApiKey) {
-    apiKeyInput.value = settingsStore.getApiKey();
+    doubaoAppIdInput.value = settingsStore.getDoubaoAppId();
+    doubaoAccessKeyInput.value = settingsStore.getDoubaoAccessKey();
   }
+  llmBaseUrlInput.value = settingsStore.getLlmBaseUrl() || DEFAULT_LLM_BASE_URL;
+  llmModelInput.value = settingsStore.selectedLlmModelId;
   thresholdEnabled.value = settingsStore.isEnhancementThresholdEnabled;
   thresholdCharCount.value = settingsStore.enhancementThresholdCharCount;
   recordingAutoCleanupEnabled.value =
@@ -908,56 +828,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="p-6 space-y-6 text-foreground">
-    <!-- 關於 SayIt -->
-    <Card>
-      <CardHeader class="border-b border-border">
-        <CardTitle class="text-base">{{ $t("settings.about.title") }}</CardTitle>
-      </CardHeader>
-      <CardContent class="space-y-4">
-        <div class="space-y-1">
-          <p class="text-sm text-muted-foreground">
-            {{ $t("settings.about.description") }}
-          </p>
-          <p class="text-sm text-muted-foreground">
-            {{ $t("settings.about.author") }}<a href="https://jackle.pro" target="_blank" rel="noopener noreferrer" class="font-medium text-foreground hover:text-primary transition-colors">Jackle Chen</a>
-          </p>
-        </div>
-
-        <div class="flex flex-wrap gap-x-4 gap-y-2">
-          <a href="https://jackle.pro" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors">
-            <Globe class="size-4" />
-            <span>{{ $t("settings.about.website") }}</span>
-          </a>
-          <a href="https://www.facebook.com/jackle45" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors">
-            <Facebook class="size-4" />
-            <span>Facebook</span>
-          </a>
-          <a href="https://www.instagram.com/jackle9527" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors">
-            <Instagram class="size-4" />
-            <span>Instagram</span>
-          </a>
-          <a href="https://www.threads.com/@jackle9527" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors">
-            <AtSign class="size-4" />
-            <span>Threads</span>
-          </a>
-        </div>
-
-        <Separator />
-
-        <div class="flex flex-wrap gap-x-4 gap-y-2">
-          <a href="https://github.com/chenjackle45/SayIt" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors">
-            <Github class="size-4" />
-            <span>{{ $t("settings.about.sourceCode") }}</span>
-          </a>
-          <a href="https://github.com/chenjackle45/SayIt/issues" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors">
-            <CircleAlert class="size-4" />
-            <span>{{ $t("settings.about.reportIssue") }}</span>
-          </a>
-        </div>
-      </CardContent>
-    </Card>
-
+  <div class="settings-page space-y-5 text-foreground">
     <!-- 快捷鍵設定 -->
     <Card>
       <CardHeader class="border-b border-border">
@@ -1114,11 +985,11 @@ onBeforeUnmount(() => {
       </CardContent>
     </Card>
 
-    <!-- Groq API Key -->
+    <!-- Doubao ASR Credentials -->
     <Card>
       <CardHeader class="flex-row items-center justify-between border-b border-border">
         <div class="flex items-center gap-2">
-          <CardTitle class="text-base">Groq API Key</CardTitle>
+          <CardTitle class="text-base">{{ $t("settings.apiKey.title") }}</CardTitle>
           <Badge
             :class="apiKeyStatusClass"
             class="border-0"
@@ -1126,14 +997,6 @@ onBeforeUnmount(() => {
             {{ apiKeyStatusLabel }}
           </Badge>
         </div>
-        <a
-          href="https://console.groq.com/keys"
-          target="_blank"
-          rel="noreferrer"
-          class="text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          {{ $t("settings.apiKey.goToConsole") }} &rarr;
-        </a>
       </CardHeader>
       <CardContent class="space-y-4">
         <p class="text-sm text-muted-foreground leading-relaxed">
@@ -1147,12 +1010,24 @@ onBeforeUnmount(() => {
           {{ $t("settings.apiKey.onboarding") }}
         </p>
 
-        <div class="flex gap-2">
-          <div class="flex flex-1 gap-2">
+        <div class="space-y-2">
+          <Label for="doubao-app-id">App ID</Label>
+          <Input
+            id="doubao-app-id"
+            v-model="doubaoAppIdInput"
+            :type="isApiKeyVisible ? 'text' : 'password'"
+            placeholder="App ID"
+            autocomplete="off"
+          />
+        </div>
+        <div class="space-y-2">
+          <Label for="doubao-access-key">Access Key (AK)</Label>
+          <div class="flex gap-2">
             <Input
-              v-model="apiKeyInput"
+              id="doubao-access-key"
+              v-model="doubaoAccessKeyInput"
               :type="isApiKeyVisible ? 'text' : 'password'"
-              placeholder="gsk_..."
+              placeholder="Access Key"
               autocomplete="off"
               class="flex-1"
             />
@@ -1164,46 +1039,46 @@ onBeforeUnmount(() => {
             >
               {{ isApiKeyVisible ? $t("settings.apiKey.hide") : $t("settings.apiKey.show") }}
             </Button>
+            <Button
+              :disabled="isSubmittingApiKey"
+              @click="handleSaveApiKey"
+            >
+              {{ $t("common.save") }}
+            </Button>
           </div>
-          <Button
-            :disabled="isSubmittingApiKey"
-            @click="handleSaveApiKey"
-          >
-            {{ $t("common.save") }}
-          </Button>
         </div>
 
-        <div class="flex items-center justify-between">
-          <transition name="feedback-fade">
-            <p
-              v-if="apiKeyFeedback.message.value !== ''"
-              class="text-sm"
-              :class="
-                apiKeyFeedback.type.value === 'success' ? 'text-green-400' : 'text-red-400'
-              "
-            >
-              {{ apiKeyFeedback.message.value }}
-            </p>
-          </transition>
-
+        <div class="flex flex-wrap items-start gap-2">
           <Button
             v-if="settingsStore.hasApiKey"
-            variant="outline"
-            :class="
-              isConfirmingDeleteApiKey
-                ? 'bg-destructive text-destructive-foreground border-destructive hover:bg-destructive/90'
-                : 'text-destructive border-destructive hover:bg-destructive/10'
-            "
+            variant="destructive"
+            size="sm"
             :disabled="isSubmittingApiKey"
             @click="requestDeleteApiKey"
           >
             {{ isConfirmingDeleteApiKey ? $t('settings.apiKey.confirmDelete') : $t('settings.apiKey.delete') }}
           </Button>
+          <ConnectionTestButton
+            :on-test="() => testAsrConnection(settingsStore.getDoubaoAppId() || doubaoAppIdInput, settingsStore.getDoubaoAccessKey() || doubaoAccessKeyInput)"
+            :disabled="!(settingsStore.hasApiKey || (doubaoAppIdInput.trim() && doubaoAccessKeyInput.trim()))"
+          />
         </div>
+
+        <transition name="feedback-fade">
+          <p
+            v-if="apiKeyFeedback.message.value !== ''"
+            class="text-sm"
+            :class="
+              apiKeyFeedback.type.value === 'success' ? 'text-green-400' : 'text-red-400'
+            "
+          >
+            {{ apiKeyFeedback.message.value }}
+          </p>
+        </transition>
       </CardContent>
     </Card>
 
-    <!-- 模型選擇 -->
+    <!-- LLM (OpenAI-compatible) -->
     <Card>
       <CardHeader class="border-b border-border">
         <CardTitle class="text-base">{{ $t("settings.model.title") }}</CardTitle>
@@ -1213,230 +1088,89 @@ onBeforeUnmount(() => {
           {{ $t("settings.model.description") }}
         </p>
 
-        <!-- Whisper 模型 -->
         <div class="space-y-2">
-          <Label for="whisper-model">{{ $t("settings.model.whisperLabel") }}</Label>
-          <Select
-            :model-value="settingsStore.selectedWhisperModelId"
-            @update:model-value="handleWhisperModelChange($event as WhisperModelId)"
-          >
-            <SelectTrigger id="whisper-model" class="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem
-                v-for="model in WHISPER_MODEL_LIST"
-                :key="model.id"
-                :value="model.id"
-              >
-                {{ model.displayName }}
-                <template v-if="model.isDefault" #extra>
-                  <Badge variant="secondary" class="ml-2 text-xs">{{ $t("settings.model.default") }}</Badge>
-                </template>
-              </SelectItem>
-            </SelectContent>
-          </Select>
-          <p class="text-xs text-muted-foreground">{{ whisperModelDescription }}</p>
-          <ConnectionTestButton
-            :on-test="() => testWhisperConnection(settingsStore.selectedWhisperModelId, settingsStore.getApiKey())"
-            :disabled="!settingsStore.hasApiKey"
+          <Label for="llm-base-url">{{ $t("settings.provider.baseUrl") }}</Label>
+          <Input
+            id="llm-base-url"
+            v-model="llmBaseUrlInput"
+            type="text"
+            :placeholder="DEFAULT_LLM_BASE_URL"
+            autocomplete="off"
+            class="font-mono text-xs"
+          />
+          <p class="text-xs text-muted-foreground">{{ $t("settings.provider.baseUrlHint") }}</p>
+        </div>
+
+        <div class="space-y-2">
+          <Label for="llm-model-id">{{ $t("settings.model.llmLabel") }}</Label>
+          <Input
+            id="llm-model-id"
+            v-model="llmModelInput"
+            type="text"
+            placeholder="gpt-4o-mini"
+            autocomplete="off"
+            class="font-mono text-xs"
           />
         </div>
 
-        <Separator />
+        <div class="space-y-2">
+          <Label for="llm-api-key">{{ $t("settings.provider.apiKey") }}</Label>
+          <div v-if="settingsStore.hasLlmApiKey" class="flex items-center gap-2">
+            <Input
+              id="llm-api-key"
+              :model-value="isLlmApiKeyVisible ? settingsStore.llmApiKey : '••••••••••'"
+              readonly
+              class="flex-1 font-mono text-xs"
+            />
+            <Button variant="ghost" size="sm" @click="isLlmApiKeyVisible = !isLlmApiKeyVisible">
+              {{ isLlmApiKeyVisible ? $t('settings.apiKey.hide') : $t('settings.apiKey.show') }}
+            </Button>
+          </div>
+          <div v-else class="flex gap-2">
+            <Input
+              id="llm-api-key"
+              v-model="llmApiKeyInput"
+              type="password"
+              placeholder="sk-..."
+              class="flex-1 font-mono text-xs"
+            />
+          </div>
+        </div>
 
-        <!-- LLM Provider 選擇 -->
-        <div class="space-y-3">
-          <Label>{{ $t("settings.provider.title") }}</Label>
-          <p class="text-xs text-muted-foreground">{{ $t("settings.provider.description") }}</p>
-          <RadioGroup
-            :model-value="settingsStore.selectedLlmProviderId"
-            class="grid grid-cols-2 gap-2"
-            @update:model-value="(v: unknown) => handleProviderChange(v as LlmProviderId)"
+        <div class="flex items-center gap-2">
+          <Button
+            v-if="settingsStore.hasLlmApiKey"
+            variant="destructive"
+            size="sm"
+            @click="handleDeleteLlmApiKey"
           >
-            <Label
-              v-for="provider in LLM_PROVIDER_LIST"
-              :key="provider.id"
-              :for="`provider-${provider.id}`"
-              class="flex cursor-pointer items-center gap-2.5 rounded-md border border-border p-3 transition-colors"
-              :class="settingsStore.selectedLlmProviderId === provider.id ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'"
-            >
-              <RadioGroupItem :id="`provider-${provider.id}`" :value="provider.id" class="!size-0 !border-0 !shadow-none overflow-hidden" />
-              <span class="text-sm font-medium">{{ $t(`settings.provider.${provider.id}`) }}</span>
-            </Label>
-          </RadioGroup>
+            {{ $t('settings.apiKey.delete') }}
+          </Button>
+          <ConnectionTestButton
+            :on-test="() => testLlmConnection(settingsStore.getLlmApiKey() || llmApiKeyInput, { modelId: llmModelInput || settingsStore.selectedLlmModelId, baseUrl: llmBaseUrlInput || settingsStore.getLlmBaseUrl() })"
+            :disabled="!(settingsStore.hasLlmApiKey || llmApiKeyInput.trim())"
+          />
+          <Button class="ml-auto" size="sm" @click="handleSaveLlmConfig">
+            {{ $t('common.save') }}
+          </Button>
         </div>
-
-        <!-- Provider-specific API Key -->
-        <div v-if="settingsStore.selectedLlmProviderId === 'groq'" class="rounded-md bg-muted/50 p-3">
-          <p class="text-xs text-muted-foreground">{{ $t("settings.provider.groqNote") }}</p>
-        </div>
-
-        <div v-else-if="settingsStore.selectedLlmProviderId === 'openai'" class="space-y-2">
-          <Label for="openai-api-key">{{ $t("settings.providerApiKey.openaiTitle") }}</Label>
-          <div v-if="settingsStore.openaiApiKey" class="flex items-center gap-2">
-            <Input
-              id="openai-api-key"
-              :model-value="isOpenaiApiKeyVisible ? settingsStore.openaiApiKey : '••••••••••'"
-              readonly
-              class="flex-1 font-mono text-xs"
-            />
-            <Button variant="ghost" size="sm" @click="isOpenaiApiKeyVisible = !isOpenaiApiKeyVisible">
-              {{ isOpenaiApiKeyVisible ? $t('settings.apiKey.hide') : $t('settings.apiKey.show') }}
-            </Button>
-            <Button variant="ghost" size="sm" class="text-destructive" @click="handleDeleteOpenaiApiKey">
-              {{ $t('settings.apiKey.delete') }}
-            </Button>
-          </div>
-          <div v-else class="flex gap-2">
-            <Input
-              id="openai-api-key"
-              v-model="openaiApiKeyInput"
-              type="password"
-              :placeholder="findProviderConfig('openai')?.apiKeyPrefix + '...'"
-              class="flex-1 font-mono text-xs"
-            />
-            <Button size="sm" :disabled="!openaiApiKeyInput.trim()" @click="handleSaveOpenaiApiKey">
-              {{ $t('common.save') }}
-            </Button>
-          </div>
-          <p class="text-xs text-muted-foreground">
-            {{ $t("settings.providerApiKey.openaiInstruction") }}
-            ·
-            <a :href="findProviderConfig('openai')?.consoleUrl" target="_blank" rel="noopener noreferrer" class="underline">{{ $t("settings.providerApiKey.goToOpenai") }}</a>
-          </p>
-        </div>
-
-        <div v-else-if="settingsStore.selectedLlmProviderId === 'anthropic'" class="space-y-2">
-          <Label for="anthropic-api-key">{{ $t("settings.providerApiKey.anthropicTitle") }}</Label>
-          <div v-if="settingsStore.anthropicApiKey" class="flex items-center gap-2">
-            <Input
-              id="anthropic-api-key"
-              :model-value="isAnthropicApiKeyVisible ? settingsStore.anthropicApiKey : '••••••••••'"
-              readonly
-              class="flex-1 font-mono text-xs"
-            />
-            <Button variant="ghost" size="sm" @click="isAnthropicApiKeyVisible = !isAnthropicApiKeyVisible">
-              {{ isAnthropicApiKeyVisible ? $t('settings.apiKey.hide') : $t('settings.apiKey.show') }}
-            </Button>
-            <Button variant="ghost" size="sm" class="text-destructive" @click="handleDeleteAnthropicApiKey">
-              {{ $t('settings.apiKey.delete') }}
-            </Button>
-          </div>
-          <div v-else class="flex gap-2">
-            <Input
-              id="anthropic-api-key"
-              v-model="anthropicApiKeyInput"
-              type="password"
-              :placeholder="findProviderConfig('anthropic')?.apiKeyPrefix + '...'"
-              class="flex-1 font-mono text-xs"
-            />
-            <Button size="sm" :disabled="!anthropicApiKeyInput.trim()" @click="handleSaveAnthropicApiKey">
-              {{ $t('common.save') }}
-            </Button>
-          </div>
-          <p class="text-xs text-muted-foreground">
-            {{ $t("settings.providerApiKey.anthropicInstruction") }}
-            ·
-            <a :href="findProviderConfig('anthropic')?.consoleUrl" target="_blank" rel="noopener noreferrer" class="underline">{{ $t("settings.providerApiKey.goToAnthropic") }}</a>
-          </p>
-        </div>
-
-        <div v-else-if="settingsStore.selectedLlmProviderId === 'gemini'" class="space-y-2">
-          <Label for="gemini-api-key">{{ $t("settings.providerApiKey.geminiTitle") }}</Label>
-          <div v-if="settingsStore.geminiApiKey" class="flex items-center gap-2">
-            <Input
-              id="gemini-api-key"
-              :model-value="isGeminiApiKeyVisible ? settingsStore.geminiApiKey : '••••••••••'"
-              readonly
-              class="flex-1 font-mono text-xs"
-            />
-            <Button variant="ghost" size="sm" @click="isGeminiApiKeyVisible = !isGeminiApiKeyVisible">
-              {{ isGeminiApiKeyVisible ? $t('settings.apiKey.hide') : $t('settings.apiKey.show') }}
-            </Button>
-            <Button variant="ghost" size="sm" class="text-destructive" @click="handleDeleteGeminiApiKey">
-              {{ $t('settings.apiKey.delete') }}
-            </Button>
-          </div>
-          <div v-else class="flex gap-2">
-            <Input
-              id="gemini-api-key"
-              v-model="geminiApiKeyInput"
-              type="password"
-              :placeholder="findProviderConfig('gemini')?.apiKeyPrefix + '...'"
-              class="flex-1 font-mono text-xs"
-            />
-            <Button size="sm" :disabled="!geminiApiKeyInput.trim()" @click="handleSaveGeminiApiKey">
-              {{ $t('common.save') }}
-            </Button>
-          </div>
-          <p class="text-xs text-muted-foreground">
-            {{ $t("settings.providerApiKey.geminiInstruction") }}
-            ·
-            <a :href="findProviderConfig('gemini')?.consoleUrl" target="_blank" rel="noopener noreferrer" class="underline">{{ $t("settings.providerApiKey.goToGemini") }}</a>
-          </p>
-        </div>
-
-        <ConnectionTestButton
-          :on-test="() => testLlmConnection(settingsStore.selectedLlmModelId, settingsStore.getLlmApiKey())"
-          :disabled="!settingsStore.hasLlmApiKey"
-        />
 
         <transition name="feedback-fade">
           <p
-            v-if="providerFeedback.message.value !== ''"
-            class="text-sm"
-            :class="providerFeedback.type.value === 'success' ? 'text-green-400' : 'text-red-400'"
-          >
-            {{ providerFeedback.message.value }}
-          </p>
-        </transition>
-
-        <template v-if="settingsStore.selectedLlmProviderId === 'groq' || settingsStore.hasLlmApiKey">
-          <Separator />
-
-          <!-- LLM 模型 -->
-          <div class="space-y-2">
-            <Label for="llm-model">{{ $t("settings.model.llmLabel") }}</Label>
-            <Select
-              :model-value="settingsStore.selectedLlmModelId"
-              @update:model-value="handleLlmModelChange($event as LlmModelId)"
-            >
-              <SelectTrigger id="llm-model" class="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem
-                  v-for="model in providerModelList"
-                  :key="model.id"
-                  :value="model.id"
-                >
-                  {{ model.displayName }}
-                  <template #extra>
-                    <Badge variant="secondary" class="ml-2 text-xs">{{ $t(model.badgeKey) }}</Badge>
-                  </template>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <p class="text-xs text-muted-foreground">{{ llmModelDescription }}</p>
-          </div>
-        </template>
-
-        <transition name="feedback-fade">
-          <p
-            v-if="modelFeedback.message.value !== ''"
+            v-if="providerFeedback.message.value !== '' || modelFeedback.message.value !== ''"
             class="text-sm"
             :class="
-              modelFeedback.type.value === 'success'
+              (providerFeedback.type.value === 'success' || modelFeedback.type.value === 'success')
                 ? 'text-green-400'
                 : 'text-red-400'
             "
           >
-            {{ modelFeedback.message.value }}
+            {{ providerFeedback.message.value || modelFeedback.message.value }}
           </p>
         </transition>
       </CardContent>
     </Card>
+
 
     <!-- AI 整理 Prompt -->
     <Card>
@@ -1498,24 +1232,20 @@ onBeforeUnmount(() => {
           @input="handlePromptInput"
         />
 
-        <div class="flex justify-end gap-2">
+        <div class="flex justify-start gap-2">
           <Button
-            :disabled="isSubmittingPrompt || (selectedPromptMode !== 'custom' && !isPresetDirty)"
-            @click="handleSavePrompt"
-          >
-            {{ $t("common.save") }}
-          </Button>
-          <Button
-            variant="outline"
-            :class="
-              isConfirmingResetPrompt
-                ? 'border-destructive text-destructive hover:bg-destructive/10'
-                : ''
-            "
+            variant="destructive"
             :disabled="isSubmittingPrompt"
             @click="requestResetPrompt"
           >
             {{ isConfirmingResetPrompt ? $t('settings.prompt.confirmReset') : $t('settings.prompt.reset') }}
+          </Button>
+          <Button
+            class="ml-auto"
+            :disabled="isSubmittingPrompt || (selectedPromptMode !== 'custom' && !isPresetDirty)"
+            @click="handleSavePrompt"
+          >
+            {{ $t("common.save") }}
           </Button>
         </div>
 
@@ -1564,6 +1294,7 @@ onBeforeUnmount(() => {
             class="w-24"
           />
           <Button
+            class="ml-auto"
             size="sm"
             @click="handleSaveThresholdCharCount"
           >
@@ -1736,6 +1467,7 @@ onBeforeUnmount(() => {
           />
           <span class="text-sm text-muted-foreground">{{ $t("settings.recording.daysUnit") }}</span>
           <Button
+            class="ml-auto"
             size="sm"
             @click="handleSaveCleanupDays"
           >
@@ -1762,11 +1494,11 @@ onBeforeUnmount(() => {
                 {{ $t("settings.recording.deleteConfirmDescription") }}
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>{{ $t("common.cancel") }}</AlertDialogCancel>
-              <AlertDialogAction @click="handleDeleteAllRecordings">
+            <AlertDialogFooter class="sm:justify-start">
+              <AlertDialogAction variant="destructive" @click="handleDeleteAllRecordings">
                 {{ $t("common.delete") }}
               </AlertDialogAction>
+              <AlertDialogCancel>{{ $t("common.cancel") }}</AlertDialogCancel>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

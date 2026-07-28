@@ -78,6 +78,11 @@ export interface VocabularyLearnedPayload {
   termList: string[];
 }
 
+/** ASR 串流中間結果（HUD 即時字幕） */
+export interface TranscriptionPartialPayload {
+  text: string;
+}
+
 export interface RecordingCapturedPayload {
   keycode: number;
   modifiers: import("./settings").ModifierFlag[];

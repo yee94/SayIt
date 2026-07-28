@@ -5,14 +5,6 @@
     "cancel": "取消"
   },
   "settings": {
-    "about": {
-      "title": "关于 SayIt",
-      "description": "按住说话，放开贴上。SayIt 是开源的桌面语音转文字工具，采用 MIT 授权。",
-      "author": "作者：",
-      "website": "个人网站",
-      "sourceCode": "查看源代码",
-      "reportIssue": "反馈问题"
-    },
     "hotkey": {
       "title": "快捷键设置",
       "triggerKeyMode": "触发键模式",
@@ -48,27 +40,30 @@
       }
     },
     "apiKey": {
-      "title": "Groq API Key（语音转录 + Groq LLM）",
+      "title": "豆包 ASR 凭据",
       "set": "已设置",
       "notSet": "未设置",
-      "goToConsole": "前往 Groq Console",
-      "instruction": "此 Key 用于语音转录（Whisper）。若 LLM Provider 选择 Groq，也会用于文字整理。",
-      "onboarding": "欢迎使用 SayIt！请先设置 Groq API Key 以启用语音输入功能。",
+      "goToConsole": "前往火山引擎控制台",
+      "instruction": "用于语音转录（Doubao SeedASR 流式识别）。填写 App ID 与 Access Key。",
+      "onboarding": "欢迎使用 SayIt！请先设置豆包 ASR 凭据以启用语音输入。",
       "show": "显示",
       "hide": "隐藏",
-      "saved": "API Key 已保存",
-      "deleted": "API Key 已删除",
+      "saved": "凭据已保存",
+      "deleted": "凭据已删除",
       "confirmDelete": "确认删除？",
-      "delete": "删除 API Key"
+      "delete": "删除凭据"
     },
     "provider": {
-      "title": "LLM 模型服务",
-      "description": "选择文字整理和字典分析使用的 AI 服务。Groq 和 Gemini 提供免费额度，OpenAI 和 Anthropic 为付费服务。",
-      "groq": "Groq（免费）",
-      "openai": "OpenAI（推荐）",
+      "title": "LLM 服务（OpenAI 兼容）",
+      "description": "文字整理与字典分析使用的自定义 LLM 接口。填写 Base URL 与 API Key。",
+      "groq": "Groq",
+      "openai": "OpenAI",
       "anthropic": "Anthropic",
-      "gemini": "Google Gemini（免费额度）",
-      "groqNote": "使用上方 Groq API Key"
+      "gemini": "Gemini",
+      "groqNote": "",
+      "baseUrl": "Base URL",
+      "baseUrlHint": "可填完整 chat/completions 地址，或仅填到 /v1",
+      "apiKey": "API Key"
     },
     "providerApiKey": {
       "openaiTitle": "OpenAI API Key",
@@ -87,12 +82,12 @@
       "success": "测试成功（{ms}ms）"
     },
     "model": {
-      "title": "模型选择",
-      "description": "选择语音转录和文字整理使用的 AI 模型。速度较快的模型响应更即时，较大的模型品质更好。",
-      "whisperLabel": "语音转录模型（Whisper）",
-      "llmLabel": "文字整理模型（LLM）",
-      "whisperUpdated": "语音转录模型已更新",
-      "llmUpdated": "文字整理模型已更新",
+      "title": "LLM 配置",
+      "description": "配置文字整理使用的 OpenAI 兼容接口与模型名称。语音转录固定使用豆包 SeedASR。",
+      "whisperLabel": "语音转录（Doubao SeedASR）",
+      "llmLabel": "模型名称（Model ID）",
+      "whisperUpdated": "语音转录已更新",
+      "llmUpdated": "模型已更新",
       "default": "默认",
       "costPerHour": "每小时 ${cost}"
     },

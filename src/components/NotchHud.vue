@@ -26,15 +26,22 @@ type VisualMode =
   | "learned"
   | "mode-switch";
 
-const props = defineProps<{
-  status: HudStatus;
-  recordingElapsedSeconds: number;
-  message: string;
-  canRetry: boolean;
-  promptModeLabel: string;
-  modeSwitchLabel: string;
-  isEditMode: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    status: HudStatus;
+    recordingElapsedSeconds: number;
+    message: string;
+    /** ASR 串流中間文本（留海下方即時字幕） */
+    liveTranscript?: string;
+    canRetry: boolean;
+    promptModeLabel: string;
+    modeSwitchLabel: string;
+    isEditMode: boolean;
+  }>(),
+  {
+    liveTranscript: "",
+  },
+);
 
 defineEmits<{
   retry: [];
@@ -90,6 +97,20 @@ const hasErrorMessage = computed(
 const isExpandedMode = computed(
   () => hasErrorMessage.value || visualMode.value === "learned",
 );
+
+/** 轉寫流程中且有中間文本時，在留海下方顯示一行即時字幕 */
+const showLiveTranscript = computed(() => {
+  const text = props.liveTranscript?.trim() ?? "";
+  if (!text) return false;
+  const mode = visualMode.value;
+  return (
+    mode === "morphing" ||
+    mode === "transcribing" ||
+    props.status === "transcribing" ||
+    props.status === "enhancing" ||
+    props.status === "editing"
+  );
+});
 
 const notchStyle = computed(() => {
   let params = NOTCH_SHAPE_OVERRIDES[visualMode.value] ?? DEFAULT_NOTCH_SHAPE;
@@ -469,6 +490,13 @@ onUnmounted(() => {
         <span class="error-message">{{ props.message }}</span>
       </div>
     </div>
+
+    <!-- 留海下方：即時轉寫字幕（單行、居中、左側省略、高光閃過） -->
+    <div v-if="showLiveTranscript" class="live-transcript-row">
+      <span class="live-transcript-text">
+        <bdi class="live-transcript-bdi">{{ props.liveTranscript }}</bdi>
+      </span>
+    </div>
   </div>
 </template>
 
@@ -479,7 +507,8 @@ onUnmounted(() => {
   left: 0;
   width: 100%;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
   filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
   animation: notchEnter 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
@@ -857,5 +886,80 @@ onUnmounted(() => {
 .notch-collapsing .learned-terms-row {
   opacity: 0;
   transition: opacity 0.15s ease;
+}
+
+/* ---- Live transcript（留海下方一行字幕） ---- */
+.live-transcript-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: min(420px, calc(100% - 32px));
+  margin-top: 6px;
+  padding: 4px 16px;
+  box-sizing: border-box;
+  overflow: hidden;
+  animation: liveTranscriptFadeIn 0.25s ease-out both;
+  /* 不受 notch drop-shadow 影響可讀性：用自身 text-shadow */
+  filter: none;
+}
+
+.live-transcript-text {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  /* 左側省略：overflow 時保留尾部（最新）文字 */
+  direction: rtl;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.35;
+}
+
+/* bdi 保持字元邏輯順序，避免 rtl 容器把中英混排弄反 */
+.live-transcript-bdi {
+  direction: ltr;
+  unicode-bidi: embed;
+  /* 高光閃過（參考 wxa-agent-plaza speech-overlay think-shine） */
+  background-image: linear-gradient(
+    100deg,
+    rgba(230, 242, 255, 0.88) 0%,
+    rgba(230, 242, 255, 0.88) 28%,
+    rgba(120, 220, 255, 1) 42%,
+    rgba(255, 255, 255, 1) 50%,
+    rgba(120, 220, 255, 1) 58%,
+    rgba(230, 242, 255, 0.88) 72%,
+    rgba(230, 242, 255, 0.88) 100%
+  );
+  background-size: 240% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  /* 桌面任意底色上的可讀性 */
+  filter: drop-shadow(0 0 8px rgba(120, 220, 255, 0.45))
+    drop-shadow(0 1px 3px rgba(0, 0, 0, 0.55));
+  animation: liveTranscriptShine 2.4s linear infinite;
+}
+
+@keyframes liveTranscriptShine {
+  0% {
+    background-position: 140% 0;
+  }
+  100% {
+    background-position: -140% 0;
+  }
+}
+
+@keyframes liveTranscriptFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>

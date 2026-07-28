@@ -59,7 +59,8 @@ describe("useSettingsStore", () => {
     it("[P0] 應從 store 載入已儲存的 hotkey config", async () => {
       mockStoreData.set("hotkeyTriggerKey", "option");
       mockStoreData.set("hotkeyTriggerMode", "toggle");
-      mockStoreData.set("groqApiKey", "gsk_test123");
+      mockStoreData.set("doubaoAppId", "app123");
+      mockStoreData.set("doubaoAccessKey", "ak_test123");
 
       const { useSettingsStore } = await import(
         "../../src/stores/useSettingsStore"
@@ -216,29 +217,30 @@ describe("useSettingsStore", () => {
   });
 
   // ==========================================================================
-  // saveApiKey
+  // saveDoubaoCredentials
   // ==========================================================================
 
-  describe("saveApiKey", () => {
-    it("[P0] 應儲存 trimmed API key", async () => {
+  describe("saveDoubaoCredentials", () => {
+    it("[P0] 應儲存 trimmed App ID / Access Key", async () => {
       const { useSettingsStore } = await import(
         "../../src/stores/useSettingsStore"
       );
       const store = useSettingsStore();
 
-      await store.saveApiKey("  gsk_abc123  ");
+      await store.saveDoubaoCredentials("  app123  ", "  ak_abc123  ");
 
-      expect(mockStoreSet).toHaveBeenCalledWith("groqApiKey", "gsk_abc123");
+      expect(mockStoreSet).toHaveBeenCalledWith("doubaoAppId", "app123");
+      expect(mockStoreSet).toHaveBeenCalledWith("doubaoAccessKey", "ak_abc123");
       expect(store.hasApiKey).toBe(true);
     });
 
-    it("[P0] 空白 API key 應拋出錯誤", async () => {
+    it("[P0] 空白憑據應拋出錯誤", async () => {
       const { useSettingsStore } = await import(
         "../../src/stores/useSettingsStore"
       );
       const store = useSettingsStore();
 
-      await expect(store.saveApiKey("   ")).rejects.toThrow(
+      await expect(store.saveDoubaoCredentials("   ", "ak")).rejects.toThrow(
         "API Key 不可為空白",
       );
     });
@@ -249,18 +251,19 @@ describe("useSettingsStore", () => {
   // ==========================================================================
 
   describe("deleteApiKey", () => {
-    it("[P0] 應從 store 刪除 API key 並清空狀態", async () => {
+    it("[P0] 應從 store 刪除 Doubao 憑據並清空狀態", async () => {
       const { useSettingsStore } = await import(
         "../../src/stores/useSettingsStore"
       );
       const store = useSettingsStore();
 
-      await store.saveApiKey("gsk_test");
+      await store.saveDoubaoCredentials("app", "ak_test");
       expect(store.hasApiKey).toBe(true);
 
       await store.deleteApiKey();
 
-      expect(mockStoreDelete).toHaveBeenCalledWith("groqApiKey");
+      expect(mockStoreDelete).toHaveBeenCalledWith("doubaoAppId");
+      expect(mockStoreDelete).toHaveBeenCalledWith("doubaoAccessKey");
       expect(mockStoreSave).toHaveBeenCalled();
       expect(store.hasApiKey).toBe(false);
     });
@@ -495,13 +498,15 @@ describe("useSettingsStore", () => {
       mockStoreData.set("hotkeyTriggerMode", "toggle");
       mockStoreData.set("customTriggerKey", { custom: { keycode: 321 } });
       mockStoreData.set("customTriggerKeyDomCode", "F13");
-      mockStoreData.set("groqApiKey", "  gsk_sync  ");
+      mockStoreData.set("doubaoAppId", "app_sync");
+      mockStoreData.set("doubaoAccessKey", "  ak_sync  ");
+      mockStoreData.set("llmApiKey", "sk_sync");
+      mockStoreData.set("llmBaseUrl", "https://example.com/v1");
       mockStoreData.set("aiPrompt", "  同步後 prompt  ");
       mockStoreData.set("promptMode", "custom");
       mockStoreData.set("enhancementThresholdEnabled", true);
       mockStoreData.set("enhancementThresholdCharCount", 42);
-      mockStoreData.set("llmModelId", "openai/gpt-oss-120b");
-      mockStoreData.set("whisperModelId", "whisper-large-v3-turbo");
+      mockStoreData.set("llmModelId", "gpt-4o-mini");
       mockStoreData.set("muteOnRecording", false);
 
       const { useSettingsStore } = await import(
@@ -517,12 +522,13 @@ describe("useSettingsStore", () => {
       });
       expect(store.customTriggerKey).toEqual({ custom: { keycode: 321 } });
       expect(store.customTriggerKeyDomCode).toBe("F13");
-      expect(store.getApiKey()).toBe("gsk_sync");
+      expect(store.getDoubaoAccessKey()).toBe("ak_sync");
+      expect(store.getLlmApiKey()).toBe("sk_sync");
       expect(store.getAiPrompt()).toBe("同步後 prompt");
       expect(store.isEnhancementThresholdEnabled).toBe(true);
       expect(store.enhancementThresholdCharCount).toBe(42);
-      expect(store.selectedLlmModelId).toBe("openai/gpt-oss-120b");
-      expect(store.selectedWhisperModelId).toBe("whisper-large-v3-turbo");
+      expect(store.selectedLlmModelId).toBe("gpt-4o-mini");
+      expect(store.selectedWhisperModelId).toBe("doubao-seedasr");
       expect(store.isMuteOnRecordingEnabled).toBe(false);
     });
   });

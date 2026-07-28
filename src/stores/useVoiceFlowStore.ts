@@ -41,6 +41,7 @@ import {
   CORRECTION_MONITOR_RESULT,
   VOCABULARY_LEARNED,
   ESCAPE_PRESSED,
+  TRANSCRIPTION_PARTIAL,
   emitEvent,
   listenToEvent,
 } from "../composables/useTauriEvents";
@@ -51,6 +52,7 @@ import {
   type QualityMonitorResultPayload,
   type CorrectionMonitorResultPayload,
   type VocabularyLearnedPayload,
+  type TranscriptionPartialPayload,
 } from "../types/events";
 import {
   detectHallucination,
@@ -107,6 +109,8 @@ const MONITOR_POLL_INTERVAL_MS = 250;
 export const useVoiceFlowStore = defineStore("voice-flow", () => {
   const status = ref<HudStatus>("idle");
   const message = ref("");
+  /** ASR 串流中間文本（HUD 留海下方即時字幕） */
+  const liveTranscript = ref("");
   const isRecording = ref<boolean>(false);
   const recordingElapsedSeconds = ref<number>(0);
   let elapsedTimer: ReturnType<typeof setInterval> | null = null;
@@ -363,11 +367,39 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     };
   }
 
+  function clearLiveTranscript() {
+    liveTranscript.value = "";
+  }
+
+  function setLiveTranscript(text: string) {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    // 轉寫 / 重送期間才更新，避免過期 partial 污染其他狀態
+    if (
+      status.value !== "transcribing" &&
+      status.value !== "enhancing" &&
+      status.value !== "editing"
+    ) {
+      return;
+    }
+    liveTranscript.value = trimmed;
+  }
+
   function transitionTo(nextStatus: HudStatus, nextMessage = "") {
     clearAutoHideTimer();
     clearCollapseHideTimer();
     status.value = nextStatus;
     message.value = nextMessage;
+    // 進入錄音或結束流程時清空字幕；轉寫 / 潤飾 / 編輯期間保留
+    if (
+      nextStatus === "recording" ||
+      nextStatus === "idle" ||
+      nextStatus === "error" ||
+      nextStatus === "cancelled" ||
+      nextStatus === "success"
+    ) {
+      clearLiveTranscript();
+    }
     emitVoiceFlowStateChanged(nextStatus, nextMessage);
 
     if (nextStatus === "idle") {
@@ -663,6 +695,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
                     apiKey,
                     {
                       modelId: settingsStore.selectedLlmModelId,
+                      baseUrl: settingsStore.getLlmBaseUrl(),
                     },
                   );
 
@@ -854,7 +887,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       id: crypto.randomUUID(),
       transcriptionId: record.id,
       apiType: "whisper",
-      model: settingsStore.selectedWhisperModelId,
+      model: "doubao-seedasr",
       promptTokens: null,
       completionTokens: null,
       totalTokens: null,
@@ -1213,17 +1246,19 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
 
       transitionTo("transcribing", t("voiceFlow.transcribing"));
       const settingsStore = useSettingsStore();
-      let apiKey = settingsStore.getApiKey();
+      let appId = settingsStore.getDoubaoAppId();
+      let accessKey = settingsStore.getDoubaoAccessKey();
 
-      if (!apiKey) {
+      if (!appId || !accessKey) {
         await settingsStore.refreshApiKey();
-        apiKey = settingsStore.getApiKey();
+        appId = settingsStore.getDoubaoAppId();
+        accessKey = settingsStore.getDoubaoAccessKey();
       }
 
-      if (!apiKey) {
+      if (!appId || !accessKey) {
         failRecordingFlow(
           t("errors.apiKeyMissing"),
-          "useVoiceFlowStore: missing API key while transcribing",
+          "useVoiceFlowStore: missing Doubao ASR credentials while transcribing",
         );
         return;
       }
@@ -1233,15 +1268,17 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       const hasVocabulary = whisperTermList.length > 0;
 
       const result = await invoke<TranscriptionResult>("transcribe_audio", {
-        apiKey,
+        appId,
+        accessKey,
         vocabularyTermList: hasVocabulary ? whisperTermList : null,
-        modelId: settingsStore.selectedWhisperModelId,
         language: settingsStore.getWhisperLanguageCode(),
       });
       if (isAborted.value) return;
 
       // #39：轉譯語言為繁中時，把 Whisper 的簡體輸出轉成繁體（落地前一次到位）
       result.rawText = applyTranscriptTextTransforms(result.rawText);
+      // 最終結果寫入字幕（partial 可能略短；繁簡轉換後再刷一次）
+      setLiveTranscript(result.rawText);
 
       writeInfoLog(`轉錄原文: "${result.rawText}"`);
 
@@ -1364,6 +1401,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
             vocabularyTermList:
               enhancementTermList.length > 0 ? enhancementTermList : undefined,
             modelId: settingsStore.selectedLlmModelId,
+            baseUrl: settingsStore.getLlmBaseUrl(),
             signal: abortController?.signal,
           };
 
@@ -1564,6 +1602,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       const editResult = await enhanceText(params.selectedText, llmApiKey, {
         systemPrompt,
         modelId: settingsStore.selectedLlmModelId,
+        baseUrl: settingsStore.getLlmBaseUrl(),
         signal: abortController?.signal,
         maxTokens: EDIT_MODE_MAX_TOKENS,
       });
@@ -1632,14 +1671,16 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
 
     try {
       const settingsStore = useSettingsStore();
-      let apiKey = settingsStore.getApiKey();
+      let appId = settingsStore.getDoubaoAppId();
+      let accessKey = settingsStore.getDoubaoAccessKey();
 
-      if (!apiKey) {
+      if (!appId || !accessKey) {
         await settingsStore.refreshApiKey();
-        apiKey = settingsStore.getApiKey();
+        appId = settingsStore.getDoubaoAppId();
+        accessKey = settingsStore.getDoubaoAccessKey();
       }
 
-      if (!apiKey) {
+      if (!appId || !accessKey) {
         transitionTo("error", t("errors.apiKeyMissing"));
         playSoundIfEnabled("play_error_sound");
         lastFailedAudioFilePath.value = null;
@@ -1655,9 +1696,9 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         "retranscribe_from_file",
         {
           filePath,
-          apiKey,
+          appId,
+          accessKey,
           vocabularyTermList: hasVocabulary ? whisperTermList : null,
-          modelId: settingsStore.selectedWhisperModelId,
           language: settingsStore.getWhisperLanguageCode(),
         },
       );
@@ -1665,6 +1706,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
 
       // #39：同主路徑，重送轉錄後也套用簡→繁
       result.rawText = applyTranscriptTextTransforms(result.rawText);
+      setLiveTranscript(result.rawText);
 
       writeInfoLog(`重送轉錄原文: "${result.rawText}"`);
 
@@ -1719,6 +1761,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
             vocabularyTermList:
               enhancementTermList.length > 0 ? enhancementTermList : undefined,
             modelId: settingsStore.selectedLlmModelId,
+            baseUrl: settingsStore.getLlmBaseUrl(),
             signal: abortController?.signal,
           });
           if (isAborted.value) return;
@@ -1945,6 +1988,12 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       listenToEvent(HOTKEY_MODE_TOGGLE, () => {
         handleDoubleTapModeToggle();
       }),
+      listenToEvent<TranscriptionPartialPayload>(
+        TRANSCRIPTION_PARTIAL,
+        (event) => {
+          setLiveTranscript(event.payload.text);
+        },
+      ),
       listenToEvent<HotkeyErrorPayload>(HOTKEY_ERROR, (event) => {
         const hudMessage = getHotkeyErrorMessage(event.payload.error);
         if (
@@ -1994,6 +2043,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
   return {
     status,
     message,
+    liveTranscript,
     recordingElapsedSeconds,
     lastWasModified,
     canRetry,

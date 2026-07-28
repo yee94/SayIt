@@ -1,12 +1,12 @@
 import { fetch } from "@tauri-apps/plugin-http";
 import type { ChatUsageData, EnhanceResult } from "../types/transcription";
-import { DEFAULT_LLM_MODEL_ID } from "./modelRegistry";
 import {
+  DEFAULT_LLM_MODEL_ID,
+  DEFAULT_LLM_BASE_URL,
+  DEFAULT_LLM_TIMEOUT_MS,
+  DEFAULT_LLM_MAX_TOKENS,
   buildFetchParams,
   parseProviderResponse,
-  getProviderIdForModel,
-  getProviderTimeout,
-  getDefaultMaxTokens,
   type LlmChatRequest,
 } from "./llmProvider";
 import { getMinimalPromptForLocale } from "../i18n/prompts";
@@ -34,6 +34,7 @@ export interface EnhanceOptions {
   systemPrompt?: string;
   vocabularyTermList?: string[];
   modelId?: string;
+  baseUrl?: string;
   signal?: AbortSignal;
   maxTokens?: number;
 }
@@ -93,7 +94,7 @@ export function buildSystemPrompt(
 }
 
 /**
- * 移除 reasoning model（如 Qwen3）回應中的 <think>...</think> 區塊，
+ * 移除 reasoning model 回應中的 <think>...</think> 區塊，
  * 只保留最終輸出內容。
  */
 export function stripReasoningTags(text: string): string {
@@ -110,7 +111,7 @@ export async function enhanceText(
   }
 
   const modelId = options?.modelId ?? DEFAULT_LLM_MODEL_ID;
-  const providerId = getProviderIdForModel(modelId);
+  const baseUrl = options?.baseUrl ?? DEFAULT_LLM_BASE_URL;
 
   const basePrompt = options?.systemPrompt || getDefaultSystemPrompt();
   const fullPrompt = buildSystemPrompt(basePrompt, options?.vocabularyTermList);
@@ -122,17 +123,17 @@ export async function enhanceText(
       { role: "user", content: rawText },
     ],
     temperature: 0.1,
-    maxTokens: options?.maxTokens ?? getDefaultMaxTokens(providerId),
+    maxTokens: options?.maxTokens ?? DEFAULT_LLM_MAX_TOKENS,
   };
 
-  const { url, init } = buildFetchParams(providerId, request, apiKey);
+  const { url, init } = buildFetchParams(request, apiKey, baseUrl);
 
   const response = await withTimeout(
     fetch(url, {
       ...init,
       signal: options?.signal,
     }),
-    getProviderTimeout(providerId),
+    DEFAULT_LLM_TIMEOUT_MS,
     options?.signal,
   );
 
@@ -147,7 +148,7 @@ export async function enhanceText(
   }
 
   const json = await response.json();
-  const result = parseProviderResponse(providerId, json);
+  const result = parseProviderResponse(json);
 
   const usage: ChatUsageData | null = result.usage
     ? {
@@ -160,10 +161,10 @@ export async function enhanceText(
       }
     : null;
 
-  if (!result.text) {
-    return { text: rawText, usage };
-  }
-
   const enhancedContent = stripReasoningTags(result.text);
-  return { text: enhancedContent || rawText, usage };
+  // 空回應時 fallback 原文，避免把空白貼進輸入框
+  return {
+    text: enhancedContent || rawText,
+    usage,
+  };
 }

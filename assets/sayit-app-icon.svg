@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1024 1024">
+  <defs>
+    <clipPath id="app-icon-shape">
+      <rect x="102" y="102" width="820" height="820" rx="184" />
+    </clipPath>
+  </defs>
+  <image
+    x="102"
+    y="102"
+    width="820"
+    height="820"
+    href="sayit-logo-macos26-v1.png"
+    xlink:href="sayit-logo-macos26-v1.png"
+    preserveAspectRatio="xMidYMid slice"
+    clip-path="url(#app-icon-shape)"
+  />
+</svg>

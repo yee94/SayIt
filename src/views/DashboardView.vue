@@ -43,15 +43,10 @@ const historyStore = useHistoryStore();
 const settingsStore = useSettingsStore();
 const router = useRouter();
 
-// 付費偵測依 LLM provider id：openai / anthropic 為計費方案（無免費額度）；
-// groq / gemini 提供免費額度。Whisper 目前僅 Groq，一律視為免費額度。
-const isPaidWhisperProvider = computed(() => false);
+// Doubao ASR / 自訂 LLM 皆無內建免費額度表，Dashboard 改顯示今日實際用量。
+const isPaidWhisperProvider = computed(() => true);
 
-const isPaidLlmProvider = computed(() => {
-  const providerId = settingsStore.selectedLlmProviderId;
-  // groq / gemini 提供免費額度；openai / anthropic 為計費方案
-  return providerId !== "groq" && providerId !== "gemini";
-});
+const isPaidLlmProvider = computed(() => true);
 
 const hasAnyPaidProvider = computed(
   () => isPaidWhisperProvider.value || isPaidLlmProvider.value,
@@ -182,9 +177,9 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="p-6">
+  <div class="app-page">
     <!-- 統計卡片 -->
-    <div class="mt-6 grid grid-cols-3 gap-4">
+    <div class="grid grid-cols-3 gap-3">
       <Card>
         <CardHeader class="pb-2">
           <CardDescription>{{ $t("dashboard.totalRecordingTime") }}</CardDescription>
@@ -349,7 +344,7 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- 每日使用趨勢圖表 -->
-    <Card class="mt-6">
+    <Card class="mt-4">
       <CardHeader>
         <CardTitle class="text-base">{{ $t("dashboard.usageTrend") }}</CardTitle>
         <CardDescription>{{ $t("dashboard.lastNDays", { days: historyStore.usageTrendDays }) }}</CardDescription>
@@ -360,7 +355,7 @@ onBeforeUnmount(() => {
     </Card>
 
     <!-- 最近轉錄 -->
-    <Card class="mt-6">
+    <Card class="mt-4">
       <CardHeader class="flex-row items-center justify-between">
         <CardTitle class="text-base">{{ $t("dashboard.recentTranscriptions") }}</CardTitle>
         <Button
@@ -409,4 +404,3 @@ onBeforeUnmount(() => {
     </Card>
   </div>
 </template>
-

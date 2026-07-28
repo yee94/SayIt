@@ -81,13 +81,16 @@ const {
     mockWebviewWindowGetByLabel,
     mockLoadSettings: vi.fn().mockResolvedValue(undefined),
     mockSettingsState: {
-      apiKey: "test-api-key-123",
+      doubaoAppId: "test-app-id",
+      doubaoAccessKey: "test-access-key",
+      llmApiKey: "test-llm-key-123",
+      llmBaseUrl: "https://api.openai.com/v1/chat/completions",
       aiPrompt: "自訂 prompt 內容",
       triggerMode: "hold" as string,
       isEnhancementThresholdEnabled: true,
       enhancementThresholdCharCount: 10,
-      selectedLlmModelId: "llama-3.3-70b-versatile",
-      selectedWhisperModelId: "whisper-large-v3",
+      selectedLlmModelId: "gpt-4o-mini",
+      selectedWhisperModelId: "doubao-seedasr",
       isMuteOnRecordingEnabled: false,
       isSoundEffectsEnabled: true,
       isSmartDictionaryEnabled: false,
@@ -175,8 +178,11 @@ vi.mock("../../src/lib/sentry", () => ({
 vi.mock("../../src/stores/useSettingsStore", () => ({
   useSettingsStore: () => ({
     loadSettings: mockLoadSettings,
-    getApiKey: () => mockSettingsState.apiKey,
-    getLlmApiKey: () => mockSettingsState.apiKey,
+    getApiKey: () => mockSettingsState.doubaoAccessKey,
+    getDoubaoAppId: () => mockSettingsState.doubaoAppId,
+    getDoubaoAccessKey: () => mockSettingsState.doubaoAccessKey,
+    getLlmApiKey: () => mockSettingsState.llmApiKey,
+    getLlmBaseUrl: () => mockSettingsState.llmBaseUrl,
     getAiPrompt: () => mockSettingsState.aiPrompt,
     refreshApiKey: vi.fn().mockResolvedValue(undefined),
     refreshLlmApiKey: vi.fn().mockResolvedValue(undefined),
@@ -320,13 +326,17 @@ describe("useVoiceFlowStore", () => {
       .mockClear()
       .mockResolvedValue({ text: "AI 整理後的書面語文字", usage: null });
     mockLoadSettings.mockClear().mockResolvedValue(undefined);
-    mockSettingsState.apiKey = "test-api-key-123";
+    mockSettingsState.doubaoAppId = "test-app-id";
+    mockSettingsState.doubaoAccessKey = "test-access-key";
+    mockSettingsState.llmApiKey = "test-llm-key-123";
+    mockSettingsState.llmBaseUrl =
+      "https://api.openai.com/v1/chat/completions";
     mockSettingsState.aiPrompt = "自訂 prompt 內容";
     mockSettingsState.triggerMode = "hold";
     mockSettingsState.isEnhancementThresholdEnabled = true;
     mockSettingsState.enhancementThresholdCharCount = 10;
-    mockSettingsState.selectedLlmModelId = "llama-3.3-70b-versatile";
-    mockSettingsState.selectedWhisperModelId = "whisper-large-v3";
+    mockSettingsState.selectedLlmModelId = "gpt-4o-mini";
+    mockSettingsState.selectedWhisperModelId = "doubao-seedasr";
     mockSettingsState.isMuteOnRecordingEnabled = false;
     mockSettingsState.isSoundEffectsEnabled = true;
     mockSettingsState.isSmartDictionaryEnabled = false;
@@ -446,9 +456,9 @@ describe("useVoiceFlowStore", () => {
 
     expect(mockInvoke).toHaveBeenCalledWith("stop_recording");
     expect(mockInvoke).toHaveBeenCalledWith("transcribe_audio", {
-      apiKey: "test-api-key-123",
+      appId: "test-app-id",
+      accessKey: "test-access-key",
       vocabularyTermList: null,
-      modelId: "whisper-large-v3",
       language: "zh",
     });
     expect(store.status).toBe("success");
@@ -579,7 +589,8 @@ describe("useVoiceFlowStore", () => {
       });
     });
 
-    mockSettingsState.apiKey = "";
+    mockSettingsState.doubaoAppId = "";
+    mockSettingsState.doubaoAccessKey = "";
     triggerHotkeyEvent("hotkey:released");
 
     await vi.waitFor(() => {
@@ -952,7 +963,7 @@ describe("useVoiceFlowStore", () => {
 
       expect(mockEnhanceText).toHaveBeenCalledWith(
         longText,
-        "test-api-key-123",
+        "test-llm-key-123",
         expect.objectContaining({
           systemPrompt: "自訂 prompt 內容",
         }),
@@ -1230,7 +1241,7 @@ describe("useVoiceFlowStore", () => {
 
       expect(mockEnhanceText).toHaveBeenCalledWith(
         longText,
-        "test-api-key-123",
+        "test-llm-key-123",
         expect.objectContaining({
           systemPrompt: "自訂 prompt 內容",
         }),
@@ -1291,7 +1302,7 @@ describe("useVoiceFlowStore", () => {
 
       expect(mockEnhanceText).toHaveBeenCalledWith(
         longText,
-        "test-api-key-123",
+        "test-llm-key-123",
         expect.objectContaining({
           vocabularyTermList: ["TypeScript", "Vue.js"],
         }),
@@ -1333,7 +1344,7 @@ describe("useVoiceFlowStore", () => {
 
       expect(mockEnhanceText).toHaveBeenCalledWith(
         longText,
-        "test-api-key-123",
+        "test-llm-key-123",
         expect.objectContaining({
           vocabularyTermList: undefined,
         }),
@@ -1387,9 +1398,9 @@ describe("useVoiceFlowStore", () => {
       });
 
       expect(mockInvoke).toHaveBeenCalledWith("transcribe_audio", {
-        apiKey: "test-api-key-123",
+        appId: "test-app-id",
+        accessKey: "test-access-key",
         vocabularyTermList: ["TypeScript", "Tauri"],
-        modelId: "whisper-large-v3",
         language: "zh",
       });
     });
@@ -1416,9 +1427,9 @@ describe("useVoiceFlowStore", () => {
       });
 
       expect(mockInvoke).toHaveBeenCalledWith("transcribe_audio", {
-        apiKey: "test-api-key-123",
+        appId: "test-app-id",
+        accessKey: "test-access-key",
         vocabularyTermList: null,
-        modelId: "whisper-large-v3",
         language: "zh",
       });
     });
@@ -1477,19 +1488,20 @@ describe("useVoiceFlowStore", () => {
 
       // transcriber 收到詞彙
       expect(mockInvoke).toHaveBeenCalledWith("transcribe_audio", {
-        apiKey: "test-api-key-123",
+        appId: "test-app-id",
+        accessKey: "test-access-key",
         vocabularyTermList: ["Pinia", "Vitest"],
-        modelId: "whisper-large-v3",
         language: "zh",
       });
 
       // enhancer 也收到詞彙
       expect(mockEnhanceText).toHaveBeenCalledWith(
         longText,
-        "test-api-key-123",
+        "test-llm-key-123",
         expect.objectContaining({
           vocabularyTermList: ["Pinia", "Vitest"],
-          modelId: "llama-3.3-70b-versatile",
+          modelId: "gpt-4o-mini",
+          baseUrl: "https://api.openai.com/v1/chat/completions",
         }),
       );
     });
@@ -1959,9 +1971,9 @@ describe("useVoiceFlowStore", () => {
 
       const whisperRecord = mockAddApiUsage.mock.calls[0][0];
       expect(whisperRecord.apiType).toBe("whisper");
-      expect(whisperRecord.model).toBe("whisper-large-v3");
+      expect(whisperRecord.model).toBe("doubao-seedasr");
       expect(whisperRecord.audioDurationMs).toBeGreaterThanOrEqual(0);
-      expect(whisperRecord.estimatedCostCeiling).toBe(0.000308);
+      expect(whisperRecord.estimatedCostCeiling).toBe(0.000308); // mocked
     });
 
     it("[P0] AI 整理成功應呼叫 addApiUsage 兩次（Whisper + Chat）", async () => {
@@ -2014,7 +2026,7 @@ describe("useVoiceFlowStore", () => {
 
       const chatRecord = mockAddApiUsage.mock.calls[1][0];
       expect(chatRecord.apiType).toBe("chat");
-      expect(chatRecord.model).toBe("llama-3.3-70b-versatile");
+      expect(chatRecord.model).toBe("gpt-4o-mini");
       expect(chatRecord.promptTokens).toBe(100);
       expect(chatRecord.completionTokens).toBe(50);
       expect(chatRecord.totalTokens).toBe(150);
@@ -2126,7 +2138,8 @@ describe("useVoiceFlowStore", () => {
         "retranscribe_from_file",
         expect.objectContaining({
           filePath: "/mock/recordings/test.wav",
-          apiKey: "test-api-key-123",
+          appId: "test-app-id",
+          accessKey: "test-access-key",
         }),
       );
 

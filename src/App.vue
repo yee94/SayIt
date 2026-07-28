@@ -111,6 +111,7 @@ onUnmounted(() => {
     <NotchHud
       :status="voiceFlowStore.status"
       :message="voiceFlowStore.message"
+      :live-transcript="voiceFlowStore.liveTranscript"
       :recording-elapsed-seconds="voiceFlowStore.recordingElapsedSeconds"
       :can-retry="voiceFlowStore.canRetry"
       :prompt-mode-label="promptModeLabel"

@@ -5,14 +5,6 @@
     "cancel": "Cancel"
   },
   "settings": {
-    "about": {
-      "title": "About SayIt",
-      "description": "Hold to speak, release to paste. SayIt is an open-source desktop speech-to-text tool, licensed under MIT.",
-      "author": "Author:",
-      "website": "Website",
-      "sourceCode": "View Source Code",
-      "reportIssue": "Report an Issue"
-    },
     "hotkey": {
       "title": "Hotkey Settings",
       "triggerKeyMode": "Trigger Key Mode",
@@ -48,27 +40,30 @@
       }
     },
     "apiKey": {
-      "title": "Groq API Key (Speech-to-Text + Groq LLM)",
+      "title": "Doubao ASR Credentials",
       "set": "Set",
-      "notSet": "Not Set",
-      "goToConsole": "Go to Groq Console",
-      "instruction": "This Key is used for speech transcription (Whisper). If Groq is selected as LLM Provider, it's also used for text enhancement.",
-      "onboarding": "Welcome to SayIt! Please set up your Groq API Key to enable voice input.",
+      "notSet": "Not set",
+      "goToConsole": "Open Volcengine Console",
+      "instruction": "Used for speech transcription (Doubao SeedASR streaming). Provide App ID and Access Key.",
+      "onboarding": "Welcome to SayIt! Set Doubao ASR credentials to enable voice input.",
       "show": "Show",
       "hide": "Hide",
-      "saved": "API Key saved",
-      "deleted": "API Key deleted",
-      "confirmDelete": "Confirm deletion?",
-      "delete": "Delete API Key"
+      "saved": "Credentials saved",
+      "deleted": "Credentials deleted",
+      "confirmDelete": "Confirm delete?",
+      "delete": "Delete credentials"
     },
     "provider": {
-      "title": "LLM Provider",
-      "description": "Select the AI service for text enhancement and dictionary analysis. Groq and Gemini offer free quota, OpenAI and Anthropic are paid services.",
-      "groq": "Groq (Free)",
-      "openai": "OpenAI (Recommended)",
+      "title": "LLM Service (OpenAI-compatible)",
+      "description": "Custom LLM endpoint for text enhancement and vocabulary analysis. Provide Base URL and API Key.",
+      "groq": "Groq",
+      "openai": "OpenAI",
       "anthropic": "Anthropic",
-      "gemini": "Google Gemini (Free Quota)",
-      "groqNote": "Uses Groq API Key above"
+      "gemini": "Gemini",
+      "groqNote": "",
+      "baseUrl": "Base URL",
+      "baseUrlHint": "Full chat/completions URL, or base ending at /v1",
+      "apiKey": "API Key"
     },
     "providerApiKey": {
       "openaiTitle": "OpenAI API Key",
@@ -87,12 +82,12 @@
       "success": "Connected ({ms}ms)"
     },
     "model": {
-      "title": "Model Selection",
-      "description": "Choose the AI models for speech transcription and text enhancement. Faster models respond quicker, while larger models offer better quality.",
-      "whisperLabel": "Speech Transcription Model (Whisper)",
-      "llmLabel": "Text Enhancement Model (LLM)",
-      "whisperUpdated": "Speech transcription model updated",
-      "llmUpdated": "Text enhancement model updated",
+      "title": "LLM Settings",
+      "description": "Configure the OpenAI-compatible endpoint and model for text enhancement. Speech uses Doubao SeedASR.",
+      "whisperLabel": "Speech (Doubao SeedASR)",
+      "llmLabel": "Model ID",
+      "whisperUpdated": "Speech model updated",
+      "llmUpdated": "Model updated",
       "default": "Default",
       "costPerHour": "${cost}/hour"
     },

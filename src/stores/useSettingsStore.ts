@@ -49,16 +49,15 @@ import { emitEvent, SETTINGS_UPDATED } from "../composables/useTauriEvents";
 import type { SettingsUpdatedPayload } from "../types/events";
 import {
   DEFAULT_LLM_MODEL_ID,
-  DEFAULT_LLM_PROVIDER_ID,
   DEFAULT_WHISPER_MODEL_ID,
   getEffectiveLlmModelId,
   getEffectiveWhisperModelId,
-  getDefaultModelIdForProvider,
-  findLlmModelConfig,
   type LlmModelId,
   type LlmProviderId,
   type WhisperModelId,
+  DOUBAO_ASR_MODEL_ID,
 } from "../lib/modelRegistry";
+import { DEFAULT_LLM_BASE_URL } from "../lib/llmProvider";
 
 declare const __APP_VERSION__: string;
 
@@ -98,8 +97,21 @@ export const useSettingsStore = defineStore("settings", () => {
   const triggerMode = computed<TriggerMode>(
     () => hotkeyConfig.value?.triggerMode ?? "hold",
   );
-  const apiKey = ref<string>("");
-  const hasApiKey = computed(() => apiKey.value !== "");
+  // Doubao ASR credentials
+  const doubaoAppId = ref<string>("");
+  const doubaoAccessKey = ref<string>("");
+  const hasApiKey = computed(
+    () => doubaoAppId.value !== "" && doubaoAccessKey.value !== "",
+  );
+
+  // Custom OpenAI-compatible LLM
+  const llmBaseUrl = ref<string>(DEFAULT_LLM_BASE_URL);
+  const llmApiKey = ref<string>("");
+  const selectedLlmModelId = ref<LlmModelId>(DEFAULT_LLM_MODEL_ID);
+  const selectedLlmProviderId = ref<LlmProviderId>("custom");
+  const selectedWhisperModelId = ref<WhisperModelId>(DEFAULT_WHISPER_MODEL_ID);
+  const hasLlmApiKey = computed(() => llmApiKey.value !== "");
+
   const aiPrompt = ref<string>(getDefaultSystemPrompt());
   const promptMode = ref<PromptMode>(DEFAULT_PROMPT_MODE);
   const showPromptUpgradeNotice = ref(false);
@@ -110,28 +122,6 @@ export const useSettingsStore = defineStore("settings", () => {
   const enhancementThresholdCharCount = ref(
     DEFAULT_ENHANCEMENT_THRESHOLD_CHAR_COUNT,
   );
-  const selectedLlmProviderId = ref<LlmProviderId>(DEFAULT_LLM_PROVIDER_ID);
-  const selectedLlmModelId = ref<LlmModelId>(DEFAULT_LLM_MODEL_ID);
-  const selectedWhisperModelId = ref<WhisperModelId>(DEFAULT_WHISPER_MODEL_ID);
-  const openaiApiKey = ref<string>("");
-  const anthropicApiKey = ref<string>("");
-  const geminiApiKey = ref<string>("");
-  const hasLlmApiKey = computed(() => {
-    switch (selectedLlmProviderId.value) {
-      case "groq":
-        return apiKey.value !== "";
-      case "openai":
-        return openaiApiKey.value !== "";
-      case "anthropic":
-        return anthropicApiKey.value !== "";
-      case "gemini":
-        return geminiApiKey.value !== "";
-      default:
-        // exhaustiveness：若 LlmProviderId 新增成員，這行會 type error
-        selectedLlmProviderId.value satisfies never;
-        return false;
-    }
-  });
   const customTriggerKey = ref<CustomTriggerKey | ComboTriggerKey | null>(null);
   const isMuteOnRecordingEnabled = ref<boolean>(DEFAULT_MUTE_ON_RECORDING);
   const isSmartDictionaryEnabled = ref<boolean>(
@@ -161,21 +151,25 @@ export const useSettingsStore = defineStore("settings", () => {
       : selectedTranscriptionLocale.value;
   }
 
+  function getDoubaoAppId(): string {
+    return doubaoAppId.value;
+  }
+
+  function getDoubaoAccessKey(): string {
+    return doubaoAccessKey.value;
+  }
+
+  /** @deprecated ASR no longer uses a single apiKey; kept for UI compatibility */
   function getApiKey(): string {
-    return apiKey.value;
+    return doubaoAccessKey.value;
   }
 
   function getLlmApiKey(): string {
-    switch (selectedLlmProviderId.value) {
-      case "groq":
-        return apiKey.value;
-      case "openai":
-        return openaiApiKey.value;
-      case "anthropic":
-        return anthropicApiKey.value;
-      case "gemini":
-        return geminiApiKey.value;
-    }
+    return llmApiKey.value;
+  }
+
+  function getLlmBaseUrl(): string {
+    return llmBaseUrl.value || DEFAULT_LLM_BASE_URL;
   }
 
   async function syncHotkeyConfigToRust(key: TriggerKey, mode: TriggerMode) {
@@ -200,14 +194,23 @@ export const useSettingsStore = defineStore("settings", () => {
       const store = await load(STORE_NAME);
       const savedKey = await store.get<TriggerKey>("hotkeyTriggerKey");
       const savedMode = await store.get<TriggerMode>("hotkeyTriggerMode");
-      const savedApiKey = await store.get<string>("groqApiKey");
+      const savedDoubaoAppId = await store.get<string>("doubaoAppId");
+      const savedDoubaoAccessKey = await store.get<string>("doubaoAccessKey");
+      const savedLlmBaseUrl = await store.get<string>("llmBaseUrl");
+      const savedLlmApiKey =
+        (await store.get<string>("llmApiKey")) ??
+        (await store.get<string>("openaiApiKey")) ??
+        (await store.get<string>("groqApiKey"));
 
       // Backward-compatible key parsing: string → PresetTriggerKey, object → CustomTriggerKey
       const key = savedKey ?? getDefaultTriggerKey();
       const mode = savedMode ?? "hold";
 
       hotkeyConfig.value = { triggerKey: key, triggerMode: mode };
-      apiKey.value = savedApiKey?.trim() ?? "";
+      doubaoAppId.value = savedDoubaoAppId?.trim() ?? "";
+      doubaoAccessKey.value = savedDoubaoAccessKey?.trim() ?? "";
+      llmBaseUrl.value = savedLlmBaseUrl?.trim() || DEFAULT_LLM_BASE_URL;
+      llmApiKey.value = savedLlmApiKey?.trim() ?? "";
 
       // Load independently persisted custom/combo key
       const savedCustomKey =
@@ -290,55 +293,12 @@ export const useSettingsStore = defineStore("settings", () => {
       enhancementThresholdCharCount.value =
         savedThresholdCharCount ?? DEFAULT_ENHANCEMENT_THRESHOLD_CHAR_COUNT;
 
-      // LLM Provider
-      const savedLlmProviderId =
-        await store.get<LlmProviderId>("llmProviderId");
-      selectedLlmProviderId.value = savedLlmProviderId ?? DEFAULT_LLM_PROVIDER_ID;
-
-      // OpenAI / Anthropic API keys
-      const savedOpenaiApiKey = await store.get<string>("openaiApiKey");
-      openaiApiKey.value = savedOpenaiApiKey?.trim() ?? "";
-      const savedAnthropicApiKey = await store.get<string>("anthropicApiKey");
-      anthropicApiKey.value = savedAnthropicApiKey?.trim() ?? "";
-      const savedGeminiApiKey = await store.get<string>("geminiApiKey");
-      geminiApiKey.value = savedGeminiApiKey?.trim() ?? "";
-
-      // LLM Model ID（含 Kimi K2 遷移）
+      // LLM (custom OpenAI-compatible)
+      selectedLlmProviderId.value = "custom";
       const savedLlmModelId = await store.get<string>("llmModelId");
-      const llmMigratedFromKimiK2 = await store.get<boolean>(
-        "llmMigratedFromKimiK2",
-      );
-      if (
-        !llmMigratedFromKimiK2 &&
-        savedLlmModelId === "moonshotai/kimi-k2-instruct"
-      ) {
-        selectedLlmModelId.value = DEFAULT_LLM_MODEL_ID;
-        selectedLlmProviderId.value = "groq";
-        await store.set("llmModelId", DEFAULT_LLM_MODEL_ID);
-        await store.set("llmProviderId", "groq");
-        await store.set("llmMigratedFromKimiK2", true);
-        await store.save();
-      } else {
-        const effectiveLlmModelId = getEffectiveLlmModelId(
-          savedLlmModelId ?? null,
-        );
-        selectedLlmModelId.value = effectiveLlmModelId;
-      }
+      selectedLlmModelId.value = getEffectiveLlmModelId(savedLlmModelId ?? null);
 
-      // model-provider 交叉驗證：防止 key 洩漏到錯誤 provider
-      const modelConfig = findLlmModelConfig(selectedLlmModelId.value);
-      if (modelConfig && modelConfig.providerId !== selectedLlmProviderId.value) {
-        selectedLlmModelId.value = getDefaultModelIdForProvider(
-          selectedLlmProviderId.value,
-        );
-        await store.set("llmModelId", selectedLlmModelId.value);
-        await store.save();
-      }
-
-      const savedWhisperModelId = await store.get<string>("whisperModelId");
-      selectedWhisperModelId.value = getEffectiveWhisperModelId(
-        savedWhisperModelId ?? null,
-      );
+      selectedWhisperModelId.value = getEffectiveWhisperModelId(null);
 
       const savedMuteOnRecording = await store.get<boolean>("muteOnRecording");
       isMuteOnRecordingEnabled.value =
@@ -530,40 +490,49 @@ export const useSettingsStore = defineStore("settings", () => {
     return String(key);
   }
 
-  async function saveApiKey(key: string) {
-    const trimmedKey = key.trim();
-    if (trimmedKey === "") {
+  async function saveDoubaoCredentials(appId: string, accessKey: string) {
+    const trimmedAppId = appId.trim();
+    const trimmedAccessKey = accessKey.trim();
+    if (trimmedAppId === "" || trimmedAccessKey === "") {
       throw new Error(i18n.global.t("errors.apiKeyEmpty"));
     }
 
     try {
       const store = await load(STORE_NAME);
-      await store.set("groqApiKey", trimmedKey);
+      await store.set("doubaoAppId", trimmedAppId);
+      await store.set("doubaoAccessKey", trimmedAccessKey);
       await store.save();
-      apiKey.value = trimmedKey;
+      doubaoAppId.value = trimmedAppId;
+      doubaoAccessKey.value = trimmedAccessKey;
 
       const payload: SettingsUpdatedPayload = {
         key: "apiKey",
-        value: trimmedKey,
+        value: "set",
       };
       await emitEvent(SETTINGS_UPDATED, payload);
 
-      console.log("[useSettingsStore] API Key saved");
+      console.log("[useSettingsStore] Doubao ASR credentials saved");
     } catch (err) {
       console.error(
-        "[useSettingsStore] saveApiKey failed:",
+        "[useSettingsStore] saveDoubaoCredentials failed:",
         extractErrorMessage(err),
       );
-      captureError(err, { source: "settings", step: "save-api-key" });
+      captureError(err, { source: "settings", step: "save-doubao-credentials" });
       throw err;
     }
+  }
+
+  /** @deprecated use saveDoubaoCredentials */
+  async function saveApiKey(key: string) {
+    await saveDoubaoCredentials(doubaoAppId.value || "unused", key);
   }
 
   async function refreshApiKey() {
     try {
       const store = await load(STORE_NAME);
-      const savedApiKey = await store.get<string>("groqApiKey");
-      apiKey.value = savedApiKey?.trim() ?? "";
+      doubaoAppId.value = (await store.get<string>("doubaoAppId"))?.trim() ?? "";
+      doubaoAccessKey.value =
+        (await store.get<string>("doubaoAccessKey"))?.trim() ?? "";
     } catch (err) {
       console.error(
         "[useSettingsStore] refreshApiKey failed:",
@@ -575,14 +544,16 @@ export const useSettingsStore = defineStore("settings", () => {
   async function deleteApiKey() {
     try {
       const store = await load(STORE_NAME);
-      await store.delete("groqApiKey");
+      await store.delete("doubaoAppId");
+      await store.delete("doubaoAccessKey");
       await store.save();
-      apiKey.value = "";
+      doubaoAppId.value = "";
+      doubaoAccessKey.value = "";
 
       const payload: SettingsUpdatedPayload = { key: "apiKey", value: "" };
       await emitEvent(SETTINGS_UPDATED, payload);
 
-      console.log("[useSettingsStore] API Key deleted");
+      console.log("[useSettingsStore] Doubao ASR credentials deleted");
     } catch (err) {
       console.error(
         "[useSettingsStore] deleteApiKey failed:",
@@ -632,8 +603,11 @@ export const useSettingsStore = defineStore("settings", () => {
       const lastSeenVersion = await store.get<string>("lastSeenVersion");
 
       if (lastSeenVersion === null || lastSeenVersion === undefined) {
-        // 區分首次安裝 vs 舊版升級：有 API key = 老使用者
-        const existingApiKey = await store.get<string>("groqApiKey");
+        // 區分首次安裝 vs 舊版升級：有任何憑證 = 老使用者
+        const existingApiKey =
+          (await store.get<string>("doubaoAccessKey")) ??
+          (await store.get<string>("llmApiKey")) ??
+          (await store.get<string>("groqApiKey"));
         if (existingApiKey) {
           showPromptUpgradeNotice.value = true;
         }
@@ -746,200 +720,134 @@ export const useSettingsStore = defineStore("settings", () => {
   }
 
   async function saveLlmModel(id: LlmModelId) {
+    const trimmed = id.trim();
+    if (!trimmed) {
+      throw new Error(i18n.global.t("errors.apiKeyEmpty"));
+    }
     try {
       const store = await load(STORE_NAME);
-      await store.set("llmModelId", id);
+      await store.set("llmModelId", trimmed);
       await store.save();
-      selectedLlmModelId.value = id;
+      selectedLlmModelId.value = trimmed;
 
       const payload: SettingsUpdatedPayload = {
         key: "llmModel",
-        value: id,
+        value: trimmed,
       };
       await emitEvent(SETTINGS_UPDATED, payload);
-      console.log(`[useSettingsStore] LLM model saved: ${id}`);
+      console.log(`[useSettingsStore] LLM model saved: ${trimmed}`);
     } catch (err) {
       console.error(
         "[useSettingsStore] saveLlmModel failed:",
         extractErrorMessage(err),
       );
+      captureError(err, { source: "settings", step: "save-llm-model" });
       throw err;
     }
   }
 
-  async function saveLlmProvider(providerId: LlmProviderId) {
+  async function saveLlmProvider(_providerId: LlmProviderId) {
+    // only custom endpoint remains
+    selectedLlmProviderId.value = "custom";
+  }
+
+  async function saveLlmBaseUrl(url: string) {
+    const trimmed = url.trim().replace(/\/+$/, "");
+    if (!trimmed) {
+      throw new Error(i18n.global.t("errors.apiKeyEmpty"));
+    }
     try {
       const store = await load(STORE_NAME);
-      await store.set("llmProviderId", providerId);
-
-      // 切換 provider 時重設為該 provider 預設模型
-      const defaultModelId = getDefaultModelIdForProvider(providerId);
-      await store.set("llmModelId", defaultModelId);
+      await store.set("llmBaseUrl", trimmed);
       await store.save();
-
-      selectedLlmProviderId.value = providerId;
-      selectedLlmModelId.value = defaultModelId;
-
+      llmBaseUrl.value = trimmed;
       const payload: SettingsUpdatedPayload = {
         key: "llmProvider",
-        value: providerId,
+        value: trimmed,
       };
       await emitEvent(SETTINGS_UPDATED, payload);
-      console.log(
-        `[useSettingsStore] LLM provider saved: ${providerId}, model reset to: ${defaultModelId}`,
-      );
+      console.log(`[useSettingsStore] LLM base URL saved: ${trimmed}`);
     } catch (err) {
       console.error(
-        "[useSettingsStore] saveLlmProvider failed:",
+        "[useSettingsStore] saveLlmBaseUrl failed:",
         extractErrorMessage(err),
       );
-      captureError(err, { source: "settings", step: "save-llm-provider" });
+      captureError(err, { source: "settings", step: "save-llm-base-url" });
       throw err;
     }
   }
 
+  async function saveLlmApiKeyValue(key: string) {
+    const trimmedKey = key.trim();
+    if (trimmedKey === "") {
+      throw new Error(i18n.global.t("errors.apiKeyEmpty"));
+    }
+    try {
+      const store = await load(STORE_NAME);
+      await store.set("llmApiKey", trimmedKey);
+      await store.save();
+      llmApiKey.value = trimmedKey;
+      console.log("[useSettingsStore] LLM API Key saved");
+    } catch (err) {
+      console.error(
+        "[useSettingsStore] saveLlmApiKeyValue failed:",
+        extractErrorMessage(err),
+      );
+      captureError(err, { source: "settings", step: "save-llm-api-key" });
+      throw err;
+    }
+  }
+
+  async function deleteLlmApiKeyValue() {
+    try {
+      const store = await load(STORE_NAME);
+      await store.delete("llmApiKey");
+      await store.save();
+      llmApiKey.value = "";
+      console.log("[useSettingsStore] LLM API Key deleted");
+    } catch (err) {
+      console.error(
+        "[useSettingsStore] deleteLlmApiKeyValue failed:",
+        extractErrorMessage(err),
+      );
+      throw err;
+    }
+  }
+
+  // Back-compat stubs (settings UI may still call these names)
   async function saveOpenaiApiKey(key: string) {
-    const trimmedKey = key.trim();
-    if (trimmedKey === "") {
-      throw new Error(i18n.global.t("errors.apiKeyEmpty"));
-    }
-    try {
-      const store = await load(STORE_NAME);
-      await store.set("openaiApiKey", trimmedKey);
-      await store.save();
-      openaiApiKey.value = trimmedKey;
-      console.log("[useSettingsStore] OpenAI API Key saved");
-    } catch (err) {
-      console.error(
-        "[useSettingsStore] saveOpenaiApiKey failed:",
-        extractErrorMessage(err),
-      );
-      captureError(err, { source: "settings", step: "save-openai-api-key" });
-      throw err;
-    }
+    await saveLlmApiKeyValue(key);
   }
-
   async function deleteOpenaiApiKey() {
-    try {
-      const store = await load(STORE_NAME);
-      await store.delete("openaiApiKey");
-      await store.save();
-      openaiApiKey.value = "";
-      console.log("[useSettingsStore] OpenAI API Key deleted");
-    } catch (err) {
-      console.error(
-        "[useSettingsStore] deleteOpenaiApiKey failed:",
-        extractErrorMessage(err),
-      );
-      throw err;
-    }
+    await deleteLlmApiKeyValue();
   }
-
   async function saveAnthropicApiKey(key: string) {
-    const trimmedKey = key.trim();
-    if (trimmedKey === "") {
-      throw new Error(i18n.global.t("errors.apiKeyEmpty"));
-    }
-    try {
-      const store = await load(STORE_NAME);
-      await store.set("anthropicApiKey", trimmedKey);
-      await store.save();
-      anthropicApiKey.value = trimmedKey;
-      console.log("[useSettingsStore] Anthropic API Key saved");
-    } catch (err) {
-      console.error(
-        "[useSettingsStore] saveAnthropicApiKey failed:",
-        extractErrorMessage(err),
-      );
-      captureError(err, {
-        source: "settings",
-        step: "save-anthropic-api-key",
-      });
-      throw err;
-    }
+    await saveLlmApiKeyValue(key);
   }
-
   async function deleteAnthropicApiKey() {
-    try {
-      const store = await load(STORE_NAME);
-      await store.delete("anthropicApiKey");
-      await store.save();
-      anthropicApiKey.value = "";
-      console.log("[useSettingsStore] Anthropic API Key deleted");
-    } catch (err) {
-      console.error(
-        "[useSettingsStore] deleteAnthropicApiKey failed:",
-        extractErrorMessage(err),
-      );
-      throw err;
-    }
+    await deleteLlmApiKeyValue();
   }
-
   async function saveGeminiApiKey(key: string) {
-    const trimmedKey = key.trim();
-    if (trimmedKey === "") {
-      throw new Error(i18n.global.t("errors.apiKeyEmpty"));
-    }
-    try {
-      const store = await load(STORE_NAME);
-      await store.set("geminiApiKey", trimmedKey);
-      await store.save();
-      geminiApiKey.value = trimmedKey;
-      console.log("[useSettingsStore] Gemini API Key saved");
-    } catch (err) {
-      console.error(
-        "[useSettingsStore] saveGeminiApiKey failed:",
-        extractErrorMessage(err),
-      );
-      captureError(err, {
-        source: "settings",
-        step: "save-gemini-api-key",
-      });
-      throw err;
-    }
+    await saveLlmApiKeyValue(key);
   }
-
   async function deleteGeminiApiKey() {
-    try {
-      const store = await load(STORE_NAME);
-      await store.delete("geminiApiKey");
-      await store.save();
-      geminiApiKey.value = "";
-      console.log("[useSettingsStore] Gemini API Key deleted");
-    } catch (err) {
-      console.error(
-        "[useSettingsStore] deleteGeminiApiKey failed:",
-        extractErrorMessage(err),
-      );
-      throw err;
-    }
+    await deleteLlmApiKeyValue();
   }
 
   async function refreshLlmApiKey() {
     try {
       const store = await load(STORE_NAME);
-      switch (selectedLlmProviderId.value) {
-        case "groq": {
-          const savedApiKey = await store.get<string>("groqApiKey");
-          apiKey.value = savedApiKey?.trim() ?? "";
-          break;
-        }
-        case "openai": {
-          const savedKey = await store.get<string>("openaiApiKey");
-          openaiApiKey.value = savedKey?.trim() ?? "";
-          break;
-        }
-        case "anthropic": {
-          const savedKey = await store.get<string>("anthropicApiKey");
-          anthropicApiKey.value = savedKey?.trim() ?? "";
-          break;
-        }
-        case "gemini": {
-          const savedKey = await store.get<string>("geminiApiKey");
-          geminiApiKey.value = savedKey?.trim() ?? "";
-          break;
-        }
-      }
+      llmApiKey.value =
+        (
+          (await store.get<string>("llmApiKey")) ??
+          (await store.get<string>("openaiApiKey")) ??
+          (await store.get<string>("groqApiKey"))
+        )?.trim() ?? "";
+      llmBaseUrl.value =
+        (await store.get<string>("llmBaseUrl"))?.trim() || DEFAULT_LLM_BASE_URL;
+      selectedLlmModelId.value = getEffectiveLlmModelId(
+        (await store.get<string>("llmModelId")) ?? null,
+      );
     } catch (err) {
       console.error(
         "[useSettingsStore] refreshLlmApiKey failed:",
@@ -948,26 +856,8 @@ export const useSettingsStore = defineStore("settings", () => {
     }
   }
 
-  async function saveWhisperModel(id: WhisperModelId) {
-    try {
-      const store = await load(STORE_NAME);
-      await store.set("whisperModelId", id);
-      await store.save();
-      selectedWhisperModelId.value = id;
-
-      const payload: SettingsUpdatedPayload = {
-        key: "whisperModel",
-        value: id,
-      };
-      await emitEvent(SETTINGS_UPDATED, payload);
-      console.log(`[useSettingsStore] Whisper model saved: ${id}`);
-    } catch (err) {
-      console.error(
-        "[useSettingsStore] saveWhisperModel failed:",
-        extractErrorMessage(err),
-      );
-      throw err;
-    }
+  async function saveWhisperModel(_id: WhisperModelId) {
+    selectedWhisperModelId.value = DOUBAO_ASR_MODEL_ID;
   }
 
   async function loadAutoStartStatus() {
@@ -1275,7 +1165,13 @@ export const useSettingsStore = defineStore("settings", () => {
       const savedCustomDomCode = await store.get<string>(
         "customTriggerKeyDomCode",
       );
-      const savedApiKey = await store.get<string>("groqApiKey");
+      const savedDoubaoAppId = await store.get<string>("doubaoAppId");
+      const savedDoubaoAccessKey = await store.get<string>("doubaoAccessKey");
+      const savedLlmBaseUrl = await store.get<string>("llmBaseUrl");
+      const savedLlmApiKey =
+        (await store.get<string>("llmApiKey")) ??
+        (await store.get<string>("openaiApiKey")) ??
+        (await store.get<string>("groqApiKey"));
       const savedPrompt = await store.get<string>("aiPrompt");
       const savedThresholdEnabled = await store.get<boolean>(
         "enhancementThresholdEnabled",
@@ -1283,13 +1179,7 @@ export const useSettingsStore = defineStore("settings", () => {
       const savedThresholdCharCount = await store.get<number>(
         "enhancementThresholdCharCount",
       );
-      const savedLlmProviderId =
-        await store.get<LlmProviderId>("llmProviderId");
       const savedLlmModelId = await store.get<string>("llmModelId");
-      const savedWhisperModelId = await store.get<string>("whisperModelId");
-      const savedOpenaiKey = await store.get<string>("openaiApiKey");
-      const savedAnthropicKey = await store.get<string>("anthropicApiKey");
-      const savedGeminiKey = await store.get<string>("geminiApiKey");
       const savedMuteOnRecording = await store.get<boolean>("muteOnRecording");
       const savedSoundEffects = await store.get<boolean>("soundEffectsEnabled");
       const savedHideDockIcon = await store.get<boolean>("hideDockIcon");
@@ -1332,7 +1222,10 @@ export const useSettingsStore = defineStore("settings", () => {
           ? (savedPromptMode as PromptMode)
           : DEFAULT_PROMPT_MODE;
 
-      apiKey.value = savedApiKey?.trim() ?? "";
+      doubaoAppId.value = savedDoubaoAppId?.trim() ?? "";
+      doubaoAccessKey.value = savedDoubaoAccessKey?.trim() ?? "";
+      llmBaseUrl.value = savedLlmBaseUrl?.trim() || DEFAULT_LLM_BASE_URL;
+      llmApiKey.value = savedLlmApiKey?.trim() ?? "";
       aiPrompt.value =
         savedPrompt?.trim() ||
         getMinimalPromptForLocale(getEffectivePromptLocale());
@@ -1340,22 +1233,11 @@ export const useSettingsStore = defineStore("settings", () => {
         savedThresholdEnabled ?? DEFAULT_ENHANCEMENT_THRESHOLD_ENABLED;
       enhancementThresholdCharCount.value =
         savedThresholdCharCount ?? DEFAULT_ENHANCEMENT_THRESHOLD_CHAR_COUNT;
-      selectedLlmProviderId.value =
-        savedLlmProviderId ?? DEFAULT_LLM_PROVIDER_ID;
-      const effectiveCrossWindowModelId = getEffectiveLlmModelId(
+      selectedLlmProviderId.value = "custom";
+      selectedLlmModelId.value = getEffectiveLlmModelId(
         savedLlmModelId ?? null,
       );
-      const crossWindowModelConfig = findLlmModelConfig(effectiveCrossWindowModelId);
-      selectedLlmModelId.value =
-        crossWindowModelConfig?.providerId === selectedLlmProviderId.value
-          ? effectiveCrossWindowModelId
-          : getDefaultModelIdForProvider(selectedLlmProviderId.value);
-      openaiApiKey.value = savedOpenaiKey?.trim() ?? "";
-      anthropicApiKey.value = savedAnthropicKey?.trim() ?? "";
-      geminiApiKey.value = savedGeminiKey?.trim() ?? "";
-      selectedWhisperModelId.value = getEffectiveWhisperModelId(
-        savedWhisperModelId ?? null,
-      );
+      selectedWhisperModelId.value = getEffectiveWhisperModelId(null);
       isMuteOnRecordingEnabled.value =
         savedMuteOnRecording ?? DEFAULT_MUTE_ON_RECORDING;
       isSoundEffectsEnabled.value =
@@ -1424,6 +1306,8 @@ export const useSettingsStore = defineStore("settings", () => {
     hotkeyConfig,
     triggerMode,
     hasApiKey,
+    doubaoAppId: computed(() => doubaoAppId.value),
+    doubaoAccessKey: computed(() => doubaoAccessKey.value),
     aiPrompt,
     promptMode,
     showPromptUpgradeNotice,
@@ -1434,11 +1318,17 @@ export const useSettingsStore = defineStore("settings", () => {
     selectedLlmModelId,
     selectedWhisperModelId,
     hasLlmApiKey,
-    openaiApiKey: computed(() => openaiApiKey.value),
-    anthropicApiKey: computed(() => anthropicApiKey.value),
-    geminiApiKey: computed(() => geminiApiKey.value),
+    llmBaseUrl: computed(() => llmBaseUrl.value),
+    llmApiKey: computed(() => llmApiKey.value),
+    // legacy aliases
+    openaiApiKey: computed(() => llmApiKey.value),
+    anthropicApiKey: computed(() => llmApiKey.value),
+    geminiApiKey: computed(() => llmApiKey.value),
     getApiKey,
+    getDoubaoAppId,
+    getDoubaoAccessKey,
     getLlmApiKey,
+    getLlmBaseUrl,
     getAiPrompt,
     savePromptMode,
     consumeUpgradeNotice,
@@ -1464,10 +1354,14 @@ export const useSettingsStore = defineStore("settings", () => {
     getHotkeyUnsupportedKeyMessage,
     getHotkeyPresetHint,
     saveApiKey,
+    saveDoubaoCredentials,
     deleteApiKey,
     saveEnhancementThreshold,
     saveLlmModel,
     saveLlmProvider,
+    saveLlmBaseUrl,
+    saveLlmApiKeyValue,
+    deleteLlmApiKeyValue,
     saveOpenaiApiKey,
     deleteOpenaiApiKey,
     saveAnthropicApiKey,

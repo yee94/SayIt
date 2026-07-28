@@ -256,4 +256,40 @@ describe("NotchHud", () => {
 
     expect(mockUnlisten).toHaveBeenCalledTimes(1);
   });
+
+  it("[P0] transcribing 且有 liveTranscript 應在留海下方顯示一行字幕", async () => {
+    const wrapper = mountNotchHud({
+      status: "transcribing",
+      recordingElapsedSeconds: 0,
+      message: "",
+      liveTranscript: "你好世界這是即時字幕",
+    });
+
+    expect(wrapper.find(".live-transcript-row").exists()).toBe(true);
+    expect(wrapper.find(".live-transcript-bdi").text()).toBe(
+      "你好世界這是即時字幕",
+    );
+  });
+
+  it("[P0] recording 狀態即使有 liveTranscript 也不顯示字幕", () => {
+    const wrapper = mountNotchHud({
+      status: "recording",
+      recordingElapsedSeconds: 1,
+      message: "",
+      liveTranscript: "不應顯示",
+    });
+
+    expect(wrapper.find(".live-transcript-row").exists()).toBe(false);
+  });
+
+  it("[P0] transcribing 無 liveTranscript 不顯示字幕列", () => {
+    const wrapper = mountNotchHud({
+      status: "transcribing",
+      recordingElapsedSeconds: 0,
+      message: "",
+      liveTranscript: "",
+    });
+
+    expect(wrapper.find(".live-transcript-row").exists()).toBe(false);
+  });
 });

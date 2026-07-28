@@ -14,6 +14,7 @@ import { computed, markRaw, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink, RouterView, useRoute } from "vue-router";
 import AccessibilityGuide from "./components/AccessibilityGuide.vue";
 import SiteHeader from "./components/SiteHeader.vue";
+import sayItLogoUrl from "./assets/logo-sayit.png";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -266,23 +267,24 @@ onUnmounted(() => {
     data-tauri-drag-region
     class="fixed top-0 left-0 right-0 z-20 flex h-9 items-center justify-center border-b border-border bg-background"
   >
-    <span data-tauri-drag-region class="text-xs font-medium text-muted-foreground select-none">SayIt - 言</span>
+    <span data-tauri-drag-region class="text-xs font-medium text-muted-foreground select-none">SayIt</span>
   </div>
 
   <SidebarProvider class="h-screen !min-h-0 pt-9">
     <Sidebar collapsible="offcanvas">
-      <SidebarHeader class="flex-row h-12 items-center gap-3 border-b border-sidebar-border px-4">
-        <img src="@/assets/logo-yan.png" alt="言" class="h-7 w-auto" />
-        <span class="text-base font-semibold text-sidebar-foreground tracking-wide" style="font-family: 'SF Pro Display', 'Inter', system-ui, sans-serif;">SayIt</span>
+      <SidebarHeader class="h-14 flex-row items-center gap-2.5 border-b border-sidebar-border px-4">
+        <img :src="sayItLogoUrl" alt="SayIt" class="h-9 w-9 shrink-0 rounded-[10px] object-cover" />
+        <span class="text-base font-semibold tracking-wide text-sidebar-foreground" style="font-family: 'SF Pro Display', 'Inter', system-ui, sans-serif;">SayIt</span>
       </SidebarHeader>
       <SidebarContent>
-        <SidebarGroup>
+        <SidebarGroup class="p-3">
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem v-for="item in navItems" :key="item.path">
                 <SidebarMenuButton
                   as-child
                   :is-active="route.path.startsWith(item.path)"
+                  class="h-10 gap-3 px-3 text-[15px] data-[active=true]:bg-primary/15 data-[active=true]:text-primary [&>svg]:size-[18px]"
                 >
                   <RouterLink :to="item.path">
                     <component :is="item.icon" />
@@ -294,7 +296,7 @@ onUnmounted(() => {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter class="border-t border-sidebar-border px-4 py-2">
+      <SidebarFooter class="border-t border-sidebar-border px-4 py-3">
         <div class="flex items-center justify-between">
           <span class="text-xs text-muted-foreground">v{{ appVersion }}</span>
           <!-- ready-to-install 時不顯示檢查按鈕，改顯示安裝提示 -->
@@ -339,7 +341,7 @@ onUnmounted(() => {
         <p class="font-medium">{{ $t("errors.databaseInitFailed") }}</p>
         <p class="mt-1 text-xs text-destructive/80">{{ databaseError }}</p>
       </div>
-      <div class="flex-1 overflow-y-auto">
+      <div class="flex-1 overflow-y-auto bg-background">
         <RouterView />
       </div>
     </SidebarInset>

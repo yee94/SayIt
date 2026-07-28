@@ -84,16 +84,18 @@ vi.mock("../../src/lib/keycodeMap", () => ({
 
 vi.mock("../../src/lib/modelRegistry", () => ({
   DEFAULT_LLM_MODEL_ID: "test-llm",
-  DEFAULT_LLM_PROVIDER_ID: "groq",
-  DEFAULT_WHISPER_MODEL_ID: "test-whisper",
+  DEFAULT_LLM_PROVIDER_ID: "custom",
+  DEFAULT_WHISPER_MODEL_ID: "doubao-seedasr",
+  DOUBAO_ASR_MODEL_ID: "doubao-seedasr",
   getEffectiveLlmModelId: (id: string | null) => id ?? "test-llm",
-  getEffectiveWhisperModelId: (id: string | null) => id ?? "test-whisper",
+  getEffectiveWhisperModelId: () => "doubao-seedasr",
   getModelListByProvider: () => [],
   getDefaultModelIdForProvider: () => "test-llm",
+  findLlmModelConfig: () => undefined,
 }));
 
 vi.mock("../../src/lib/llmProvider", () => ({
-  findProviderConfig: () => undefined,
+  DEFAULT_LLM_BASE_URL: "https://api.openai.com/v1/chat/completions",
 }));
 
 describe("useSettingsStore — prompt mode 遷移", () => {

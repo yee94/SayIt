@@ -193,7 +193,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="p-6">
+  <div class="app-page">
     <!-- 搜尋列 -->
     <div class="relative mb-6">
       <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -340,7 +340,15 @@ onBeforeUnmount(() => {
               </div>
 
               <!-- 操作按鈕 -->
-              <div class="flex justify-end gap-2 mt-3">
+              <div class="mt-3 flex justify-start gap-2">
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  @click.stop="handleDeleteRecord(record)"
+                >
+                  <Trash2 class="h-3.5 w-3.5 mr-1.5" />
+                  {{ $t("history.delete") }}
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
@@ -349,14 +357,6 @@ onBeforeUnmount(() => {
                   <Check v-if="copiedRecordId === record.id" class="h-3.5 w-3.5 mr-1.5" />
                   <Copy v-else class="h-3.5 w-3.5 mr-1.5" />
                   {{ copiedRecordId === record.id ? $t("history.copied") : $t("history.copy") }}
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  @click.stop="handleDeleteRecord(record)"
-                >
-                  <Trash2 class="h-3.5 w-3.5 mr-1.5" />
-                  {{ $t("history.delete") }}
                 </Button>
               </div>
             </div>

@@ -104,7 +104,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="p-6">
+  <div class="app-page">
     <!-- Page header -->
     <div class="flex flex-wrap items-center justify-between gap-4">
       <Badge variant="secondary">{{ $t("dictionary.termCount", { count: vocabularyStore.termCount }) }}</Badge>
@@ -199,7 +199,7 @@ onBeforeUnmount(() => {
                 <TableHead class="w-full">{{ $t("dictionary.termHeader") }}</TableHead>
                 <TableHead class="w-24 text-center">{{ $t("dictionary.weight") }}</TableHead>
                 <TableHead class="w-40">{{ $t("dictionary.dateHeader") }}</TableHead>
-                <TableHead class="w-20 text-right">{{ $t("dictionary.actionHeader") }}</TableHead>
+                <TableHead class="w-20 text-left">{{ $t("dictionary.actionHeader") }}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -209,11 +209,10 @@ onBeforeUnmount(() => {
                   <Badge :variant="getWeightVariant(entry.weight)">{{ entry.weight }}</Badge>
                 </TableCell>
                 <TableCell class="text-muted-foreground">{{ formatDate(entry.createdAt) }}</TableCell>
-                <TableCell class="text-right">
+                <TableCell class="text-left">
                   <Button
-                    variant="ghost"
+                    variant="destructive"
                     size="icon-sm"
-                    class="text-destructive"
                     :disabled="removingTermIdSet.has(entry.id)"
                     @click="handleRemoveTerm(entry.id, entry.term)"
                   >
@@ -241,7 +240,7 @@ onBeforeUnmount(() => {
                 <TableHead class="w-full">{{ $t("dictionary.termHeader") }}</TableHead>
                 <TableHead class="w-24 text-center">{{ $t("dictionary.weight") }}</TableHead>
                 <TableHead class="w-40">{{ $t("dictionary.dateHeader") }}</TableHead>
-                <TableHead class="w-20 text-right">{{ $t("dictionary.actionHeader") }}</TableHead>
+                <TableHead class="w-20 text-left">{{ $t("dictionary.actionHeader") }}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -251,11 +250,10 @@ onBeforeUnmount(() => {
                   <Badge :variant="getWeightVariant(entry.weight)">{{ entry.weight }}</Badge>
                 </TableCell>
                 <TableCell class="text-muted-foreground">{{ formatDate(entry.createdAt) }}</TableCell>
-                <TableCell class="text-right">
+                <TableCell class="text-left">
                   <Button
-                    variant="ghost"
+                    variant="destructive"
                     size="icon-sm"
-                    class="text-destructive"
                     :disabled="removingTermIdSet.has(entry.id)"
                     @click="handleRemoveTerm(entry.id, entry.term)"
                   >

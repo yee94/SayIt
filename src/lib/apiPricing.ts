@@ -1,41 +1,22 @@
-import {
-  findWhisperModelConfig,
-  findLlmModelConfig,
-  DEFAULT_WHISPER_MODEL_ID,
-  DEFAULT_LLM_MODEL_ID,
-} from "./modelRegistry";
-
-const WHISPER_MIN_BILLING_MS = 10_000;
-
 /**
- * 計算 Whisper API 費用上限。
- * Groq 最低計費 10 秒/次，不足 10 秒一律按 10 秒算。
- * 從 modelRegistry 查表取得對應模型的每小時費率。
+ * 計算 ASR 費用上限。
+ * Doubao 計費由火山控制台決定，本地無法準確估算，回傳 0。
  */
 export function calculateWhisperCostCeiling(
-  audioDurationMs: number,
-  modelId: string = DEFAULT_WHISPER_MODEL_ID,
+  _audioDurationMs: number,
+  _modelId: string,
 ): number {
-  const config = findWhisperModelConfig(modelId);
-  const costPerHour = config?.costPerHour ?? 0.111;
-  const billedMs = Math.max(audioDurationMs, WHISPER_MIN_BILLING_MS);
-  return (billedMs / 3_600_000) * costPerHour;
+  return 0;
 }
 
 /**
- * 計算 Chat LLM API 費用上限。
- * 全部 token 按較貴的價格算（input vs output 取大），保證是上限。
+ * 計算 LLM chat 費用上限。
+ * 自訂 endpoint 價格未知，回傳 0。
  */
 export function calculateChatCostCeiling(
-  totalTokens: number,
-  modelId: string = DEFAULT_LLM_MODEL_ID,
+  _promptTokens: number,
+  _completionTokensOrModelId: number | string,
+  _modelId?: string,
 ): number {
-  const config = findLlmModelConfig(modelId);
-  // fallback 取全 registry 最貴的 outputCostPerMillion（gemini-3.5-flash $9/M），
-  // 維持「保證是上限」的不變量——查不到 config 時（如遺留的死 model id）不會低估
-  const maxCostPerToken = config
-    ? Math.max(config.inputCostPerMillion, config.outputCostPerMillion) /
-      1_000_000
-    : 0.000009;
-  return totalTokens * maxCostPerToken;
+  return 0;
 }

@@ -3,8 +3,8 @@ import { DEFAULT_LLM_MODEL_ID } from "./modelRegistry";
 import {
   buildFetchParams,
   parseProviderResponse,
-  getProviderIdForModel,
-  getProviderTimeout,
+  DEFAULT_LLM_TIMEOUT_MS,
+  DEFAULT_LLM_BASE_URL,
   type LlmChatRequest,
   type LlmUsageData,
 } from "./llmProvider";
@@ -105,10 +105,10 @@ export async function analyzeCorrections(
   pastedText: string,
   fieldText: string,
   apiKey: string,
-  options?: { modelId?: string },
+  options?: { modelId?: string; baseUrl?: string },
 ): Promise<VocabularyAnalysisResult> {
   const modelId = options?.modelId ?? DEFAULT_LLM_MODEL_ID;
-  const providerId = getProviderIdForModel(modelId);
+  const baseUrl = options?.baseUrl ?? DEFAULT_LLM_BASE_URL;
 
   const request: LlmChatRequest = {
     model: modelId,
@@ -123,9 +123,9 @@ export async function analyzeCorrections(
     maxTokens: 256,
   };
 
-  const { url, init } = buildFetchParams(providerId, request, apiKey);
+  const { url, init } = buildFetchParams(request, apiKey, baseUrl);
 
-  const timeoutMs = getProviderTimeout(providerId);
+  const timeoutMs = DEFAULT_LLM_TIMEOUT_MS;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   let response: Awaited<ReturnType<typeof fetch>>;
@@ -148,7 +148,7 @@ export async function analyzeCorrections(
   }
 
   const json = await response.json();
-  const result = parseProviderResponse(providerId, json);
+  const result = parseProviderResponse(json);
   const usage = convertUsage(result.usage);
 
   if (!result.text) {

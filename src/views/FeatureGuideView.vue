@@ -28,7 +28,7 @@ const featureList = [
 </script>
 
 <template>
-  <div class="p-6 space-y-4 text-foreground">
+  <div class="app-page space-y-3 text-foreground">
     <p class="text-sm text-muted-foreground">
       {{ t("featureGuide.subtitle") }}
     </p>

@@ -11,6 +11,11 @@ body {
   overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 @theme inline {
@@ -53,74 +58,78 @@ body {
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --radius: 0.5rem;
+  --background: oklch(0.975 0.006 78);
+  --foreground: oklch(0.24 0.012 60);
+  --card: oklch(0.992 0.004 78);
+  --card-foreground: oklch(0.24 0.012 60);
+  --popover: oklch(0.992 0.004 78);
+  --popover-foreground: oklch(0.24 0.012 60);
+  --primary: oklch(0.56 0.15 258);
+  --primary-foreground: oklch(0.985 0.004 78);
+  --secondary: oklch(0.94 0.007 72);
+  --secondary-foreground: oklch(0.3 0.012 60);
+  --muted: oklch(0.945 0.006 72);
+  --muted-foreground: oklch(0.52 0.012 60);
+  --accent: oklch(0.925 0.01 75);
+  --accent-foreground: oklch(0.26 0.012 60);
   --destructive: oklch(0.577 0.245 27.325);
   --warning: oklch(0.702 0.191 56.568);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --border: oklch(0.875 0.008 70);
+  --input: oklch(0.875 0.008 70);
+  --ring: oklch(0.62 0.14 258);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: oklch(0.955 0.007 72);
+  --sidebar-foreground: oklch(0.3 0.012 60);
+  --sidebar-primary: oklch(0.56 0.15 258);
+  --sidebar-primary-foreground: oklch(0.985 0.004 78);
+  --sidebar-accent: oklch(0.905 0.01 72);
+  --sidebar-accent-foreground: oklch(0.24 0.012 60);
+  --sidebar-border: oklch(0.875 0.008 70);
+  --sidebar-ring: oklch(0.62 0.14 258);
+  --surface-muted: oklch(0.955 0.006 72);
+  --surface-elevated: oklch(0.992 0.004 78);
 }
 
 .dark {
-  --background: #09090b;
-  --foreground: #fafafa;
-  --card: #18181b;
-  --card-foreground: #fafafa;
-  --popover: #18181b;
-  --popover-foreground: #fafafa;
-  --primary: #fafafa;
-  --primary-foreground: #18181b;
-  --secondary: #27272a;
-  --secondary-foreground: #fafafa;
-  --muted: #27272a;
-  --muted-foreground: #a1a1aa;
+  --background: #0b0b0c;
+  --foreground: #f1f1f3;
+  --card: #151516;
+  --card-foreground: #f1f1f3;
+  --popover: #19191b;
+  --popover-foreground: #f4f4f5;
+  --primary: #6f95e8;
+  --primary-foreground: #08111f;
+  --secondary: #202023;
+  --secondary-foreground: #e7e7e9;
+  --muted: #202023;
+  --muted-foreground: #98989f;
   --accent: #27272a;
-  --accent-foreground: #fafafa;
-  --destructive: #ef4444;
-  --warning: #f97316;
-  --border: #27272a;
-  --input: #27272a;
-  --ring: #a1a1aa;
+  --accent-foreground: #f4f4f5;
+  --destructive: #d84b4b;
+  --warning: #d89a55;
+  --border: #2b2b2e;
+  --input: #353539;
+  --ring: #6f95e8;
   --chart-1: #22c55e;
   --chart-2: #a855f7;
   --chart-3: #f97316;
   --chart-4: #3b82f6;
   --chart-5: #ef4444;
-  --sidebar: #18181b;
-  --sidebar-foreground: #fafafa;
-  --sidebar-primary: #fafafa;
-  --sidebar-primary-foreground: #18181b;
+  --sidebar: #111112;
+  --sidebar-foreground: #e4e4e7;
+  --sidebar-primary: #6f95e8;
+  --sidebar-primary-foreground: #08111f;
   --sidebar-accent: #27272a;
   --sidebar-accent-foreground: #fafafa;
-  --sidebar-border: #27272a;
-  --sidebar-ring: #a1a1aa;
+  --sidebar-border: #2b2b2e;
+  --sidebar-ring: #6f95e8;
+  --surface-muted: #101011;
+  --surface-elevated: #171718;
 }
 
 @layer base {
@@ -130,4 +139,88 @@ body {
   body {
     @apply bg-background text-foreground;
   }
+}
+
+.app-page {
+    width: 100%;
+    padding: 1.25rem;
+}
+
+.settings-page {
+    width: min(100%, 64rem);
+    margin-inline: auto;
+    padding: 1rem 1.25rem 2rem;
+}
+
+  /* Settings follow a grouped desktop grammar: quiet label outside, compact
+     material surface inside. This avoids making every section a hero card. */
+.settings-page > [data-slot="card"] {
+    gap: 0.5rem;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+.settings-page > [data-slot="card"] > [data-slot="card-header"] {
+    min-height: 1.5rem;
+    padding: 0 0.5rem;
+    border: 0;
+}
+
+.settings-page > [data-slot="card"] > [data-slot="card-header"] [data-slot="card-title"] {
+    font-size: 0.8125rem !important;
+    line-height: 1.25rem;
+    font-weight: 500;
+    color: var(--muted-foreground);
+}
+
+.settings-page > [data-slot="card"] > [data-slot="card-content"] {
+    border: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent);
+    border-radius: 0.75rem;
+    background: color-mix(in srgb, var(--surface-muted) 52%, var(--surface-elevated));
+    padding: 0.875rem 1rem;
+}
+
+.settings-page > [data-slot="card"] > [data-slot="card-content"].space-y-3 > :not([hidden]) ~ :not([hidden]),
+.settings-page > [data-slot="card"] > [data-slot="card-content"].space-y-4 > :not([hidden]) ~ :not([hidden]),
+.settings-page > [data-slot="card"] > [data-slot="card-content"].space-y-5 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0.75rem;
+}
+
+.settings-page [data-slot="input"],
+.settings-page [data-slot="select-trigger"],
+.settings-page [data-slot="textarea"] {
+    background: color-mix(in srgb, var(--background) 45%, transparent);
+    box-shadow: none;
+}
+
+.settings-page [data-slot="input"]:focus-visible,
+.settings-page [data-slot="select-trigger"]:focus-visible,
+.settings-page [data-slot="textarea"]:focus-visible {
+    background: var(--background);
+}
+
+@media (max-width: 720px) {
+  .app-page,
+  .settings-page {
+    padding: 1rem;
+  }
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--muted-foreground) 38%, transparent) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted-foreground) 38%, transparent);
+  background-clip: padding-box;
 }

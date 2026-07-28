@@ -109,17 +109,15 @@ describe("enhancer.ts", () => {
 
       const callArgs = mockFetch.mock.calls[0];
       expect(callArgs[0]).toBe(
-        "https://api.groq.com/openai/v1/chat/completions",
+        "https://api.openai.com/v1/chat/completions",
       );
       expect(callArgs[1].method).toBe("POST");
       expect(callArgs[1].headers["Content-Type"]).toBe("application/json");
       expect(callArgs[1].headers.Authorization).toBe(`Bearer ${TEST_API_KEY}`);
 
       const body = JSON.parse(callArgs[1].body);
-      expect(body.model).toBe("qwen/qwen3.6-27b");
+      expect(body.model).toBe("gpt-4o-mini");
       expect(body.temperature).toBe(0.1);
-      // Qwen3.x 預設開 <think> 思考模式，必須明確關閉（省時間、保 5 秒 timeout）
-      expect(body.reasoning_effort).toBe("none");
       expect(body.max_tokens).toBe(8192);
       expect(body.messages).toHaveLength(2);
       expect(body.messages[0].role).toBe("system");
@@ -127,43 +125,20 @@ describe("enhancer.ts", () => {
       expect(body.messages[1].content).toBe("測試輸入文字");
     });
 
-    it("[P0] Anthropic provider 應使用正確的 URL、header、body 格式", async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: vi.fn().mockResolvedValue({
-          content: [{ type: "text", text: "Anthropic 整理結果" }],
-          usage: { input_tokens: 40, output_tokens: 60 },
-        }),
-      });
+    it("[P0] 自訂 baseUrl 應生效", async () => {
+      mockFetch.mockResolvedValue(createSuccessResponse("整理結果"));
 
       const { enhanceText } = await import("../../src/lib/enhancer");
       const result = await enhanceText("測試輸入", TEST_API_KEY, {
-        modelId: "claude-haiku-4-5-20251001",
+        modelId: "my-model",
+        baseUrl: "https://proxy.local/v1",
       });
 
-      expect(result.text).toBe("Anthropic 整理結果");
-      expect(result.usage).toEqual({
-        promptTokens: 40,
-        completionTokens: 60,
-        totalTokens: 100,
-        promptTimeMs: undefined,
-        completionTimeMs: undefined,
-        totalTimeMs: undefined,
-      });
-
+      expect(result.text).toBe("整理結果");
       const callArgs = mockFetch.mock.calls[0];
-      expect(callArgs[0]).toBe("https://api.anthropic.com/v1/messages");
-
-      const headers = callArgs[1].headers;
-      expect(headers["x-api-key"]).toBe(TEST_API_KEY);
-      expect(headers["anthropic-version"]).toBe("2023-06-01");
-      expect(headers.Authorization).toBeUndefined();
-
+      expect(callArgs[0]).toBe("https://proxy.local/v1/chat/completions");
       const body = JSON.parse(callArgs[1].body);
-      expect(body.system).toBeDefined();
-      expect(body.messages).toHaveLength(1);
-      expect(body.messages[0].role).toBe("user");
-      expect(body.max_tokens).toBe(8192);
+      expect(body.model).toBe("my-model");
     });
 
     it("[P0] 應 trim 回傳的文字", async () => {
@@ -439,20 +414,20 @@ describe("enhancer.ts", () => {
   });
 
   describe("Timeout 處理", () => {
-    it("[P0] 超過 5 秒應拋出逾時錯誤", async () => {
+    it("[P0] 超過 timeout 應拋出逾時錯誤", async () => {
       vi.useFakeTimers();
 
       mockFetch.mockImplementation(
         () =>
           new Promise((resolve) => {
-            setTimeout(() => resolve(createSuccessResponse("晚了")), 6000);
+            setTimeout(() => resolve(createSuccessResponse("晚了")), 35_000);
           }),
       );
 
       const { enhanceText } = await import("../../src/lib/enhancer");
       const promise = enhanceText("測試文字測試文字測試", TEST_API_KEY);
 
-      vi.advanceTimersByTime(5000);
+      vi.advanceTimersByTime(30_000);
 
       await expect(promise).rejects.toThrow("Enhancement timeout");
 
