@@ -4635,7 +4635,7 @@ dependencies = [
 
 [[package]]
 name = "sayit"
-version = "0.12.2"
+version = "0.12.3"
 dependencies = [
  "arboard",
  "core-foundation 0.10.1",
