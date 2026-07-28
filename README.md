@@ -1,94 +1,62 @@
 # SayIt
 
-> 按住說話，放開貼上 — 語音轉書面語桌面工具
+> 按住说话，松开粘贴 — 跨平台语音输入桌面工具
 
-SayIt 是一款跨平台桌面語音輸入工具。在任何應用程式中按住快捷鍵說話，放開後語音經 Groq Whisper API 轉錄，再由 Groq LLM 自動將口語轉為通順的繁體中文書面語，直接貼入游標位置。
+在任意应用中按快捷键说话，松开后自动转写、AI 整理，并粘贴到光标位置。
 
-## 特色
+## 功能
 
-- **口語到書面語** — AI 自動去除贅詞、重組句構、修正標點，說完即可用
-- **全域快捷鍵** — 在任何應用程式中觸發，支援 Hold / Toggle 雙模式
-- **低延遲** — 基於 Groq 推論引擎，端到端 < 3 秒（含 AI 整理）
-- **自訂詞彙字典** — 確保專有名詞、技術術語正確轉錄
-- **歷史記錄與統計** — 自動保存所有轉錄，Dashboard 一覽使用狀況
-- **極簡設定** — 只需設定 API Key 即可使用
+- **口语 → 书面语** — 修错字、去赘词、补标点，可选精简 / 积极整理
+- **全局快捷键** — Hold / Toggle，支持组合键
+- **自定义字典** — 专有名词、术语优先识别，可智能学习
+- **历史与统计** — 自动保存转录，Dashboard 查看用量
+- **多语言界面** — 简体中文、繁体中文、English、日本語、한국어
 
-## 安裝
+## 下载
 
-### 下載
-
-| 平台 | 下載連結 |
-|------|---------|
-| macOS (Apple Silicon) | [SayIt-mac-arm64.dmg](https://github.com/yee94/SayIt/releases/latest/download/SayIt-mac-arm64.dmg) |
-| macOS (Intel) | [SayIt-mac-x64.dmg](https://github.com/yee94/SayIt/releases/latest/download/SayIt-mac-x64.dmg) |
+| 平台 | 链接 |
+|------|------|
+| macOS ARM | [SayIt-mac-arm64.dmg](https://github.com/yee94/SayIt/releases/latest/download/SayIt-mac-arm64.dmg) |
+| macOS Intel | [SayIt-mac-x64.dmg](https://github.com/yee94/SayIt/releases/latest/download/SayIt-mac-x64.dmg) |
 | Windows | [SayIt-windows-x64.exe](https://github.com/yee94/SayIt/releases/latest/download/SayIt-windows-x64.exe) |
 
-### 前置需求
+## 快速开始
 
-- [Groq API Key](https://console.groq.com/keys)（免費申請）
+1. 安装并打开 SayIt  
+2. 设置 → 填写 [豆包 ASR](https://console.volcengine.com/) 凭据（语音转写）  
+3. 设置 → 配置 LLM 服务（文字整理，OpenAI 兼容接口）  
+4. 按住快捷键说话，松开后文字自动粘贴  
 
-### 快速開始
+macOS 首次使用需授予「辅助使用」权限。
 
-1. 下載並安裝
-2. 開啟 SayIt → 設定頁面 → 貼上 Groq API Key
-3. 在任何應用程式中按住 `Fn` 鍵說話，放開後文字自動貼上
-
-## 技術架構
+## 技术栈
 
 ```
-Tauri v2 (Rust) + Vue 3 + TypeScript
-
-  ┌──────────────────────────────────┐
-  │        Tauri Backend (Rust)      │
-  │  全域熱鍵 · 剪貼簿 · 音量控制    │
-  └───────┬──────────────┬───────────┘
-          │ invoke()     │ emit()
-  ┌───────▼──┐    ┌──────▼───────────┐
-  │   HUD    │    │    Dashboard     │
-  │ 狀態浮窗  │    │ 設定/歷史/統計   │
-  └──────────┘    └──────────────────┘
+Tauri v2 (Rust) + Vue 3 + TypeScript + shadcn-vue
+  · 语音转写：豆包 SeedASR
+  · 文字整理：OpenAI 兼容 LLM
+  · 存储：SQLite + tauri-plugin-store
 ```
 
-- **Frontend** — Vue 3 + TypeScript + shadcn-vue + Tailwind CSS
-- **Backend** — Rust (Tauri v2)
-- **AI** — Groq Whisper (語音轉文字) + Groq LLM (文字整理)
-- **Storage** — SQLite (歷史記錄) + tauri-plugin-store (設定)
+双窗口：HUD（状态浮层）+ Dashboard（设置 / 历史 / 字典 / 统计）。
 
-## 開發
-
-### 環境需求
-
-- Node.js 24+
-- pnpm 10+
-- Rust stable
-- Xcode Command Line Tools (macOS)
-
-### 指令
+## 开发
 
 ```bash
-# 安裝依賴
+# 环境：Node.js 24、pnpm 10、Rust stable
+
 pnpm install
-
-# 開發模式
-pnpm tauri dev
-
-# 建構
-pnpm tauri build
-
-# 測試
-pnpm test
-
-# 型別檢查
-npx vue-tsc --noEmit
+pnpm tauri:dev      # 使用独立开发版标识启动
+pnpm build          # 前端构建（含类型检查）
+pnpm test           # 单元 / 组件测试
+pnpm tauri build    # 打包
 ```
 
-### 發版
+发版：
 
 ```bash
-./scripts/release.sh 0.2.0
-# → 自動更新版本號、commit、tag、push
-# → GitHub Actions 建構 macOS + Windows 安裝檔
-# → 到 GitHub Releases 手動 Publish
+./scripts/release.sh 0.12.0
+# 更新版本号 → tag → push → GitHub Actions 测试与构建 → 自动发布 Release
 ```
 
 ## License
