@@ -3,10 +3,6 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useVocabularyStore } from "../stores/useVocabularyStore";
 import { useSettingsStore } from "../stores/useSettingsStore";
 import { extractErrorMessage } from "../lib/errorUtils";
-import {
-  assertVocabularyImportFileSize,
-  parseVocabularyImportText,
-} from "../lib/vocabularyImport";
 import { useFeedbackMessage } from "../composables/useFeedbackMessage";
 import { useI18n } from "vue-i18n";
 import { Plus, Trash2, Bot, Hand, Info, Upload } from "lucide-vue-next";
@@ -31,7 +27,6 @@ const { t, locale } = useI18n();
 const newTermInput = ref("");
 const isAdding = ref(false);
 const isImporting = ref(false);
-const importFileInputRef = ref<HTMLInputElement | null>(null);
 const removingTermIdSet = ref(new Set<string>());
 const feedback = useFeedbackMessage();
 
@@ -81,35 +76,19 @@ async function handleRemoveTerm(id: string, term: string) {
   }
 }
 
-function openImportFilePicker() {
-  if (isImporting.value) return;
-  importFileInputRef.value?.click();
-}
-
-async function handleImportFileChange(event: Event) {
-  const input = event.target as HTMLInputElement;
-  const file = input.files?.[0];
-  // 允許連續選同一檔
-  input.value = "";
-  if (!file) return;
-
+async function handleImportFromTypeless() {
   try {
     isImporting.value = true;
-    assertVocabularyImportFileSize(file.size);
-
-    const content = await file.text();
-    const parsed = parseVocabularyImportText(content);
-
-    if (parsed.terms.length === 0) {
-      feedback.show("error", t("dictionary.importEmpty", { file: file.name }));
+    const { fetched, added, skipped } =
+      await vocabularyStore.importFromTypeless();
+    if (fetched === 0) {
+      feedback.show("success", t("dictionary.typelessEmpty"));
       return;
     }
-
-    const { added, skipped } = await vocabularyStore.importTerms(parsed.terms);
     if (added === 0) {
       feedback.show(
         "success",
-        t("dictionary.importAllSkipped", { skipped: skipped + parsed.duplicateInFileCount }),
+        t("dictionary.importAllSkipped", { skipped }),
       );
       return;
     }
@@ -118,17 +97,20 @@ async function handleImportFileChange(event: Event) {
       "success",
       t("dictionary.importSuccess", {
         added,
-        skipped: skipped + parsed.duplicateInFileCount,
+        skipped,
       }),
     );
   } catch (err) {
     const message = extractErrorMessage(err);
-    if (message === "FILE_TOO_LARGE") {
-      feedback.show("error", t("dictionary.importFileTooLarge"));
-    } else {
-      feedback.show("error", t("dictionary.importFailed"));
-      captureError(err, { source: "dictionary-import" });
-    }
+    const errorKey = message.includes("TYPELESS_SESSION_NOT_FOUND")
+      ? "dictionary.typelessSessionNotFound"
+      : message.includes("TYPELESS_SESSION_EXPIRED")
+        ? "dictionary.typelessSessionExpired"
+        : message.includes("TYPELESS_PLATFORM_UNSUPPORTED")
+          ? "dictionary.typelessPlatformUnsupported"
+          : "dictionary.typelessImportFailed";
+    feedback.show("error", t(errorKey));
+    captureError(err, { source: "typeless-import" });
   } finally {
     isImporting.value = false;
   }
@@ -169,19 +151,12 @@ onBeforeUnmount(() => {
       <Badge variant="secondary">{{ $t("dictionary.termCount", { count: vocabularyStore.termCount }) }}</Badge>
 
       <div class="flex items-center gap-2">
-        <input
-          ref="importFileInputRef"
-          type="file"
-          class="hidden"
-          accept=".csv,.txt,.json,text/csv,text/plain,application/json"
-          @change="handleImportFileChange"
-        />
         <Button
           size="sm"
           variant="outline"
           :disabled="isImporting || isAdding"
           :title="$t('dictionary.importTypelessHint')"
-          @click="openImportFilePicker"
+          @click="handleImportFromTypeless"
         >
           <Upload class="h-4 w-4 mr-1" />
           {{ isImporting ? $t("dictionary.importing") : $t("dictionary.importTypeless") }}

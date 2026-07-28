@@ -452,6 +452,7 @@ pub fn run() {
             plugins::transcription::start_live_asr,
             plugins::transcription::finish_live_asr,
             plugins::transcription::cancel_live_asr,
+            plugins::typeless_import::fetch_typeless_dictionary_terms,
             plugins::sound_feedback::play_start_sound,
             plugins::sound_feedback::play_stop_sound,
             plugins::sound_feedback::play_error_sound,

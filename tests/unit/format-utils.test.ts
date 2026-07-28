@@ -83,24 +83,24 @@ describe("formatUtils.ts", () => {
   });
 
   describe("formatDurationFromMs", () => {
-    it("0 毫秒應回傳 '0 分鐘'", () => {
-      expect(formatDurationFromMs(0)).toBe("0 分鐘");
+    it("0 毫秒应回传 '0 分钟'", () => {
+      expect(formatDurationFromMs(0)).toBe("0 分钟");
     });
 
-    it("30 秒應回傳 '0 分鐘'", () => {
-      expect(formatDurationFromMs(30000)).toBe("1 分鐘");
+    it("30 秒应回传 '1 分钟'", () => {
+      expect(formatDurationFromMs(30000)).toBe("1 分钟");
     });
 
-    it("5 分鐘應回傳 '5 分鐘'", () => {
-      expect(formatDurationFromMs(300000)).toBe("5 分鐘");
+    it("5 分钟应回传 '5 分钟'", () => {
+      expect(formatDurationFromMs(300000)).toBe("5 分钟");
     });
 
-    it("90 分鐘應回傳 '1 小時 30 分鐘'", () => {
-      expect(formatDurationFromMs(5400000)).toBe("1 小時 30 分鐘");
+    it("90 分钟应回传 '1 小时 30 分钟'", () => {
+      expect(formatDurationFromMs(5400000)).toBe("1 小时 30 分钟");
     });
 
-    it("120 分鐘應回傳 '2 小時'", () => {
-      expect(formatDurationFromMs(7200000)).toBe("2 小時");
+    it("120 分钟应回传 '2 小时'", () => {
+      expect(formatDurationFromMs(7200000)).toBe("2 小时");
     });
   });
 

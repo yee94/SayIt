@@ -515,6 +515,7 @@ fn build_session_config(
 /// - `Ok((None, false))` 继续
 /// - `Ok((None, true))` 会话 last packet / final（可结束读循环）
 /// - `Ok((Some(err), _))` 服务端业务错误（已 close）
+///
 /// `on_partial` 在累计文本有更新时回调（供 HUD 即時字幕）。
 async fn handle_binary_frame(
     data: &[u8],
@@ -1477,7 +1478,7 @@ mod tests {
         let json = br#"{"result":{"additions":{"log_id":"abc"}}}"#;
         let mut buf = vec![0u8; 4];
         buf[0] = (PROTOCOL_VERSION << 4) | 1;
-        buf[1] = (0b1001 << 4) | 0; // no sequence
+        buf[1] = 0b1001 << 4; // no sequence
         buf[2] = (SERIAL_JSON << 4) | COMPRESSION_NONE;
         buf[3] = 0;
         buf.extend_from_slice(&(json.len() as u32).to_be_bytes());

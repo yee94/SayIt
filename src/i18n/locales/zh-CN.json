@@ -262,14 +262,16 @@
     "noAiSuggestions": "暂无 AI 推荐词汇，启用智能字典学习后系统会自动学习",
     "noAiSuggestionsEnabled": "智能字典学习已启用，当你修正转录文字时系统会自动学习新词",
     "aiTermCount": "{count} 个词",
-    "importTypeless": "导入 Typeless",
-    "importTypelessHint": "选择 Typeless 导出的 CSV / TXT（每行一词）",
+    "importTypeless": "一键导入 Typeless",
+    "importTypelessHint": "从本机已登录的 Typeless 账号同步个人词典",
     "importing": "导入中...",
     "importSuccess": "已导入 {added} 个词，跳过 {skipped} 个重复",
     "importAllSkipped": "全部为已有词汇，跳过 {skipped} 个",
-    "importEmpty": "在 {file} 中未找到有效词汇",
-    "importFileTooLarge": "文件过大，最大 5 MB",
-    "importFailed": "导入失败，请确认文件格式后重试"
+    "typelessEmpty": "Typeless 词典为空",
+    "typelessSessionNotFound": "未找到 Typeless 登录信息，请先安装并登录 Typeless",
+    "typelessSessionExpired": "Typeless 登录已过期，请重新登录后再试",
+    "typelessPlatformUnsupported": "一键导入 Typeless 当前支持 macOS",
+    "typelessImportFailed": "读取 Typeless 词典失败，请确认 Typeless 已登录后重试"
   },
   "accessibility": {
     "title": "需要辅助使用权限",

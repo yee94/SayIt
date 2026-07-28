@@ -4,6 +4,11 @@ import { createPinia, setActivePinia } from "pinia";
 const mockDbExecute = vi.fn().mockResolvedValue(undefined);
 const mockDbSelect = vi.fn().mockResolvedValue([]);
 const mockEmit = vi.fn().mockResolvedValue(undefined);
+const mockInvoke = vi.fn();
+
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: mockInvoke,
+}));
 
 vi.mock("../../src/lib/database", () => ({
   getDatabase: () => ({
@@ -46,6 +51,7 @@ describe("useVocabularyStore", () => {
     mockDbExecute.mockClear().mockResolvedValue(undefined);
     mockDbSelect.mockClear().mockResolvedValue([]);
     mockEmit.mockClear().mockResolvedValue(undefined);
+    mockInvoke.mockClear();
   });
 
   // ==========================================================================
@@ -283,6 +289,27 @@ describe("useVocabularyStore", () => {
       const result = await store.importTerms(["Vue.js", "vue.js"]);
       expect(result).toEqual({ added: 0, skipped: 2 });
       expect(mockDbExecute).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("importFromTypeless", () => {
+    it("拉取 Typeless 詞典並匯入新詞", async () => {
+      mockInvoke.mockResolvedValueOnce(["Tauri", "Pinia"]);
+      mockDbSelect.mockResolvedValueOnce([
+        createRawVocabularyRow({ id: "1", term: "Tauri", source: "manual" }),
+        createRawVocabularyRow({ id: "2", term: "Pinia", source: "manual" }),
+      ]);
+
+      const { useVocabularyStore } = await import(
+        "../../src/stores/useVocabularyStore"
+      );
+      const store = useVocabularyStore();
+      const result = await store.importFromTypeless();
+
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "fetch_typeless_dictionary_terms",
+      );
+      expect(result).toEqual({ fetched: 2, added: 2, skipped: 0 });
     });
   });
 });

@@ -262,14 +262,16 @@
     "noAiSuggestions": "AI 推奨の用語はまだありません。スマート辞書学習を有効にすると自動学習されます",
     "noAiSuggestionsEnabled": "スマート辞書学習は有効です。文字起こしを修正すると、新しい用語が自動的に学習されます",
     "aiTermCount": "{count} 語",
-    "importTypeless": "Typeless をインポート",
-    "importTypelessHint": "Typeless の CSV / TXT エクスポートを選択（1 行 1 語）",
+    "importTypeless": "Typeless から一括取込",
+    "importTypelessHint": "この Mac でログイン中の Typeless 個人辞書を同期",
     "importing": "インポート中...",
     "importSuccess": "{added} 語を追加、重複 {skipped} 語をスキップ",
     "importAllSkipped": "すべて既存の語彙のため {skipped} 語をスキップ",
-    "importEmpty": "{file} に有効な語彙が見つかりません",
-    "importFileTooLarge": "ファイルが大きすぎます。最大 5 MB",
-    "importFailed": "インポートに失敗しました。ファイル形式を確認して再試行してください"
+    "typelessEmpty": "Typeless の辞書は空です",
+    "typelessSessionNotFound": "Typeless のログイン情報が見つかりません。先にインストールしてログインしてください",
+    "typelessSessionExpired": "Typeless のログイン期限が切れています。再ログインしてお試しください",
+    "typelessPlatformUnsupported": "Typeless の一括取込は現在 macOS に対応しています",
+    "typelessImportFailed": "Typeless 辞書を読み込めませんでした。ログイン状態を確認して再試行してください"
   },
   "accessibility": {
     "title": "アクセシビリティ権限が必要です",

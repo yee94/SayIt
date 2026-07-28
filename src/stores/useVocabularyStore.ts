@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
+import { invoke } from "@tauri-apps/api/core";
 import { getDatabase } from "../lib/database";
 import { extractErrorMessage } from "../lib/errorUtils";
 import { captureError } from "../lib/sentry";
@@ -249,6 +250,16 @@ export const useVocabularyStore = defineStore("vocabulary", () => {
     }
   }
 
+  async function importFromTypeless(): Promise<{
+    fetched: number;
+    added: number;
+    skipped: number;
+  }> {
+    const terms = await invoke<string[]>("fetch_typeless_dictionary_terms");
+    const result = await importTerms(terms);
+    return { fetched: terms.length, ...result };
+  }
+
   return {
     termList,
     isLoading,
@@ -262,6 +273,7 @@ export const useVocabularyStore = defineStore("vocabulary", () => {
     batchIncrementWeights,
     getTopTermListByWeight,
     importTerms,
+    importFromTypeless,
     removeTerm,
   };
 });

@@ -262,14 +262,16 @@
     "noAiSuggestions": "No AI suggestions yet. Enable Smart Dictionary Learning to auto-learn new terms",
     "noAiSuggestionsEnabled": "Smart Dictionary Learning is on. New terms are learned automatically when you correct a transcription",
     "aiTermCount": "{count} terms",
-    "importTypeless": "Import Typeless",
-    "importTypelessHint": "Choose a Typeless CSV / TXT export (one word per line)",
+    "importTypeless": "Import from Typeless",
+    "importTypelessHint": "Sync the personal dictionary from the local Typeless session",
     "importing": "Importing...",
     "importSuccess": "Imported {added} terms, skipped {skipped} duplicates",
     "importAllSkipped": "All terms already exist, skipped {skipped}",
-    "importEmpty": "No valid terms found in {file}",
-    "importFileTooLarge": "File is too large. Maximum size is 5 MB",
-    "importFailed": "Import failed. Check the file format and try again"
+    "typelessEmpty": "The Typeless dictionary is empty",
+    "typelessSessionNotFound": "Typeless login data was not found. Install and sign in to Typeless first",
+    "typelessSessionExpired": "The Typeless session has expired. Sign in again and retry",
+    "typelessPlatformUnsupported": "One-click Typeless import currently supports macOS",
+    "typelessImportFailed": "Failed to read the Typeless dictionary. Confirm Typeless is signed in and retry"
   },
   "accessibility": {
     "title": "Accessibility Permission Required",
