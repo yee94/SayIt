@@ -9,6 +9,10 @@ const {
   mockInvoke,
   mockEnhanceText,
   mockGetCurrentWindow,
+  mockHudWindowShow,
+  mockHudWindowHide,
+  mockHudWindowSetIgnoreCursorEvents,
+  mockHudWindowSetPosition,
   mockWebviewWindowGetByLabel,
   mockMainWindowShow,
   mockMainWindowSetFocus,
@@ -71,10 +75,15 @@ const {
     mockEnhanceText: vi
       .fn()
       .mockResolvedValue({ text: "AI 整理后的书面语文字", usage: null }),
+    mockHudWindowShow: vi.fn().mockResolvedValue(undefined),
+    mockHudWindowHide: vi.fn().mockResolvedValue(undefined),
+    mockHudWindowSetIgnoreCursorEvents: vi.fn().mockResolvedValue(undefined),
+    mockHudWindowSetPosition: vi.fn().mockResolvedValue(undefined),
     mockGetCurrentWindow: vi.fn(() => ({
-      show: vi.fn().mockResolvedValue(undefined),
-      hide: vi.fn().mockResolvedValue(undefined),
-      setIgnoreCursorEvents: vi.fn().mockResolvedValue(undefined),
+      show: mockHudWindowShow,
+      hide: mockHudWindowHide,
+      setIgnoreCursorEvents: mockHudWindowSetIgnoreCursorEvents,
+      setPosition: mockHudWindowSetPosition,
     })),
     mockMainWindowShow,
     mockMainWindowSetFocus,
@@ -360,6 +369,10 @@ describe("useVoiceFlowStore", () => {
       .mockResolvedValue(undefined);
     mockAddApiUsage.mockClear().mockResolvedValue(undefined);
     mockGetCurrentWindow.mockClear();
+    mockHudWindowShow.mockClear().mockResolvedValue(undefined);
+    mockHudWindowHide.mockClear().mockResolvedValue(undefined);
+    mockHudWindowSetIgnoreCursorEvents.mockClear().mockResolvedValue(undefined);
+    mockHudWindowSetPosition.mockClear().mockResolvedValue(undefined);
     mockWebviewWindowGetByLabel.mockClear();
     mockMainWindowShow.mockClear().mockResolvedValue(undefined);
     mockMainWindowSetFocus.mockClear().mockResolvedValue(undefined);
@@ -416,6 +429,148 @@ describe("useVoiceFlowStore", () => {
     vi.useRealTimers();
   });
 
+  it("[P0] 热键按下时应在录音设备 ready 前显示 HUD，并异步查询位置", async () => {
+    const recordingStart = createDeferredPromise<void>();
+    const hudPosition = createDeferredPromise<{
+      monitorKey: string;
+      x: number;
+      y: number;
+    }>();
+    const base = createMockInvokeHandler();
+    mockInvoke.mockImplementation(async (cmd: string, args?: unknown) => {
+      if (cmd === "start_recording") return recordingStart.promise;
+      if (cmd === "get_hud_target_position") return hudPosition.promise;
+      return base(cmd, args);
+    });
+    const store = useVoiceFlowStore();
+    await store.initialize();
+
+    triggerHotkeyEvent("hotkey:pressed");
+
+    expect(store.status).toBe("recording");
+    expect(mockHudWindowShow).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("get_hud_target_position");
+    });
+
+    const positionCallIndex = mockInvoke.mock.calls.findIndex(
+      ([command]) => command === "get_hud_target_position",
+    );
+    expect(mockHudWindowShow.mock.invocationCallOrder[0]).toBeLessThan(
+      mockInvoke.mock.invocationCallOrder[positionCallIndex],
+    );
+    expect(mockHudWindowSetPosition).not.toHaveBeenCalled();
+    store.transitionTo("idle");
+    hudPosition.resolvePromise({ monitorKey: "test", x: 100, y: 0 });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(mockHudWindowSetPosition).not.toHaveBeenCalled();
+    store.cleanup();
+  });
+
+  it("[P0] 设备启动期间释放热键应在启动完成后按序停止", async () => {
+    const recordingStart = createDeferredPromise<void>();
+    const base = createMockInvokeHandler();
+    mockInvoke.mockImplementation(async (cmd: string, args?: unknown) => {
+      if (cmd === "start_recording") return recordingStart.promise;
+      return base(cmd, args);
+    });
+    const store = useVoiceFlowStore();
+    await store.initialize();
+
+    triggerHotkeyEvent("hotkey:pressed");
+    await vi.waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("start_recording", {
+        deviceName: "",
+      });
+    });
+    triggerHotkeyEvent("hotkey:released");
+    await Promise.resolve();
+
+    expect(mockInvoke).not.toHaveBeenCalledWith("stop_recording");
+
+    recordingStart.resolvePromise();
+
+    await vi.waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("stop_recording");
+    });
+    await vi.waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
+        text: "测试转录",
+        restoreClipboard: false,
+      });
+    });
+    store.cleanup();
+  });
+
+  it("[P0] ESC 等待设备停止期间应隔离下一轮录音", async () => {
+    const recordingStart = createDeferredPromise<void>();
+    const base = createMockInvokeHandler();
+    mockInvoke.mockImplementation(async (cmd: string, args?: unknown) => {
+      if (cmd === "start_recording") return recordingStart.promise;
+      return base(cmd, args);
+    });
+    const store = useVoiceFlowStore();
+    await store.initialize();
+
+    triggerHotkeyEvent("hotkey:pressed");
+    await vi.waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("start_recording", {
+        deviceName: "",
+      });
+    });
+    triggerHotkeyEvent("escape:pressed");
+    triggerHotkeyEvent("hotkey:pressed");
+
+    expect(
+      mockInvoke.mock.calls.filter(([command]) => command === "start_recording"),
+    ).toHaveLength(1);
+
+    recordingStart.resolvePromise();
+    await vi.waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("stop_recording");
+    });
+
+    triggerHotkeyEvent("hotkey:pressed");
+    await vi.waitFor(() => {
+      expect(
+        mockInvoke.mock.calls.filter(
+          ([command]) => command === "start_recording",
+        ),
+      ).toHaveLength(2);
+    });
+    store.cleanup();
+  });
+
+  it("[P0] 录音设备启动失败后应显示错误并允许下一次触发", async () => {
+    const base = createMockInvokeHandler();
+    let startAttempt = 0;
+    mockInvoke.mockImplementation(async (cmd: string, args?: unknown) => {
+      if (cmd === "start_recording") {
+        startAttempt += 1;
+        if (startAttempt === 1) {
+          throw new Error("No input device available");
+        }
+        return undefined;
+      }
+      return base(cmd, args);
+    });
+    const store = useVoiceFlowStore();
+    await store.initialize();
+
+    triggerHotkeyEvent("hotkey:pressed");
+    await vi.waitFor(() => {
+      expect(store.status).toBe("error");
+    });
+
+    triggerHotkeyEvent("hotkey:pressed");
+    await vi.waitFor(() => {
+      expect(startAttempt).toBe(2);
+      expect(store.status).toBe("recording");
+    });
+    store.cleanup();
+  });
+
   it("[P0] HOTKEY_PRESSED 只会在未录音时启动录音并广播 recording", async () => {
     const store = useVoiceFlowStore();
     await store.initialize();
@@ -467,7 +622,9 @@ describe("useVoiceFlowStore", () => {
       vocabularyTermList: null,
       language: "zh",
     });
-    expect(store.status).toBe("success");
+    await vi.waitFor(() => {
+      expect(store.status).toBe("success");
+    });
     expect(store.message).toBe("voiceFlow.pasteSuccess");
     expect(mockEmit).toHaveBeenCalledWith("voice-flow:state-changed", {
       status: "success",

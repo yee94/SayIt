@@ -51,3 +51,23 @@
 - **发现**：`clipboard_paste.rs` 的 `paste_text` 入口有一行非 `cfg(debug_assertions)` 包覆的 println，会在 release build 持续打到 stdout。
 - **延后理由**：此 println 是 baseline 既有程式码，非本 story 引入；且在 Tauri app 中 stdout 通常被 OS 吞掉。属于既有 tech-debt。
 - **后续切入点**：未来做 logging 统一改造时一并处理（`tracing` crate 整合）。
+
+## 来自 spec-hotkey-immediate-recording-feedback.md（2026-07-29）
+
+### 1. 原生录音启动缺少硬件 ready 超时
+
+- **发现**：`audio_recorder::start_recording()` 同步等待音频线程回报 ready。异常驱动或设备 API 长时间无回应时，前端的启动与停止屏障会持续等待。
+- **延后理由**：可靠的超时恢复需要 Rust 端为启动线程提供取消与资源回收协议，涉及录音 command 生命周期；当前快捷键画面反馈已即时出现。
+- **后续切入点**：在 `audio_recorder.rs` 增加可取消的 ready 等待与明确超时错误，再让前端以该错误走既有录音失败流程。
+
+### 2. 静音与恢复音量的 IPC 到达顺序
+
+- **发现**：延迟静音与停止时恢复音量是独立 IPC；极端排程下，恢复命令可能先于静音命令到达 Rust。
+- **延后理由**：现有流程已尽量在停止前取消未触发的静音计时器。严格配对需要在 Rust audio control state 内引入录音世代或操作序号，影响系统音频控制的跨平台路径。
+- **后续切入点**：为 `mute_system_audio` / `restore_system_audio` 增加录音世代参数，由 Rust 忽略过期命令，并补 macOS 与 Windows 的顺序测试。
+
+### 3. HUD 卸载期间的录音资源收尾
+
+- **发现**：`cleanup()` 主要解除前端监听与计时器；HUD 窗口卸载时的录音停止、实时 ASR 取消和系统音频恢复缺少统一收尾 action。
+- **延后理由**：该路径属于既有窗口生命周期设计，完整修复需要协调 Tauri 退出流程与 Rust plugin shutdown 顺序。
+- **后续切入点**：提炼可 await 的 `abortCurrentRecording()`，在 `cleanup()`、ESC 与应用退出共用，并用窗口卸载测试验证麦克风和音量状态。

@@ -93,6 +93,9 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
   /** ASR 串流中间文本（HUD 留海下方即时字幕） */
   const liveTranscript = ref("");
   const isRecording = ref<boolean>(false);
+  let pendingRecordingStart: Promise<void> | null = null;
+  let isRecorderStopPending = false;
+  let isStopRequested = false;
   const recordingElapsedSeconds = ref<number>(0);
   let elapsedTimer: ReturnType<typeof setInterval> | null = null;
   let cachedAppWindow: ReturnType<typeof getCurrentWindow> | null = null;
@@ -146,6 +149,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
 
   let lastMonitorKey = "";
   let isRepositioning = false;
+  let hudPresentationEpoch = 0;
 
   function getAppWindow() {
     if (!cachedAppWindow) cachedAppWindow = getCurrentWindow();
@@ -200,13 +204,16 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     void emitEvent(VOICE_FLOW_STATE_CHANGED, payload);
   }
 
-  async function repositionHudToCurrentMonitor() {
+  async function repositionHudToCurrentMonitor(
+    presentationEpoch = hudPresentationEpoch,
+  ) {
     if (isRepositioning) return;
     isRepositioning = true;
     try {
       const position = await invoke<HudTargetPosition>(
         "get_hud_target_position",
       );
+      if (presentationEpoch !== hudPresentationEpoch) return;
       if (position.monitorKey !== lastMonitorKey) {
         lastMonitorKey = position.monitorKey;
         await getAppWindow().setPosition(
@@ -221,7 +228,9 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
   }
 
   function startMonitorPolling() {
-    stopMonitorPolling();
+    if (monitorPollTimer) {
+      clearInterval(monitorPollTimer);
+    }
     monitorPollTimer = setInterval(() => {
       void repositionHudToCurrentMonitor();
     }, MONITOR_POLL_INTERVAL_MS);
@@ -236,13 +245,25 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     isRepositioning = false;
   }
 
-  async function showHud() {
+  async function showHud(shouldIgnoreCursorEvents = true) {
     clearLearnedHideTimer();
     const window = getAppWindow();
+    const presentationEpoch = ++hudPresentationEpoch;
     lastMonitorKey = "";
-    await repositionHudToCurrentMonitor();
     await window.show();
-    await window.setIgnoreCursorEvents(true);
+    if (presentationEpoch !== hudPresentationEpoch) return;
+    if (shouldIgnoreCursorEvents) {
+      void window.setIgnoreCursorEvents(true).catch((err) => {
+        writeErrorLog(
+          `useVoiceFlowStore: enable HUD cursor passthrough failed: ${extractErrorMessage(err)}`,
+        );
+        captureError(err, {
+          source: "voice-flow",
+          step: "enable-hud-cursor-passthrough",
+        });
+      });
+    }
+    void repositionHudToCurrentMonitor(presentationEpoch);
     startMonitorPolling();
   }
 
@@ -384,6 +405,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     emitVoiceFlowStateChanged(nextStatus, nextMessage);
 
     if (nextStatus === "idle") {
+      hudPresentationEpoch += 1;
       stopMonitorPolling();
       collapseHideTimer = setTimeout(() => {
         hideHud().catch((err) => {
@@ -437,7 +459,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     }
 
     if (nextStatus === "error") {
-      showHud()
+      showHud(false)
         .then(async () => {
           await getAppWindow().setIgnoreCursorEvents(false);
         })
@@ -465,6 +487,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     error?: unknown,
   ) {
     clearDelayedMuteTimer();
+    isStopRequested = true;
     restoreSystemAudio();
     isRecording.value = false;
     transitionTo("error", errorMessage);
@@ -479,6 +502,23 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     if (useSettingsStore().isSoundEffectsEnabled) {
       void invoke(command).catch(() => {});
     }
+  }
+
+  function stopRecorderAfterStart(
+    recordingStartPromise: Promise<void> | null,
+  ) {
+    if (isRecorderStopPending) return;
+    isRecorderStopPending = true;
+    void (async () => {
+      try {
+        await recordingStartPromise;
+        await invoke("stop_recording");
+      } catch {
+        // 录音启动失败时，启动流程会负责呈现错误状态。
+      } finally {
+        isRecorderStopPending = false;
+      }
+    })();
   }
 
   function escapeRegex(str: string): string {
@@ -947,6 +987,14 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
   }
 
   function applyDoubleTapModeSwitch() {
+    if (isRecording.value) {
+      isStopRequested = true;
+      clearDelayedMuteTimer();
+      stopElapsedTimer();
+      void restoreSystemAudio();
+      void invoke("cancel_live_asr").catch(() => {});
+      stopRecorderAfterStart(pendingRecordingStart);
+    }
     isRecording.value = false;
     // 世代 +1：这轮录音被双击静默取消，途中的选取侦测回呼全部失效
     recordingEpoch += 1;
@@ -1004,15 +1052,19 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
 
     writeInfoLog(`useVoiceFlowStore: ESC abort from ${currentStatus}`);
     isAborted.value = true;
+    isStopRequested = true;
     abortController?.abort();
     editSourceText.value = null;
 
     // 无条件重置 isRecording，避免永久锁死
     isRecording.value = false;
 
+    const recordingStartPromise = pendingRecordingStart;
+    pendingRecordingStart = null;
+
     if (currentStatus === "recording") {
       void invoke("cancel_live_asr").catch(() => {});
-      void invoke("stop_recording").catch(() => {});
+      stopRecorderAfterStart(recordingStartPromise);
       stopElapsedTimer();
     } else {
       // 转写中途 ESC：也关掉 live session
@@ -1047,8 +1099,11 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
   }
 
   async function handleStartRecording() {
-    if (isRecording.value) return;
+    if (isRecording.value || isRecorderStopPending) return;
     isRecording.value = true;
+    isStopRequested = false;
+    clearModeSwitchLabelTimer();
+    modeSwitchLabel.value = "";
     recordingStartTimestamp = performance.now();
     isAborted.value = false;
     abortController = new AbortController();
@@ -1066,6 +1121,13 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     // 捕获当前前景视窗（Windows: HUD show 前记住目标，贴上前恢复焦点）
     void invoke("capture_target_window").catch(() => {});
 
+    transitionTo("recording", t("voiceFlow.recording"));
+    playSoundIfEnabled("play_start_sound");
+    delayedMuteTimer = setTimeout(() => {
+      delayedMuteTimer = null;
+      void muteSystemAudioIfEnabled();
+    }, START_SOUND_DURATION_MS);
+
     // 侦测选取文字（非阻塞）：AX 被动查询，零按键模拟（#24/#25）。
     // AX 不可见的 App 标记剪贴簿后备，延后到录音停止、按键放开后执行
     editSourceText.value = null;
@@ -1073,6 +1135,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     pendingSelectionCapture = null;
     recordingEpoch += 1;
     const probeEpoch = recordingEpoch;
+    const currentRecordingEpoch = recordingEpoch;
     invoke<{ kind: string; text: string | null }>("read_selection_state")
       .then((state) => {
         // 过期回呼（下一轮录音已开始）直接失效，防止跨录音状态污染
@@ -1092,18 +1155,22 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       })
       .catch(() => {});
 
-    try {
-      playSoundIfEnabled("play_start_sound");
-      delayedMuteTimer = setTimeout(() => {
-        delayedMuteTimer = null;
-        void muteSystemAudioIfEnabled();
-      }, START_SOUND_DURATION_MS);
-      await invoke("start_recording", {
+    const recordingStartPromise = invoke<void>("start_recording", {
         deviceName: useSettingsStore().selectedAudioInputDeviceName,
       });
-      if (isAborted.value) return;
+    pendingRecordingStart = recordingStartPromise;
+
+    try {
+      await recordingStartPromise;
+      if (
+        currentRecordingEpoch !== recordingEpoch ||
+        isAborted.value ||
+        !isRecording.value
+      ) {
+        return;
+      }
+      if (isStopRequested) return;
       startElapsedTimer();
-      transitionTo("recording", t("voiceFlow.recording"));
       writeInfoLog("useVoiceFlowStore: recording started");
 
       // 边说边出：录音开始后立刻挂上 live ASR（失败不阻断录音）
@@ -1116,6 +1183,10 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         `useVoiceFlowStore: start recording failed: ${technicalErrorMessage}`,
         error,
       );
+    } finally {
+      if (pendingRecordingStart === recordingStartPromise) {
+        pendingRecordingStart = null;
+      }
     }
   }
 
@@ -1136,10 +1207,11 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         );
         return;
       }
-      if (isAborted.value || !isRecording.value) return;
+      if (isAborted.value || !isRecording.value || isStopRequested) return;
 
       const vocabularyStore = useVocabularyStore();
       const termList = await vocabularyStore.getTopTermListByWeight(50);
+      if (isAborted.value || !isRecording.value || isStopRequested) return;
       await invoke("start_live_asr", {
         appId,
         accessKey,
@@ -1158,6 +1230,8 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
   async function handleStopRecording() {
     if (!isRecording.value) return;
     if (isAborted.value) return;
+    isStopRequested = true;
+    const recordingStartPromise = pendingRecordingStart;
 
     // Pre-estimate duration for double-tap detection (before any async work).
     // Use precise timestamp — recordingElapsedSeconds has 1s resolution, too coarse for 300ms threshold.
@@ -1172,7 +1246,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         clearDelayedMuteTimer();
         void restoreSystemAudio();
         void invoke("cancel_live_asr").catch(() => {});
-        void invoke("stop_recording").catch(() => {});
+        stopRecorderAfterStart(recordingStartPromise);
         applyDoubleTapModeSwitch();
         return;
       }
@@ -1225,6 +1299,12 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     let rmsEnergyLevel = 0;
 
     try {
+      try {
+        await recordingStartPromise;
+      } catch {
+        return;
+      }
+      if (isAborted.value || !isRecording.value) return;
       const stopResult = await invoke<StopRecordingResult>("stop_recording");
       if (isAborted.value) return;
       recordingDurationMs = stopResult.recordingDurationMs;
