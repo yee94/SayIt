@@ -234,8 +234,7 @@
  └──────────┘         │  macOS Intel    │
                       │  Windows x64    │
                       │                 │
-                      │ + Apple Signing │
-                      │ + Notarization  │
+                      │ + ad-hoc signing│
                       │ + Updater .sig  │
                       │ + Sentry upload │
                       └────────┬────────┘
@@ -257,18 +256,12 @@
 - 正式版 telemetry 與 sourcemap upload 只能走 `release.yml`，不得繞過 workflow 手動上傳
 - 發版前必須確認 GitHub Secrets 與 Sentry Secrets 齊全
 
-### GitHub Secrets（13 個）
+### GitHub Secrets（7 個）
 
 | Secret | 用途 |
 |--------|------|
 | `TAURI_SIGNING_PRIVATE_KEY` | Updater 簽署私鑰 |
 | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | 私鑰密碼 |
-| `APPLE_CERTIFICATE` | Developer ID .p12 (Base64) |
-| `APPLE_CERTIFICATE_PASSWORD` | .p12 密碼 |
-| `APPLE_SIGNING_IDENTITY` | Developer ID signing identity（見 GitHub Secrets） |
-| `APPLE_ID` | Apple ID email |
-| `APPLE_PASSWORD` | App-Specific Password |
-| `APPLE_TEAM_ID` | Apple Developer Team ID（見 GitHub Secrets） |
 | `SENTRY_DSN` | Rust 正式版 Sentry DSN |
 | `VITE_SENTRY_DSN` | Frontend 正式版 Sentry DSN |
 | `SENTRY_AUTH_TOKEN` | Sentry sourcemap upload token |
@@ -279,9 +272,9 @@
 
 | 平台 | URL |
 |------|-----|
-| macOS ARM | `https://github.com/chenjackle45/SayIt/releases/latest/download/SayIt-mac-arm64.dmg` |
-| macOS Intel | `https://github.com/chenjackle45/SayIt/releases/latest/download/SayIt-mac-x64.dmg` |
-| Windows | `https://github.com/chenjackle45/SayIt/releases/latest/download/SayIt-windows-x64.exe` |
+| macOS ARM | `https://github.com/yee94/SayIt/releases/latest/download/SayIt-mac-arm64.dmg` |
+| macOS Intel | `https://github.com/yee94/SayIt/releases/latest/download/SayIt-mac-x64.dmg` |
+| Windows | `https://github.com/yee94/SayIt/releases/latest/download/SayIt-windows-x64.exe` |
 
 ### Claude Code Review Workflow
 

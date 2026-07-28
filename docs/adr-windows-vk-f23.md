@@ -4,7 +4,7 @@
 |------|------|
 | 狀態 | Accepted |
 | 決議日期 | 2026-05-04 |
-| 引入版本 | v0.9.5 之後（PR [#29](https://github.com/chenjackle45/SayIt/pull/29)） |
+| 引入版本 | v0.9.5 之後（PR [#29](https://github.com/yee94/SayIt/pull/29)） |
 | 影響範圍 | Windows 平台、低階鍵盤 hook |
 | 程式碼位置 | `src-tauri/src/plugins/hotkey_listener.rs` 之 `mod windows_hook` |
 
@@ -58,5 +58,5 @@ if kbd.vkCode == VK_F23 {
 ## References
 
 - [Windows Virtual-Key Codes](https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes)
-- PR #29: https://github.com/chenjackle45/SayIt/pull/29
+- PR #29: https://github.com/yee94/SayIt/pull/29
 - Memory: `windows-platform-quirks.md`

@@ -487,7 +487,7 @@ pub fn run() {
             app.manage(plugins::transcription::TranscriptionState::new());
 
             let open_dashboard_item =
-                MenuItem::with_id(app, "open-dashboard", "開啟 Dashboard", true, None::<&str>)?;
+                MenuItem::with_id(app, "open-dashboard", "打开 Dashboard", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "Quit SayIt", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&open_dashboard_item, &quit_item])?;
 

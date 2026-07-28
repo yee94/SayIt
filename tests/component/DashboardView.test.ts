@@ -81,20 +81,20 @@ function mountDashboard(renderTooltip = false) {
   });
 }
 
-describe("DashboardView 額度卡片", () => {
+describe("DashboardView 额度卡片", () => {
   beforeEach(() => {
     i18n.global.locale.value = "zh-TW";
     historyState = makeHistory({ whisperRequestCount: 10, llmRequestCount: 5 });
     settingsState = makeSettings();
   });
 
-  it("[P0] 自訂 endpoint：主體顯示今日用量（無免費額度）", () => {
+  it("[P0] 自订 endpoint：主体显示今日用量（无免费额度）", () => {
     const text = mountDashboard().text();
     expect(text).toContain("今日用量");
-    expect(text).toContain("計費");
+    expect(text).toContain("计费");
   });
 
-  it("[P0] 用量數字應反映 history store", () => {
+  it("[P0] 用量数字应反映 history store", () => {
     historyState = makeHistory({
       whisperRequestCount: 10,
       llmRequestCount: 8,
@@ -105,8 +105,8 @@ describe("DashboardView 額度卡片", () => {
     expect(text).toContain("8");
   });
 
-  it("[P0] tooltip 保留付費方案提示", () => {
+  it("[P0] tooltip 保留付费方案提示", () => {
     const text = mountDashboard(true).text();
-    expect(text).toContain("付費方案 — 無免費額度限制");
+    expect(text).toContain("付费方案 — 无免费额度限制");
   });
 });

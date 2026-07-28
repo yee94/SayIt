@@ -303,8 +303,8 @@ CREATE TABLE IF NOT EXISTS schema_version (
 **決策：GitHub Releases 自動更新**
 
 - 使用 tauri-plugin-updater + GitHub Releases endpoint
-- Updater endpoint: `https://github.com/chenjackle45/SayIt/releases/latest/download/latest.json`
-- Public repo: `chenjackle45/SayIt`
+- Updater endpoint: `https://github.com/yee94/SayIt/releases/latest/download/latest.json`
+- Public repo: `yee94/SayIt`
 - 使用者體驗：
   - **定時檢查** — 啟動 5 秒後首次檢查，之後每 4 小時背景檢查
   - **手動檢查** — Sidebar Footer 的「檢查更新」按鈕，結果以 inline feedback 顯示（2.5 秒自動消失）
@@ -314,8 +314,8 @@ CREATE TABLE IF NOT EXISTS schema_version (
 **CI/CD Pipeline（已實作）：**
 - **CI**（`.github/workflows/ci.yml`）— push/PR to main 觸發 vue-tsc + Vitest
 - **Release**（`.github/workflows/release.yml`）— push tag `v*` 觸發 3 平台建構
-  - macOS ARM + Intel：Apple Code Signing + Notarization
-  - Windows x64：NSIS installer
+  - macOS ARM + Intel：ad-hoc 簽名，無 Apple Developer ID 與 Notarization
+  - Windows x64：未簽名 NSIS installer
 
 **發版流程：**
 1. `./scripts/release.sh X.Y.Z`（自動更新版本號、commit、tag、push）
@@ -323,9 +323,10 @@ CREATE TABLE IF NOT EXISTS schema_version (
 3. 到 GitHub Releases 手動 Publish draft release
 4. 使用者的 App 自動偵測並提示更新
 
-**Code Signing（已實作）：**
-- macOS：Developer ID Application（見 GitHub Secrets），含 Notarization
-- Windows：暫無 EV code signing certificate，初期使用者手動信任
+**安裝包簽名策略：**
+- macOS：ad-hoc 簽名，使用者首次開啟時手動信任
+- Windows：無 Authenticode 憑證，使用者依 SmartScreen 提示手動信任
+- Updater：保留 minisign 更新包簽名與驗證
 
 **安裝包格式：**
 - macOS：`.dmg`（含 `.app`）+ `.app.tar.gz`（updater 用）

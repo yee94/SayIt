@@ -649,16 +649,16 @@ src/
 
 #### 產出格式
 
-- **macOS** — `.dmg`（含 `.app`），Apple Developer ID 簽名 + Notarization
+- **macOS** — `.dmg`（含 `.app`），ad-hoc 簽名，無 Apple Developer ID 與 Notarization
 - **Windows** — NSIS `.exe` + `.msi`
 - **自動更新** — `tauri-plugin-updater` + GitHub Releases endpoint（啟動 5 秒後首次檢查，每 4 小時 `setInterval` 定時檢查 + Sidebar「檢查更新」按鈕顯示 `UpdateCheckResult` 狀態）
 
 #### CI/CD
 
 - **CI** — `.github/workflows/ci.yml`（push/PR to main → vue-tsc + Vitest）
-- **Release** — `.github/workflows/release.yml`（tag `v*` 或 `workflow_dispatch` → 3 平台建構 + Apple 簽名 + Sentry sourcemap upload + 自動公開 Release）
+- **Release** — `.github/workflows/release.yml`（tag `v*` 或 `workflow_dispatch` → 前端與跨平台 Rust 品質門禁 → 3 平台建構 + macOS ad-hoc 簽名 + Sentry sourcemap upload + 自動公開 Release）
 - **發版腳本** — `./scripts/release.sh X.Y.Z`（bump 版本 → commit → tag → 分開推送 branch/tag）
-- **GitHub Secrets** — 13 個（`TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID`, `SENTRY_DSN`, `VITE_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`）
+- **GitHub Secrets** — 7 個（`TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, `SENTRY_DSN`, `VITE_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`）
 - **Stable-name Assets** — Release workflow 自動上傳固定名稱 DMG/EXE（`SayIt-mac-arm64.dmg`, `SayIt-mac-x64.dmg`, `SayIt-windows-x64.exe`），支援官網固定下載 URL
 - **Release 公開流程** — `tauri-action` 先建立 Draft release，待 matrix build 全部成功後由 `publish-release` job 自動執行 `gh release edit --draft=false`
 - **Tag 推送陷阱** — `git push origin main --tags` 可能不觸發 tag 事件，必須分開推送（release.sh 已修正）
@@ -671,7 +671,6 @@ src/
 
 **建構/簽署（CI/CD only）：**
 - **`TAURI_SIGNING_PRIVATE_KEY`** / **`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`** — Updater 簽署
-- **`APPLE_CERTIFICATE` 等 6 個** — Apple Code Signing（見 CLAUDE.md）
 
 **Sentry（CI/CD 注入，生產環境用）：**
 

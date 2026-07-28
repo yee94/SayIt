@@ -261,7 +261,15 @@
     "weightDescription": "音声認識のたびに、重みが最も高い上位 {limit} 語が AI 認識プロンプトに含まれます。同じ修正が繰り返し検出されると、その用語の重みが自動的に増加します。",
     "noAiSuggestions": "AI 推奨の用語はまだありません。スマート辞書学習を有効にすると自動学習されます",
     "noAiSuggestionsEnabled": "スマート辞書学習は有効です。文字起こしを修正すると、新しい用語が自動的に学習されます",
-    "aiTermCount": "{count} 語"
+    "aiTermCount": "{count} 語",
+    "importTypeless": "Typeless をインポート",
+    "importTypelessHint": "Typeless の CSV / TXT エクスポートを選択（1 行 1 語）",
+    "importing": "インポート中...",
+    "importSuccess": "{added} 語を追加、重複 {skipped} 語をスキップ",
+    "importAllSkipped": "すべて既存の語彙のため {skipped} 語をスキップ",
+    "importEmpty": "{file} に有効な語彙が見つかりません",
+    "importFileTooLarge": "ファイルが大きすぎます。最大 5 MB",
+    "importFailed": "インポートに失敗しました。ファイル形式を確認して再試行してください"
   },
   "accessibility": {
     "title": "アクセシビリティ権限が必要です",

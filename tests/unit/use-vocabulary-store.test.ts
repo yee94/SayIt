@@ -232,4 +232,57 @@ describe("useVocabularyStore", () => {
       expect(sql).toContain("'manual'");
     });
   });
+
+  // ==========================================================================
+  // importTerms
+  // ==========================================================================
+
+  describe("importTerms", () => {
+    it("批量插入新詞並跳過已存在（大小寫不敏感）", async () => {
+      mockDbSelect
+        .mockResolvedValueOnce([
+          createRawVocabularyRow({ id: "1", term: "Vue.js", source: "manual" }),
+        ])
+        .mockResolvedValueOnce([
+          createRawVocabularyRow({ id: "1", term: "Vue.js", source: "manual" }),
+          createRawVocabularyRow({ id: "2", term: "Tauri", source: "manual" }),
+          createRawVocabularyRow({ id: "3", term: "Pinia", source: "manual" }),
+        ]);
+
+      const { useVocabularyStore } = await import(
+        "../../src/stores/useVocabularyStore"
+      );
+      const store = useVocabularyStore();
+      await store.fetchTermList();
+
+      const result = await store.importTerms(["vue.js", "Tauri", "Pinia", "  "]);
+
+      expect(result).toEqual({ added: 2, skipped: 2 });
+      // 兩次 INSERT（Tauri、Pinia）
+      const insertCalls = mockDbExecute.mock.calls.filter(([sql]) =>
+        String(sql).includes("INSERT INTO vocabulary"),
+      );
+      expect(insertCalls).toHaveLength(2);
+      expect(insertCalls.every(([sql]) => String(sql).includes("'manual'"))).toBe(
+        true,
+      );
+    });
+
+    it("全部已存在時不寫入 DB", async () => {
+      mockDbSelect.mockResolvedValueOnce([
+        createRawVocabularyRow({ id: "1", term: "Vue.js", source: "manual" }),
+      ]);
+
+      const { useVocabularyStore } = await import(
+        "../../src/stores/useVocabularyStore"
+      );
+      const store = useVocabularyStore();
+      await store.fetchTermList();
+      mockDbExecute.mockClear();
+
+      const result = await store.importTerms(["Vue.js", "vue.js"]);
+      expect(result).toEqual({ added: 0, skipped: 2 });
+      expect(mockDbExecute).not.toHaveBeenCalled();
+    });
+  });
 });

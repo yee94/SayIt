@@ -33,7 +33,7 @@ vi.mock("@tauri-apps/api/event", () => ({
   emit: mockEmit,
 }));
 
-describe("i18n 設定功能", () => {
+describe("i18n 设定功能", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     mockStoreData.clear();
@@ -51,7 +51,7 @@ describe("i18n 設定功能", () => {
   // ==========================================================================
 
   describe("saveLocale", () => {
-    it("[P0] saveLocale('en') 應正確存入 store 並更新 i18n.global.locale", async () => {
+    it("[P0] saveLocale('en') 应正确存入 store 并更新 i18n.global.locale", async () => {
       const { useSettingsStore } = await import(
         "../../src/stores/useSettingsStore"
       );
@@ -64,7 +64,7 @@ describe("i18n 設定功能", () => {
       expect(mockStoreSave).toHaveBeenCalled();
     });
 
-    it("[P0] saveLocale('ja') 應更新 document.documentElement.lang 為 'ja'", async () => {
+    it("[P0] saveLocale('ja') 应更新 document.documentElement.lang 为 'ja'", async () => {
       const { useSettingsStore } = await import(
         "../../src/stores/useSettingsStore"
       );
@@ -111,14 +111,14 @@ describe("i18n 設定功能", () => {
   // ==========================================================================
 
   describe("TranscriptionLocale", () => {
-    it("[P0] getWhisperCodeForTranscriptionLocale('auto') 應回傳 null", async () => {
+    it("[P0] getWhisperCodeForTranscriptionLocale('auto') 应回传 null", async () => {
       const { getWhisperCodeForTranscriptionLocale } = await import(
         "../../src/i18n/languageConfig"
       );
       expect(getWhisperCodeForTranscriptionLocale("auto")).toBeNull();
     });
 
-    it("[P0] getWhisperCodeForTranscriptionLocale 各語言應回傳正確的 whisperCode", async () => {
+    it("[P0] getWhisperCodeForTranscriptionLocale 各语言应回传正确的 whisperCode", async () => {
       const { getWhisperCodeForTranscriptionLocale } = await import(
         "../../src/i18n/languageConfig"
       );
@@ -129,7 +129,7 @@ describe("i18n 設定功能", () => {
       expect(getWhisperCodeForTranscriptionLocale("ko")).toBe("ko");
     });
 
-    it("[P0] TRANSCRIPTION_LANGUAGE_OPTIONS 應包含 auto + 5 個語言選項", async () => {
+    it("[P0] TRANSCRIPTION_LANGUAGE_OPTIONS 应包含 auto + 5 个语言选项", async () => {
       const { TRANSCRIPTION_LANGUAGE_OPTIONS } = await import(
         "../../src/i18n/languageConfig"
       );
@@ -154,7 +154,7 @@ describe("i18n 設定功能", () => {
   // ==========================================================================
 
   describe("saveTranscriptionLocale", () => {
-    it("[P0] saveTranscriptionLocale('ja') 應正確存入 store", async () => {
+    it("[P0] saveTranscriptionLocale('ja') 应正确存入 store", async () => {
       mockStoreData.set("selectedLocale", "zh-TW");
 
       const { useSettingsStore } = await import(
@@ -172,7 +172,7 @@ describe("i18n 設定功能", () => {
       expect(mockStoreSave).toHaveBeenCalled();
     });
 
-    it("[P0] saveTranscriptionLocale 應發送 SETTINGS_UPDATED event", async () => {
+    it("[P0] saveTranscriptionLocale 应发送 SETTINGS_UPDATED event", async () => {
       mockStoreData.set("selectedLocale", "zh-TW");
 
       const { useSettingsStore } = await import(
@@ -189,7 +189,7 @@ describe("i18n 設定功能", () => {
       });
     });
 
-    it("[P0] saveTranscriptionLocale('auto') 後 getWhisperLanguageCode 應回傳 null", async () => {
+    it("[P0] saveTranscriptionLocale('auto') 后 getWhisperLanguageCode 应回传 null", async () => {
       mockStoreData.set("selectedLocale", "zh-TW");
 
       const { useSettingsStore } = await import(
@@ -209,7 +209,7 @@ describe("i18n 設定功能", () => {
   // ==========================================================================
 
   describe("detectSystemLocale", () => {
-    it("[P0] 精確匹配：navigator.languages=['zh-Hant-TW'] → 'zh-TW'", async () => {
+    it("[P0] 精确匹配：navigator.languages=['zh-Hant-TW'] → 'zh-TW'", async () => {
       vi.stubGlobal("navigator", { languages: ["zh-Hant-TW"] });
 
       const { detectSystemLocale } = await import(
@@ -242,7 +242,7 @@ describe("i18n 設定功能", () => {
       vi.unstubAllGlobals();
     });
 
-    it("[P0] 前綴匹配：navigator.languages=['ja-JP'] → 'ja'", async () => {
+    it("[P0] 前缀匹配：navigator.languages=['ja-JP'] → 'ja'", async () => {
       vi.stubGlobal("navigator", { languages: ["ja-JP"] });
 
       const { detectSystemLocale } = await import(
@@ -253,13 +253,13 @@ describe("i18n 設定功能", () => {
       vi.unstubAllGlobals();
     });
 
-    it("[P0] 無匹配時 fallback 為 'zh-TW'：navigator.languages=['th']", async () => {
+    it("[P0] 无匹配时 fallback 为 'zh-CN'：navigator.languages=['th']", async () => {
       vi.stubGlobal("navigator", { languages: ["th"] });
 
       const { detectSystemLocale } = await import(
         "../../src/i18n/languageConfig"
       );
-      expect(detectSystemLocale()).toBe("zh-TW");
+      expect(detectSystemLocale()).toBe("zh-CN");
 
       vi.unstubAllGlobals();
     });
@@ -269,8 +269,8 @@ describe("i18n 設定功能", () => {
   // Prompt auto-switch
   // ==========================================================================
 
-  describe("轉錄語言切換 prompt 連動", () => {
-    it("[P0] 未自訂 prompt 時，切換轉錄語言應自動更新為新語言預設", async () => {
+  describe("转录语言切换 prompt 连动", () => {
+    it("[P0] 未自订 prompt 时，切换转录语言应自动更新为新语言预设", async () => {
       // 明確設定起始 locale 為 zh-TW（避免 jsdom 環境 detectSystemLocale 不穩定）
       mockStoreData.set("selectedLocale", "zh-TW");
 
@@ -300,8 +300,8 @@ describe("i18n 設定功能", () => {
       expect(aiPromptSetCallList).toHaveLength(0);
     });
 
-    it("[P0] 已自訂 prompt 時，切換轉錄語言不應改變 prompt", async () => {
-      const customPrompt = "我的自訂 prompt 內容";
+    it("[P0] 已自订 prompt 时，切换转录语言不应改变 prompt", async () => {
+      const customPrompt = "我的自订 prompt 内容";
       mockStoreData.set("selectedLocale", "zh-TW");
       mockStoreData.set("aiPrompt", customPrompt);
 
@@ -318,7 +318,7 @@ describe("i18n 設定功能", () => {
       expect(store.getAiPrompt()).toBe(customPrompt);
     });
 
-    it("[P0] 轉錄語言為特定語言時，切換 UI 語言不應改變 prompt", async () => {
+    it("[P0] 转录语言为特定语言时，切换 UI 语言不应改变 prompt", async () => {
       mockStoreData.set("selectedLocale", "zh-TW");
 
       const { useSettingsStore } = await import(
@@ -339,7 +339,7 @@ describe("i18n 設定功能", () => {
       expect(store.getAiPrompt()).toBe(zhDefault);
     });
 
-    it("[P0] 轉錄語言為 auto 時，切換 UI 語言應更新 prompt（僅記憶體）", async () => {
+    it("[P0] 转录语言为 auto 时，切换 UI 语言应更新 prompt（仅记忆体）", async () => {
       mockStoreData.set("selectedLocale", "zh-TW");
       mockStoreData.set("selectedTranscriptionLocale", "auto");
 
@@ -374,8 +374,8 @@ describe("i18n 設定功能", () => {
   // 翻譯檔 key 一致性驗證
   // ==========================================================================
 
-  describe("翻譯檔 key 一致性", () => {
-    it("[P0] 所有 5 個 locale JSON 檔的 key 集合應完全一致", async () => {
+  describe("翻译档 key 一致性", () => {
+    it("[P0] 所有 5 个 locale JSON 档的 key 集合应完全一致", async () => {
       const zhTW = await import("../../src/i18n/locales/zh-TW.json");
       const en = await import("../../src/i18n/locales/en.json");
       const ja = await import("../../src/i18n/locales/ja.json");

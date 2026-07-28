@@ -84,7 +84,7 @@ say-it/
 | [data-models.md](./data-models.md)                       | SQLite Schema + Store 結構                    |
 | [component-inventory-frontend.md](./component-inventory-frontend.md) | UI 元件清單                       |
 | [development-guide.md](./development-guide.md)           | 開發環境、指令、常見任務                      |
-| [deployment-guide.md](./deployment-guide.md)             | CI/CD、Apple notarize、發版流程               |
+| [deployment-guide.md](./deployment-guide.md)             | CI/CD、無開發者認證建構、發版流程             |
 
 ### 5.3 計畫 / 故事 / 規格（_bmad-output/）
 

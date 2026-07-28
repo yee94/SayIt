@@ -1,6 +1,6 @@
 # Deployment Guide
 
-> CI/CD pipeline、Apple Code Signing、Notarization、發版流程
+> CI/CD pipeline、無開發者認證建構、自動更新簽名、發版流程
 > 掃描日期：2026-05-08 · 版本：0.9.5
 
 ---
@@ -14,14 +14,14 @@ push/PR to main           push tag v*
  ┌──────────┐         ┌─────────────────────────────────┐
  │  ci.yml  │         │       release.yml               │
  │  ──────  │         │  ────────────────────────────   │
- │ vue-tsc  │         │  Job: build (matrix · 3)        │
- │ vitest   │         │   ├── macOS aarch64-apple-darwin│
- │ cargo    │         │   ├── macOS x86_64-apple-darwin │
- │  check   │         │   └── Windows x64               │
- │ (mac+win)│         │                                 │
- └──────────┘         │  + tauri-action                 │
-                      │   - Apple Code Sign             │
-                      │   - Notarization                │
+ │ vue-tsc  │         │  frontend-check + rust-check    │
+ │ vitest   │         │              │                  │
+ │ clippy   │         │              ▼                  │
+ │ rust test│         │  Job: build (matrix · 3)        │
+ └──────────┘         │   ├── macOS arm64（ad-hoc）     │
+                      │   ├── macOS x64（ad-hoc）       │
+                      │   └── Windows x64（未簽名）     │
+                      │  + tauri-action                 │
                       │   - Updater .sig                │
                       │  + Sentry sourcemap upload      │
                       │     (mac arm64 only)            │
@@ -59,14 +59,9 @@ steps:
   4. cargo check (working-directory: src-tauri)
 ```
 
-### 2.3 ⚠️ CI 缺漏
+### 2.3 Release 品質門禁
 
-| 項目                       | 影響                                              |
-| -------------------------- | ------------------------------------------------- |
-| 沒跑 `cargo test`          | 17+ 個 Rust 純函式測試沒 CI 守門                  |
-| 沒跑 `cargo clippy`        | Rust lint 規則沒 enforce                          |
-| 沒跑 ESLint                | 雖然 PostToolUse hook 自動跑，但 PR 仍可能漏掉    |
-| 沒跑 Playwright E2E        | E2E 仍是本機跑，沒整合 CI                         |
+`release.yml` 會重跑 vue-tsc、ESLint、Vitest，以及 macOS/Windows 的 Cargo clippy 與 Cargo test。三平台安裝包只有在全部檢查通過後才開始建構。
 
 ---
 
@@ -112,14 +107,6 @@ VITE_SENTRY_RELEASE=sayit@0.9.5
 ```
 TAURI_SIGNING_PRIVATE_KEY              ← Updater 簽署私鑰
 TAURI_SIGNING_PRIVATE_KEY_PASSWORD     ← 私鑰密碼
-
-# Apple Code Signing + Notarization (macOS only)
-APPLE_CERTIFICATE                      ← Developer ID .p12 (Base64)
-APPLE_CERTIFICATE_PASSWORD             ← .p12 密碼
-APPLE_SIGNING_IDENTITY                 ← Developer ID Application: ...
-APPLE_ID                               ← Apple ID email
-APPLE_PASSWORD                         ← App-Specific Password
-APPLE_TEAM_ID                          ← Apple Developer Team ID
 
 # Sentry
 SENTRY_DSN, VITE_SENTRY_DSN
@@ -225,7 +212,7 @@ tag push 後自動觸發 `release.yml`：
 - 三個 build job 平行跑（mac arm64 / mac x64 / windows）
 - 完成後 `publish-release` job 把 Draft Release 改為 Published
 
-時間：~ 15-25 分鐘（含 Apple notarize 等待）
+時間：依 GitHub Actions runner 與跨平台測試、建構速度而定。
 
 ### 4.4 驗證 Release
 
@@ -238,7 +225,7 @@ tag push 後自動觸發 `release.yml`：
    - 自動命名版（SayIt_0.9.5_*.dmg / .exe）
    - latest.json（updater）
    - 對應的 .sig 檔（updater 簽名）
-3. 下載 .dmg → 開啟 → 確認 Notarization 通過（不會跳「未驗證」警告）
+3. 下載 .dmg → 開啟 → 用 Finder 右鍵「打開」完成首次授權
 4. 檢查 Sentry：
    - Releases 頁面看到 sayit@0.9.5
    - Sourcemaps 已上傳（前端 stack trace 應該有原始檔名）
@@ -247,38 +234,32 @@ tag push 後自動觸發 `release.yml`：
 
 ---
 
-## 五、Apple Code Signing & Notarization
+## 五、無開發者認證的安裝包
 
-### 5.1 Developer ID
+### 5.1 macOS ad-hoc 簽名
 
-- Team：Tai-Cheng Chen (G9J8D2T6DV)
-- Apple ID：chenjackle45@gmail.com
-- Signing Identity：`Developer ID Application: Tai-Cheng Chen (G9J8D2T6DV)`
+- `src-tauri/tauri.conf.json` 固定使用 `"signingIdentity": "-"`。
+- 建構流程不使用 Apple Developer ID，也不提交 notarization。
+- 從網路下載後，macOS 會顯示未認證開發者警告；使用者需透過 Finder 右鍵「打開」，或在「隱私權與安全性」中允許。
 
-### 5.2 簽署流程（tauri-action 自動處理）
+### 5.2 Windows 未簽名安裝包
 
-```
-1. 從 APPLE_CERTIFICATE secret 解 .p12 並 import 到 keychain
-2. tauri-action 用 APPLE_SIGNING_IDENTITY 簽 .app bundle
-3. 用 APPLE_ID + APPLE_PASSWORD 提交 notarization
-4. notarize ticket 回來後 staple 到 .dmg
-```
+- Windows 安裝器不使用 Authenticode 憑證。
+- SmartScreen 可能顯示未知發行者警告，使用者可選擇繼續安裝。
 
 ### 5.3 必要 entitlements（`src-tauri/Entitlements.plist`）
 
 要的權限（節錄）：
-- `com.apple.security.cs.disable-library-validation`（cpal 動態載入 audio framework）
 - `com.apple.security.device.audio-input`（麥克風）
-- `com.apple.security.cs.allow-jit`（WebView）
-- `com.apple.security.cs.allow-unsigned-executable-memory`（WebView）
+- `com.apple.security.automation.apple-events`（Apple Events）
 
 ### 5.4 自動更新簽名
 
 `tauri-plugin-updater` 用 minisign 簽名：
 
-- 私鑰：`~/.tauri/sayit.key`，密碼：`sayit-updater-2026`
+- 私鑰只存放在 GitHub Secrets，本機路徑與密碼不得寫入版本庫
 - 公鑰：嵌入 `tauri.conf.json` 的 `plugins.updater.pubkey`
-- Updater endpoint：`https://github.com/chenjackle45/SayIt/releases/latest/download/latest.json`
+- Updater endpoint：`https://github.com/yee94/SayIt/releases/latest/download/latest.json`
 
 每次 release.yml 跑時：
 - tauri-action 用 `TAURI_SIGNING_PRIVATE_KEY` + 密碼產 `latest.json` + 各平台 `.sig` 檔
@@ -286,18 +267,12 @@ tag push 後自動觸發 `release.yml`：
 
 ---
 
-## 六、GitHub Secrets（13 個）
+## 六、GitHub Secrets（7 個）
 
 | Secret                                  | 用途                                            |
 | --------------------------------------- | ----------------------------------------------- |
 | `TAURI_SIGNING_PRIVATE_KEY`             | Updater 簽署私鑰                                |
 | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`    | 私鑰密碼                                        |
-| `APPLE_CERTIFICATE`                     | Developer ID .p12（Base64）                     |
-| `APPLE_CERTIFICATE_PASSWORD`            | .p12 密碼                                       |
-| `APPLE_SIGNING_IDENTITY`                | Developer ID signing identity                   |
-| `APPLE_ID`                              | Apple ID email                                  |
-| `APPLE_PASSWORD`                        | App-Specific Password                           |
-| `APPLE_TEAM_ID`                         | Apple Developer Team ID                         |
 | `SENTRY_DSN`                            | Rust 正式版 Sentry DSN                          |
 | `VITE_SENTRY_DSN`                       | Frontend 正式版 Sentry DSN                      |
 | `SENTRY_AUTH_TOKEN`                     | Sentry sourcemap upload token                   |
@@ -321,16 +296,16 @@ tag push 後自動觸發 `release.yml`：
 
 ```
 macOS ARM:
-  https://github.com/chenjackle45/SayIt/releases/latest/download/SayIt-mac-arm64.dmg
+  https://github.com/yee94/SayIt/releases/latest/download/SayIt-mac-arm64.dmg
 
 macOS Intel:
-  https://github.com/chenjackle45/SayIt/releases/latest/download/SayIt-mac-x64.dmg
+  https://github.com/yee94/SayIt/releases/latest/download/SayIt-mac-x64.dmg
 
 Windows:
-  https://github.com/chenjackle45/SayIt/releases/latest/download/SayIt-windows-x64.exe
+  https://github.com/yee94/SayIt/releases/latest/download/SayIt-windows-x64.exe
 
 Updater latest.json:
-  https://github.com/chenjackle45/SayIt/releases/latest/download/latest.json
+  https://github.com/yee94/SayIt/releases/latest/download/latest.json
 ```
 
 ---
@@ -358,7 +333,7 @@ git push --delete origin v0.9.5
 □ CHANGELOG.md 有 [<version>] 區塊
 □ working tree 乾淨
 □ CI 全綠（main 分支）
-□ GitHub Secrets 13 個齊全
+□ GitHub Secrets 7 個齊全
 □ ./scripts/release.sh 執行成功
 □ release.yml 三個 build job 全跑完
 □ publish-release job 完成（Draft → Published）

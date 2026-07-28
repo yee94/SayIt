@@ -60,7 +60,7 @@
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://github.com/chenjackle45/SayIt/releases/latest/download/latest.json"
+        "https://github.com/yee94/SayIt/releases/latest/download/latest.json"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDBENjAzMzYyRTMxMTNGQjgKUldTNFB4SGpZak5nRFJoYUpxR0RGMkZyZUhHYStyNzgxWEwxVHR2ZEFZMzh3eFQ1QlpXVEJLVGUK"
     }
@@ -78,7 +78,7 @@
     ],
     "macOS": {
       "entitlements": "./Entitlements.plist",
-      "signingIdentity": "Developer ID Application: Tai-Cheng Chen (G9J8D2T6DV)"
+      "signingIdentity": "-"
     }
   }
 }

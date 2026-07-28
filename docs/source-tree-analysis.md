@@ -29,7 +29,7 @@ say-it/
 ├── docs/                   # ← 本次掃描產出
 ├── .github/workflows/      # CI/CD
 │   ├── ci.yml              #   PR/push 檢查
-│   ├── release.yml         #   tag → 多平台建構 + Apple notarize
+│   ├── release.yml         #   tag → 品質門禁 + 無開發者認證的多平台建構
 │   ├── claude.yml          #   Claude Code GitHub Actions
 │   └── claude-code-review.yml
 ├── .claude/                # Claude Code skills + hooks 設定

@@ -134,7 +134,7 @@ SayIt 版本更新紀錄。
 
 - `getMicrophoneErrorMessage` 支援 Rust AudioRecorderError 字串匹配（No input device / Failed to build audio stream / Failed to get input config）
 
-## [0.8.7](https://github.com/chenjackle45/SayIt/releases/tag/v0.8.7) - 2026-03-17
+## [0.8.7](https://github.com/yee94/SayIt/releases/tag/v0.8.7) - 2026-03-17
 
 ### Changed
 
@@ -150,7 +150,7 @@ SayIt 版本更新紀錄。
 
 - 移除幻覺字典功能（DB table、Store、管理頁面、Sidebar 導航、自動學習、HUD 通知）
 
-## [0.8.6](https://github.com/chenjackle45/SayIt/releases/tag/v0.8.6) - 2026-03-16
+## [0.8.6](https://github.com/yee94/SayIt/releases/tag/v0.8.6) - 2026-03-16
 
 ### Fixed
 
@@ -159,7 +159,7 @@ SayIt 版本更新紀錄。
 - 播放失敗時新增 Sentry 錯誤回報（原本靜默吞錯）
 - 修正 read_recording_file command 的安全性：改為接受 id 參數，Rust 端組合路徑，避免任意檔案讀取風險
 
-## [0.8.5](https://github.com/chenjackle45/SayIt/releases/tag/v0.8.5) - 2026-03-16
+## [0.8.5](https://github.com/yee94/SayIt/releases/tag/v0.8.5) - 2026-03-16
 
 ### Fixed
 
@@ -167,7 +167,7 @@ SayIt 版本更新紀錄。
 - 自動恢復先前版本損壞導致遺失的 api_usage 表
 - 升級提示彈窗新增資料庫修復說明
 
-## [0.8.4](https://github.com/chenjackle45/SayIt/releases/tag/v0.8.4) - 2026-03-16
+## [0.8.4](https://github.com/yee94/SayIt/releases/tag/v0.8.4) - 2026-03-16
 
 ### Fixed
 
@@ -175,13 +175,13 @@ SayIt 版本更新紀錄。
 - 防止連線池覆蓋：第二個視窗改用 Database.get() 複用既有連線池
 - 自動恢復遺失的 api_usage 表：migration 結束後驗證關鍵表是否存在，不存在則重建
 
-## [0.8.3](https://github.com/chenjackle45/SayIt/releases/tag/v0.8.3) - 2026-03-16
+## [0.8.3](https://github.com/yee94/SayIt/releases/tag/v0.8.3) - 2026-03-16
 
 ### Fixed
 
 - 修正版本升級後首次啟動出現「database is locked (code: 5)」錯誤：HUD 與 Dashboard 雙視窗同時初始化資料庫導致競態條件，加入 Promise lock 序列化初始化 + PRAGMA busy_timeout 防護
 
-## [0.8.2](https://github.com/chenjackle45/SayIt/releases/tag/v0.8.2) - 2026-03-16
+## [0.8.2](https://github.com/yee94/SayIt/releases/tag/v0.8.2) - 2026-03-16
 
 ### Fixed
 
@@ -189,7 +189,7 @@ SayIt 版本更新紀錄。
 - 修正儀表板「平均每次字數」偏高：改用原始辨識字數計算，不再受 AI 整理後文字膨脹影響
 - 修正儀表板「節省時間」高估：公式改為（打字時間 − 口述時間），而非僅計算打字時間
 
-## [0.8.1](https://github.com/chenjackle45/SayIt/releases/tag/v0.8.1) - 2026-03-16
+## [0.8.1](https://github.com/yee94/SayIt/releases/tag/v0.8.1) - 2026-03-16
 
 ### Fixed
 
@@ -199,7 +199,7 @@ SayIt 版本更新紀錄。
 - 修正自動更新通知彈在隱藏視窗：下載完成後自動顯示 Dashboard 視窗
 - 修正自動更新只在啟動時檢查一次：恢復定時檢查機制（每 15 分鐘）
 
-## [0.8.0](https://github.com/chenjackle45/SayIt/releases/tag/v0.8.0) - 2026-03-16
+## [0.8.0](https://github.com/yee94/SayIt/releases/tag/v0.8.0) - 2026-03-16
 
 ### AI 整理模式切換
 
@@ -225,14 +225,14 @@ SayIt 版本更新紀錄。
 - HUD 狀態顯示優化與輔助使用權限引導改善
 - 幻覺偵測升級為 RMS 能量 + 4 層偵測機制，移除內建詞庫
 
-## [0.7.3](https://github.com/chenjackle45/SayIt/releases/tag/v0.7.3) - 2026-03-13
+## [0.7.3](https://github.com/yee94/SayIt/releases/tag/v0.7.3) - 2026-03-13
 
 ### Fixed
 
 - 修復英文語句含重複冠詞（the、and 等）被誤判為「未偵測到語音」的問題
 - 移除 Whisper 幻聽攔截機制，非空轉錄結果一律貼上，讓使用者自行判斷模型輸出品質
 
-## [0.7.2](https://github.com/chenjackle45/SayIt/releases/tag/v0.7.2) - 2026-03-11
+## [0.7.2](https://github.com/yee94/SayIt/releases/tag/v0.7.2) - 2026-03-11
 
 ### Added
 
@@ -244,13 +244,13 @@ SayIt 版本更新紀錄。
 
 - 修復模型下拉選單選中後 Badge 文字與模型名稱黏在一起的問題
 
-## [0.7.1](https://github.com/chenjackle45/SayIt/releases/tag/v0.7.1) - 2026-03-10
+## [0.7.1](https://github.com/yee94/SayIt/releases/tag/v0.7.1) - 2026-03-10
 
 ### Fixed
 
 - 移除已下架的 Llama 4 Maverick 17B 模型選項（Groq 已停用），已選用的使用者自動遷移至 Qwen3 32B
 
-## [0.7.0](https://github.com/chenjackle45/SayIt/releases/tag/v0.7.0) - 2026-03-10
+## [0.7.0](https://github.com/yee94/SayIt/releases/tag/v0.7.0) - 2026-03-10
 
 ### 智慧字典學習
 
@@ -262,7 +262,7 @@ SayIt 現在會自動從你的修正中學習。每次語音輸入貼上後，�
 - HUD 即時通知新學習的詞彙
 - 設定中可開關（macOS 預設開啟）
 
-## [0.6.0](https://github.com/chenjackle45/SayIt/releases/tag/v0.6.0) - 2026-03-09
+## [0.6.0](https://github.com/yee94/SayIt/releases/tag/v0.6.0) - 2026-03-09
 
 ### Added
 
@@ -277,13 +277,13 @@ SayIt 現在會自動從你的修正中學習。每次語音輸入貼上後，�
 
 - 修復自動更新後 App 無法重新啟動的問題（_exit(0) 截殺 Tauri restart 邏輯）
 
-## [0.5.0](https://github.com/chenjackle45/SayIt/releases/tag/v0.5.0) - 2026-03-08
+## [0.5.0](https://github.com/yee94/SayIt/releases/tag/v0.5.0) - 2026-03-08
 
 ### Added
 
 - 錄音開始／結束音效回饋，讓使用者明確感知錄音狀態
 
-## [0.4.0](https://github.com/chenjackle45/SayIt/releases/tag/v0.4.0) - 2026-03-08
+## [0.4.0](https://github.com/yee94/SayIt/releases/tag/v0.4.0) - 2026-03-08
 
 ### Added
 
@@ -293,7 +293,7 @@ SayIt 現在會自動從你的修正中學習。每次語音輸入貼上後，�
 
 - 強化 Whisper 靜音幻覺偵測，減少無聲片段產生錯誤轉錄
 
-## [0.3.0](https://github.com/chenjackle45/SayIt/releases/tag/v0.3.0) - 2026-03-08
+## [0.3.0](https://github.com/yee94/SayIt/releases/tag/v0.3.0) - 2026-03-08
 
 ### Added
 
@@ -305,7 +305,7 @@ SayIt 現在會自動從你的修正中學習。每次語音輸入貼上後，�
 
 - 修正 Sentry sourcemap upload 指令與 release publish 設定
 
-## [0.2.5](https://github.com/chenjackle45/SayIt/releases/tag/v0.2.5) - 2026-03-06
+## [0.2.5](https://github.com/yee94/SayIt/releases/tag/v0.2.5) - 2026-03-06
 
 ### Added
 
@@ -315,26 +315,26 @@ SayIt 現在會自動從你的修正中學習。每次語音輸入貼上後，�
 
 - 修復語音 fallback 機制與設定同步更新問題
 
-## [0.2.4](https://github.com/chenjackle45/SayIt/releases/tag/v0.2.4) - 2026-03-06
+## [0.2.4](https://github.com/yee94/SayIt/releases/tag/v0.2.4) - 2026-03-06
 
 ### Changed
 
 - 優化預設 prompt 防護性，切換預設模型為 Qwen3 32B
 
-## [0.2.3](https://github.com/chenjackle45/SayIt/releases/tag/v0.2.3) - 2026-03-06
+## [0.2.3](https://github.com/yee94/SayIt/releases/tag/v0.2.3) - 2026-03-06
 
 ### Fixed
 
 - Dashboard 額度文字修正與短文字門檻預設停用
 - 停用 Dashboard 右鍵選單並移除重複的更新檢查
 
-## [0.2.2](https://github.com/chenjackle45/SayIt/releases/tag/v0.2.2) - 2026-03-06
+## [0.2.2](https://github.com/yee94/SayIt/releases/tag/v0.2.2) - 2026-03-06
 
 ### Fixed
 
 - 重構自動更新流程，修復檢查更新無回應問題
 
-## [0.2.1](https://github.com/chenjackle45/SayIt/releases/tag/v0.2.1) - 2026-03-06
+## [0.2.1](https://github.com/yee94/SayIt/releases/tag/v0.2.1) - 2026-03-06
 
 ### Added
 
@@ -345,7 +345,7 @@ SayIt 現在會自動從你的修正中學習。每次語音輸入貼上後，�
 - 修正 stable-name asset 上傳路徑以支援 cross-compilation
 - 新增 workflow_dispatch 觸發器並分離 tag 推送
 
-## [0.2.0](https://github.com/chenjackle45/SayIt/releases/tag/v0.2.0) - 2026-03-06
+## [0.2.0](https://github.com/yee94/SayIt/releases/tag/v0.2.0) - 2026-03-06
 
 ### Added
 
@@ -356,7 +356,7 @@ SayIt 現在會自動從你的修正中學習。每次語音輸入貼上後，�
 
 - 授予輔助使用權限後自動偵測並啟用快捷鍵
 
-## [0.1.0](https://github.com/chenjackle45/SayIt/releases/tag/v0.1.0) - 2026-03-05
+## [0.1.0](https://github.com/yee94/SayIt/releases/tag/v0.1.0) - 2026-03-05
 
 ### Added
 

@@ -11,7 +11,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 import AccessibilityGuide from "../../src/components/AccessibilityGuide.vue";
 
 describe("i18n smoke test", () => {
-  it("[P0] 切換 locale 後 UI 文字應更新為對應語言", async () => {
+  it("[P0] 切换 locale 后 UI 文字应更新为对应语言", async () => {
     const i18n = createI18n({
       legacy: false,
       locale: "zh-TW",
@@ -23,11 +23,11 @@ describe("i18n smoke test", () => {
       global: { plugins: [i18n] },
     });
 
-    // 驗證 zh-TW 文字已正確渲染
-    expect(wrapper.text()).toContain("需要輔助使用權限");
+    // 验证 zh-TW 文字已正确渲染（现与简体文案对齐）
+    expect(wrapper.text()).toContain("需要辅助使用权限");
     const buttonListZh = wrapper.findAll("button");
-    expect(buttonListZh[0].text()).toBe("開啟系統設定");
-    expect(buttonListZh[1].text()).toBe("稍後設定");
+    expect(buttonListZh[0].text()).toBe("打开系统设置");
+    expect(buttonListZh[1].text()).toBe("稍后设置");
 
     // 切換到 English
     i18n.global.locale.value = "en";

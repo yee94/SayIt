@@ -261,7 +261,15 @@
     "weightDescription": "During each speech recognition, the top {limit} terms by weight are included in the AI recognition prompt. When the AI detects you repeatedly correcting the same term, its weight increases automatically.",
     "noAiSuggestions": "No AI suggestions yet. Enable Smart Dictionary Learning to auto-learn new terms",
     "noAiSuggestionsEnabled": "Smart Dictionary Learning is on. New terms are learned automatically when you correct a transcription",
-    "aiTermCount": "{count} terms"
+    "aiTermCount": "{count} terms",
+    "importTypeless": "Import Typeless",
+    "importTypelessHint": "Choose a Typeless CSV / TXT export (one word per line)",
+    "importing": "Importing...",
+    "importSuccess": "Imported {added} terms, skipped {skipped} duplicates",
+    "importAllSkipped": "All terms already exist, skipped {skipped}",
+    "importEmpty": "No valid terms found in {file}",
+    "importFileTooLarge": "File is too large. Maximum size is 5 MB",
+    "importFailed": "Import failed. Check the file format and try again"
   },
   "accessibility": {
     "title": "Accessibility Permission Required",

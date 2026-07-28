@@ -261,7 +261,15 @@
     "weightDescription": "음성 인식 시 가중치가 가장 높은 상위 {limit}개 용어가 AI 인식 프롬프트에 포함됩니다. 동일한 수정이 반복 감지되면 해당 용어의 가중치가 자동으로 증가합니다.",
     "noAiSuggestions": "아직 AI 추천 용어가 없습니다. 스마트 사전 학습을 활성화하면 자동으로 학습됩니다",
     "noAiSuggestionsEnabled": "스마트 사전 학습이 켜져 있습니다. 전사를 수정하면 새 용어가 자동으로 학습됩니다",
-    "aiTermCount": "{count}개 용어"
+    "aiTermCount": "{count}개 용어",
+    "importTypeless": "Typeless 가져오기",
+    "importTypelessHint": "Typeless CSV / TXT 내보내기 파일 선택 (한 줄에 한 단어)",
+    "importing": "가져오는 중...",
+    "importSuccess": "{added}개 추가, 중복 {skipped}개 건너뜀",
+    "importAllSkipped": "모두 기존 단어라 {skipped}개 건너뜀",
+    "importEmpty": "{file}에서 유효한 단어를 찾을 수 없습니다",
+    "importFileTooLarge": "파일이 너무 큽니다. 최대 5 MB",
+    "importFailed": "가져오기에 실패했습니다. 파일 형식을 확인한 후 다시 시도하세요"
   },
   "accessibility": {
     "title": "손쉬운 사용 권한 필요",

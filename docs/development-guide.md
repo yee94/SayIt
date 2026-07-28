@@ -23,7 +23,7 @@
 
 ```bash
 # 1. clone repo
-git clone https://github.com/chenjackle45/SayIt.git
+git clone https://github.com/yee94/SayIt.git
 cd SayIt
 
 # 2. 切到正確 Node 版本

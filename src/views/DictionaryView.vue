@@ -3,9 +3,13 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useVocabularyStore } from "../stores/useVocabularyStore";
 import { useSettingsStore } from "../stores/useSettingsStore";
 import { extractErrorMessage } from "../lib/errorUtils";
+import {
+  assertVocabularyImportFileSize,
+  parseVocabularyImportText,
+} from "../lib/vocabularyImport";
 import { useFeedbackMessage } from "../composables/useFeedbackMessage";
 import { useI18n } from "vue-i18n";
-import { Plus, Trash2, Bot, Hand, Info } from "lucide-vue-next";
+import { Plus, Trash2, Bot, Hand, Info, Upload } from "lucide-vue-next";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,11 +30,13 @@ const { t, locale } = useI18n();
 
 const newTermInput = ref("");
 const isAdding = ref(false);
+const isImporting = ref(false);
+const importFileInputRef = ref<HTMLInputElement | null>(null);
 const removingTermIdSet = ref(new Set<string>());
 const feedback = useFeedbackMessage();
 
 const isAddDisabled = computed(
-  () => !newTermInput.value.trim() || isAdding.value,
+  () => !newTermInput.value.trim() || isAdding.value || isImporting.value,
 );
 
 const showDuplicateHint = computed(
@@ -75,6 +81,59 @@ async function handleRemoveTerm(id: string, term: string) {
   }
 }
 
+function openImportFilePicker() {
+  if (isImporting.value) return;
+  importFileInputRef.value?.click();
+}
+
+async function handleImportFileChange(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  // 允許連續選同一檔
+  input.value = "";
+  if (!file) return;
+
+  try {
+    isImporting.value = true;
+    assertVocabularyImportFileSize(file.size);
+
+    const content = await file.text();
+    const parsed = parseVocabularyImportText(content);
+
+    if (parsed.terms.length === 0) {
+      feedback.show("error", t("dictionary.importEmpty", { file: file.name }));
+      return;
+    }
+
+    const { added, skipped } = await vocabularyStore.importTerms(parsed.terms);
+    if (added === 0) {
+      feedback.show(
+        "success",
+        t("dictionary.importAllSkipped", { skipped: skipped + parsed.duplicateInFileCount }),
+      );
+      return;
+    }
+
+    feedback.show(
+      "success",
+      t("dictionary.importSuccess", {
+        added,
+        skipped: skipped + parsed.duplicateInFileCount,
+      }),
+    );
+  } catch (err) {
+    const message = extractErrorMessage(err);
+    if (message === "FILE_TOO_LARGE") {
+      feedback.show("error", t("dictionary.importFileTooLarge"));
+    } else {
+      feedback.show("error", t("dictionary.importFailed"));
+      captureError(err, { source: "dictionary-import" });
+    }
+  } finally {
+    isImporting.value = false;
+  }
+}
+
 function formatDate(dateString: string): string {
   try {
     // SQLite created_at 儲存為 UTC 且不帶時區後綴，附加 "Z" 確保以 UTC 解析
@@ -110,11 +169,29 @@ onBeforeUnmount(() => {
       <Badge variant="secondary">{{ $t("dictionary.termCount", { count: vocabularyStore.termCount }) }}</Badge>
 
       <div class="flex items-center gap-2">
+        <input
+          ref="importFileInputRef"
+          type="file"
+          class="hidden"
+          accept=".csv,.txt,.json,text/csv,text/plain,application/json"
+          @change="handleImportFileChange"
+        />
+        <Button
+          size="sm"
+          variant="outline"
+          :disabled="isImporting || isAdding"
+          :title="$t('dictionary.importTypelessHint')"
+          @click="openImportFilePicker"
+        >
+          <Upload class="h-4 w-4 mr-1" />
+          {{ isImporting ? $t("dictionary.importing") : $t("dictionary.importTypeless") }}
+        </Button>
         <div class="flex flex-col">
           <Input
             v-model="newTermInput"
             :placeholder="$t('dictionary.inputPlaceholder')"
             class="w-48"
+            :disabled="isImporting"
             @keydown.enter="handleAddTerm"
           />
           <p v-if="showDuplicateHint" class="mt-1 text-xs text-destructive">

@@ -19,9 +19,9 @@ SayIt 是一款跨平台桌面語音輸入工具。在任何應用程式中按�
 
 | 平台 | 下載連結 |
 |------|---------|
-| macOS (Apple Silicon) | [SayIt-mac-arm64.dmg](https://github.com/chenjackle45/SayIt/releases/latest/download/SayIt-mac-arm64.dmg) |
-| macOS (Intel) | [SayIt-mac-x64.dmg](https://github.com/chenjackle45/SayIt/releases/latest/download/SayIt-mac-x64.dmg) |
-| Windows | [SayIt-windows-x64.exe](https://github.com/chenjackle45/SayIt/releases/latest/download/SayIt-windows-x64.exe) |
+| macOS (Apple Silicon) | [SayIt-mac-arm64.dmg](https://github.com/yee94/SayIt/releases/latest/download/SayIt-mac-arm64.dmg) |
+| macOS (Intel) | [SayIt-mac-x64.dmg](https://github.com/yee94/SayIt/releases/latest/download/SayIt-mac-x64.dmg) |
+| Windows | [SayIt-windows-x64.exe](https://github.com/yee94/SayIt/releases/latest/download/SayIt-windows-x64.exe) |
 
 ### 前置需求
 

@@ -56,7 +56,7 @@ describe("useSettingsStore", () => {
   // ==========================================================================
 
   describe("loadSettings", () => {
-    it("[P0] 應從 store 載入已儲存的 hotkey config", async () => {
+    it("[P0] 应从 store 载入已储存的 hotkey config", async () => {
       mockStoreData.set("hotkeyTriggerKey", "option");
       mockStoreData.set("hotkeyTriggerMode", "toggle");
       mockStoreData.set("doubaoAppId", "app123");
@@ -77,7 +77,7 @@ describe("useSettingsStore", () => {
       expect(store.hasApiKey).toBe(true);
     });
 
-    it("[P0] 無儲存值時應使用平台預設值", async () => {
+    it("[P0] 无储存值时应使用平台预设值", async () => {
       const { useSettingsStore } = await import(
         "../../src/stores/useSettingsStore"
       );
@@ -90,7 +90,7 @@ describe("useSettingsStore", () => {
       expect(store.hotkeyConfig?.triggerMode).toBe("hold");
     });
 
-    it("[P1] 載入後應同步 hotkey config 到 Rust", async () => {
+    it("[P1] 载入后应同步 hotkey config 到 Rust", async () => {
       mockStoreData.set("hotkeyTriggerKey", "control");
       mockStoreData.set("hotkeyTriggerMode", "hold");
 
@@ -107,7 +107,7 @@ describe("useSettingsStore", () => {
       });
     });
 
-    it("[P1] store 載入失敗時應 fallback 到預設值", async () => {
+    it("[P1] store 载入失败时应 fallback 到预设值", async () => {
       mockStoreGet.mockRejectedValueOnce(new Error("store corrupted"));
 
       const { useSettingsStore } = await import(
@@ -121,7 +121,7 @@ describe("useSettingsStore", () => {
       expect(store.hotkeyConfig?.triggerMode).toBe("hold");
     });
 
-    it("[P2] 重複呼叫 loadSettings 應只執行一次", async () => {
+    it("[P2] 重复呼叫 loadSettings 应只执行一次", async () => {
       const { useSettingsStore } = await import(
         "../../src/stores/useSettingsStore"
       );
@@ -143,7 +143,7 @@ describe("useSettingsStore", () => {
   // ==========================================================================
 
   describe("saveHotkeyConfig", () => {
-    it("[P0] 應持久化 triggerKey 和 triggerMode 到 store", async () => {
+    it("[P0] 应持久化 triggerKey 和 triggerMode 到 store", async () => {
       const { useSettingsStore } = await import(
         "../../src/stores/useSettingsStore"
       );
@@ -156,7 +156,7 @@ describe("useSettingsStore", () => {
       expect(mockStoreSave).toHaveBeenCalled();
     });
 
-    it("[P0] 應更新 hotkeyConfig ref", async () => {
+    it("[P0] 应更新 hotkeyConfig ref", async () => {
       const { useSettingsStore } = await import(
         "../../src/stores/useSettingsStore"
       );
@@ -171,7 +171,7 @@ describe("useSettingsStore", () => {
       expect(store.triggerMode).toBe("hold");
     });
 
-    it("[P0] 應透過 invoke 同步 config 到 Rust", async () => {
+    it("[P0] 应透过 invoke 同步 config 到 Rust", async () => {
       const { useSettingsStore } = await import(
         "../../src/stores/useSettingsStore"
       );
@@ -185,7 +185,7 @@ describe("useSettingsStore", () => {
       });
     });
 
-    it("[P0] 應發送 SETTINGS_UPDATED 事件廣播", async () => {
+    it("[P0] 应发送 SETTINGS_UPDATED 事件广播", async () => {
       const { useSettingsStore } = await import(
         "../../src/stores/useSettingsStore"
       );
@@ -199,7 +199,7 @@ describe("useSettingsStore", () => {
       });
     });
 
-    it("[P1] SETTINGS_UPDATED payload 應包含正確的 key 和 value", async () => {
+    it("[P1] SETTINGS_UPDATED payload 应包含正确的 key 和 value", async () => {
       const { useSettingsStore } = await import(
         "../../src/stores/useSettingsStore"
       );
@@ -221,7 +221,7 @@ describe("useSettingsStore", () => {
   // ==========================================================================
 
   describe("saveDoubaoCredentials", () => {
-    it("[P0] 應儲存 trimmed App ID / Access Key", async () => {
+    it("[P0] 应储存 trimmed App ID / Access Key", async () => {
       const { useSettingsStore } = await import(
         "../../src/stores/useSettingsStore"
       );
@@ -234,14 +234,14 @@ describe("useSettingsStore", () => {
       expect(store.hasApiKey).toBe(true);
     });
 
-    it("[P0] 空白憑據應拋出錯誤", async () => {
+    it("[P0] 空白凭据应抛出错误", async () => {
       const { useSettingsStore } = await import(
         "../../src/stores/useSettingsStore"
       );
       const store = useSettingsStore();
 
       await expect(store.saveDoubaoCredentials("   ", "ak")).rejects.toThrow(
-        "API Key 不可為空白",
+        "API Key 不可为空",
       );
     });
   });
@@ -251,7 +251,7 @@ describe("useSettingsStore", () => {
   // ==========================================================================
 
   describe("deleteApiKey", () => {
-    it("[P0] 應從 store 刪除 Doubao 憑據並清空狀態", async () => {
+    it("[P0] 应从 store 删除 Doubao 凭据并清空状态", async () => {
       const { useSettingsStore } = await import(
         "../../src/stores/useSettingsStore"
       );
@@ -274,7 +274,7 @@ describe("useSettingsStore", () => {
   // ==========================================================================
 
   describe("saveAiPrompt", () => {
-    it("[P0] 應儲存自訂 prompt", async () => {
+    it("[P0] 应储存自订 prompt", async () => {
       const { useSettingsStore } = await import(
         "../../src/stores/useSettingsStore"
       );
@@ -282,40 +282,40 @@ describe("useSettingsStore", () => {
 
       // 先切到 custom 模式，getAiPrompt() 才回傳 aiPrompt ref 值
       await store.savePromptMode("custom");
-      await store.saveAiPrompt("自訂 prompt 內容");
+      await store.saveAiPrompt("自订 prompt 内容");
 
-      expect(mockStoreSet).toHaveBeenCalledWith("aiPrompt", "自訂 prompt 內容");
-      expect(store.getAiPrompt()).toBe("自訂 prompt 內容");
+      expect(mockStoreSet).toHaveBeenCalledWith("aiPrompt", "自订 prompt 内容");
+      expect(store.getAiPrompt()).toBe("自订 prompt 内容");
     });
 
-    it("[P0] 空白 prompt 應拋出錯誤", async () => {
+    it("[P0] 空白 prompt 应抛出错误", async () => {
       const { useSettingsStore } = await import(
         "../../src/stores/useSettingsStore"
       );
       const store = useSettingsStore();
 
       await expect(store.saveAiPrompt("  ")).rejects.toThrow(
-        "Prompt 不可為空白",
+        "Prompt 不可为空",
       );
     });
   });
 
   describe("resetAiPrompt", () => {
-    it("[P0] 應重置為預設 prompt", async () => {
+    it("[P0] 应重置为预设 prompt", async () => {
       const { useSettingsStore } = await import(
         "../../src/stores/useSettingsStore"
       );
       const store = useSettingsStore();
 
-      await store.saveAiPrompt("自訂內容");
+      await store.saveAiPrompt("自订内容");
       await store.resetAiPrompt();
 
       // 應恢復為當前語言的預設 prompt（非空）
-      expect(store.getAiPrompt()).not.toBe("自訂內容");
+      expect(store.getAiPrompt()).not.toBe("自订内容");
       expect(store.getAiPrompt().length).toBeGreaterThan(0);
       expect(mockStoreSet).toHaveBeenCalledWith(
         "aiPrompt",
-        expect.stringContaining("繁體中文"),
+        expect.stringContaining("简体中文"),
       );
     });
   });
@@ -325,7 +325,7 @@ describe("useSettingsStore", () => {
   // ==========================================================================
 
   describe("saveEnhancementThreshold", () => {
-    it("[P0] 應持久化 enabled 和 charCount 到 store", async () => {
+    it("[P0] 应持久化 enabled 和 charCount 到 store", async () => {
       const { useSettingsStore } = await import(
         "../../src/stores/useSettingsStore"
       );
@@ -344,7 +344,7 @@ describe("useSettingsStore", () => {
       expect(mockStoreSave).toHaveBeenCalled();
     });
 
-    it("[P0] 應更新 reactive refs", async () => {
+    it("[P0] 应更新 reactive refs", async () => {
       const { useSettingsStore } = await import(
         "../../src/stores/useSettingsStore"
       );
@@ -356,7 +356,7 @@ describe("useSettingsStore", () => {
       expect(store.enhancementThresholdCharCount).toBe(25);
     });
 
-    it("[P0] 應發送 SETTINGS_UPDATED 事件廣播", async () => {
+    it("[P0] 应发送 SETTINGS_UPDATED 事件广播", async () => {
       const { useSettingsStore } = await import(
         "../../src/stores/useSettingsStore"
       );
@@ -370,7 +370,7 @@ describe("useSettingsStore", () => {
       });
     });
 
-    it("[P1] charCount < 1 應 fallback 到預設值", async () => {
+    it("[P1] charCount < 1 应 fallback 到预设值", async () => {
       const { useSettingsStore, DEFAULT_ENHANCEMENT_THRESHOLD_CHAR_COUNT } =
         await import("../../src/stores/useSettingsStore");
       const store = useSettingsStore();
@@ -386,7 +386,7 @@ describe("useSettingsStore", () => {
       );
     });
 
-    it("[P1] 非整數 charCount 應 fallback 到預設值", async () => {
+    it("[P1] 非整数 charCount 应 fallback 到预设值", async () => {
       const { useSettingsStore, DEFAULT_ENHANCEMENT_THRESHOLD_CHAR_COUNT } =
         await import("../../src/stores/useSettingsStore");
       const store = useSettingsStore();
@@ -398,7 +398,7 @@ describe("useSettingsStore", () => {
       );
     });
 
-    it("[P1] store 儲存失敗時應拋出錯誤", async () => {
+    it("[P1] store 储存失败时应抛出错误", async () => {
       mockStoreSave.mockRejectedValueOnce(new Error("disk full"));
 
       const { useSettingsStore } = await import(
@@ -430,7 +430,7 @@ describe("useSettingsStore", () => {
       uaSpy = null;
     });
 
-    it("[P1] 應持久化 hideDockIcon 並 emit settings:updated", async () => {
+    it("[P1] 应持久化 hideDockIcon 并 emit settings:updated", async () => {
       const { useSettingsStore } = await import(
         "../../src/stores/useSettingsStore"
       );
@@ -447,7 +447,7 @@ describe("useSettingsStore", () => {
       });
     });
 
-    it("[P1] macOS 上啟用隱藏應呼叫 setDockVisibility(false)", async () => {
+    it("[P1] macOS 上启用隐藏应呼叫 setDockVisibility(false)", async () => {
       stubMacUserAgent();
       const { useSettingsStore } = await import(
         "../../src/stores/useSettingsStore"
@@ -459,7 +459,7 @@ describe("useSettingsStore", () => {
       expect(mockSetDockVisibility).toHaveBeenCalledWith(false);
     });
 
-    it("[P2] setDockVisibility 失敗不應讓儲存失敗", async () => {
+    it("[P2] setDockVisibility 失败不应让储存失败", async () => {
       stubMacUserAgent();
       mockSetDockVisibility.mockRejectedValueOnce(new Error("boom"));
       const { useSettingsStore } = await import(
@@ -472,7 +472,7 @@ describe("useSettingsStore", () => {
       expect(mockStoreSet).toHaveBeenCalledWith("hideDockIcon", true);
     });
 
-    it("[P2] loadSettings 應載入已儲存的 hideDockIcon", async () => {
+    it("[P2] loadSettings 应载入已储存的 hideDockIcon", async () => {
       mockStoreData.set("hideDockIcon", true);
       const { useSettingsStore } = await import(
         "../../src/stores/useSettingsStore"
@@ -482,7 +482,7 @@ describe("useSettingsStore", () => {
       expect(store.isHideDockIconEnabled).toBe(true);
     });
 
-    it("[P2] loadSettings 未存過 hideDockIcon 時預設 false", async () => {
+    it("[P2] loadSettings 未存过 hideDockIcon 时预设 false", async () => {
       const { useSettingsStore } = await import(
         "../../src/stores/useSettingsStore"
       );
@@ -493,7 +493,7 @@ describe("useSettingsStore", () => {
   });
 
   describe("refreshCrossWindowSettings", () => {
-    it("[P0] 應整包重新讀取跨視窗會用到的設定", async () => {
+    it("[P0] 应整包重新读取跨视窗会用到的设定", async () => {
       mockStoreData.set("hotkeyTriggerKey", "command");
       mockStoreData.set("hotkeyTriggerMode", "toggle");
       mockStoreData.set("customTriggerKey", { custom: { keycode: 321 } });
@@ -502,7 +502,7 @@ describe("useSettingsStore", () => {
       mockStoreData.set("doubaoAccessKey", "  ak_sync  ");
       mockStoreData.set("llmApiKey", "sk_sync");
       mockStoreData.set("llmBaseUrl", "https://example.com/v1");
-      mockStoreData.set("aiPrompt", "  同步後 prompt  ");
+      mockStoreData.set("aiPrompt", "  同步后 prompt  ");
       mockStoreData.set("promptMode", "custom");
       mockStoreData.set("enhancementThresholdEnabled", true);
       mockStoreData.set("enhancementThresholdCharCount", 42);
@@ -524,7 +524,7 @@ describe("useSettingsStore", () => {
       expect(store.customTriggerKeyDomCode).toBe("F13");
       expect(store.getDoubaoAccessKey()).toBe("ak_sync");
       expect(store.getLlmApiKey()).toBe("sk_sync");
-      expect(store.getAiPrompt()).toBe("同步後 prompt");
+      expect(store.getAiPrompt()).toBe("同步后 prompt");
       expect(store.isEnhancementThresholdEnabled).toBe(true);
       expect(store.enhancementThresholdCharCount).toBe(42);
       expect(store.selectedLlmModelId).toBe("gpt-4o-mini");
@@ -538,7 +538,7 @@ describe("useSettingsStore", () => {
   // ==========================================================================
 
   describe("selectedTranscriptionLocale", () => {
-    it("[P0] loadSettings 應從 store 載入已儲存的 transcriptionLocale", async () => {
+    it("[P0] loadSettings 应从 store 载入已储存的 transcriptionLocale", async () => {
       mockStoreData.set("selectedLocale", "en");
       mockStoreData.set("selectedTranscriptionLocale", "ja");
 
@@ -551,7 +551,7 @@ describe("useSettingsStore", () => {
       expect(store.selectedTranscriptionLocale).toBe("ja");
     });
 
-    it("[P0] store 無 selectedTranscriptionLocale 時應預設為 selectedLocale（遷移）", async () => {
+    it("[P0] store 无 selectedTranscriptionLocale 时应预设为 selectedLocale（迁移）", async () => {
       mockStoreData.set("selectedLocale", "ko");
       // 不設定 selectedTranscriptionLocale 以觸發遷移邏輯
 
@@ -568,7 +568,7 @@ describe("useSettingsStore", () => {
       );
     });
 
-    it("[P0] getWhisperLanguageCode 應讀取 selectedTranscriptionLocale（非 selectedLocale）", async () => {
+    it("[P0] getWhisperLanguageCode 应读取 selectedTranscriptionLocale（非 selectedLocale）", async () => {
       mockStoreData.set("selectedLocale", "en");
       mockStoreData.set("selectedTranscriptionLocale", "ja");
 
@@ -582,7 +582,7 @@ describe("useSettingsStore", () => {
       expect(store.getWhisperLanguageCode()).toBe("ja");
     });
 
-    it("[P0] getWhisperLanguageCode 在 auto 模式下應回傳 null", async () => {
+    it("[P0] getWhisperLanguageCode 在 auto 模式下应回传 null", async () => {
       mockStoreData.set("selectedLocale", "zh-TW");
       mockStoreData.set("selectedTranscriptionLocale", "auto");
 
@@ -595,7 +595,7 @@ describe("useSettingsStore", () => {
       expect(store.getWhisperLanguageCode()).toBeNull();
     });
 
-    it("[P0] refreshCrossWindowSettings 應同步 selectedTranscriptionLocale", async () => {
+    it("[P0] refreshCrossWindowSettings 应同步 selectedTranscriptionLocale", async () => {
       mockStoreData.set("selectedLocale", "en");
       mockStoreData.set("selectedTranscriptionLocale", "ja");
 

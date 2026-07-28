@@ -1,6 +1,6 @@
-export type SupportedLocale = "zh-TW" | "en" | "ja" | "zh-CN" | "ko";
+export type SupportedLocale = "zh-CN" | "en" | "ja" | "zh-TW" | "ko";
 
-export const FALLBACK_LOCALE: SupportedLocale = "zh-TW";
+export const FALLBACK_LOCALE: SupportedLocale = "zh-CN";
 
 export interface LanguageOption {
   locale: SupportedLocale;
@@ -12,11 +12,11 @@ export interface LanguageOption {
 
 export const LANGUAGE_OPTIONS: LanguageOption[] = [
   {
-    locale: "zh-TW",
-    displayName: "\u7E41\u9AD4\u4E2D\u6587",
+    locale: "zh-CN",
+    displayName: "简体中文",
     whisperCode: "zh",
-    htmlLang: "zh-Hant",
-    navigatorPatternList: ["zh-Hant-TW", "zh-Hant", "zh-TW"],
+    htmlLang: "zh-Hans",
+    navigatorPatternList: ["zh-Hans", "zh-CN"],
   },
   {
     locale: "en",
@@ -27,21 +27,21 @@ export const LANGUAGE_OPTIONS: LanguageOption[] = [
   },
   {
     locale: "ja",
-    displayName: "\u65E5\u672C\u8A9E",
+    displayName: "日本語",
     whisperCode: "ja",
     htmlLang: "ja",
     navigatorPatternList: ["ja"],
   },
   {
-    locale: "zh-CN",
-    displayName: "\u7B80\u4F53\u4E2D\u6587",
+    locale: "zh-TW",
+    displayName: "繁体中文",
     whisperCode: "zh",
-    htmlLang: "zh-Hans",
-    navigatorPatternList: ["zh-Hans", "zh-CN"],
+    htmlLang: "zh-Hant",
+    navigatorPatternList: ["zh-Hant-TW", "zh-Hant", "zh-TW"],
   },
   {
     locale: "ko",
-    displayName: "\uD55C\uAD6D\uC5B4",
+    displayName: "한국어",
     whisperCode: "ko",
     htmlLang: "ko",
     navigatorPatternList: ["ko"],
@@ -83,9 +83,9 @@ export function detectSystemLocale(): SupportedLocale {
       }
     }
 
-    // 4. Bare "zh" -> zh-TW (protect traditional Chinese users)
+    // 4. Bare "zh" -> zh-CN
     if (langPrefix === "zh") {
-      return "zh-TW";
+      return "zh-CN";
     }
   }
 
@@ -95,7 +95,7 @@ export function detectSystemLocale(): SupportedLocale {
 
 export function getHtmlLangForLocale(locale: SupportedLocale): string {
   const option = LANGUAGE_OPTIONS.find((o) => o.locale === locale);
-  return option?.htmlLang ?? "zh-Hant";
+  return option?.htmlLang ?? "zh-Hans";
 }
 
 export function getWhisperCodeForLocale(locale: SupportedLocale): string {
@@ -114,7 +114,7 @@ export interface TranscriptionLanguageOption {
 export const TRANSCRIPTION_LANGUAGE_OPTIONS: TranscriptionLanguageOption[] = [
   {
     locale: "auto",
-    displayName: "自動偵測",
+    displayName: "自动检测",
     whisperCode: null,
   },
   ...LANGUAGE_OPTIONS.map((opt) => ({

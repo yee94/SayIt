@@ -185,6 +185,70 @@ export const useVocabularyStore = defineStore("vocabulary", () => {
     }
   }
 
+  /**
+   * 批量匯入詞條（source=manual）。
+   * 已存在（大小寫不敏感）則跳過；成功後只刷新一次並廣播一次事件。
+   */
+  async function importTerms(
+    terms: string[],
+  ): Promise<{ added: number; skipped: number }> {
+    const existingKeys = new Set(
+      termList.value.map((entry) => entry.term.trim().toLowerCase()),
+    );
+
+    const toInsert: string[] = [];
+    const batchKeys = new Set<string>();
+    let skipped = 0;
+
+    for (const raw of terms) {
+      const term = raw.trim();
+      if (!term) {
+        skipped += 1;
+        continue;
+      }
+      const key = term.toLowerCase();
+      if (existingKeys.has(key) || batchKeys.has(key)) {
+        skipped += 1;
+        continue;
+      }
+      batchKeys.add(key);
+      toInsert.push(term);
+    }
+
+    if (toInsert.length === 0) {
+      return { added: 0, skipped };
+    }
+
+    try {
+      const db = getDatabase();
+      for (const term of toInsert) {
+        const id = crypto.randomUUID();
+        await db.execute(
+          "INSERT INTO vocabulary (id, term, source) VALUES ($1, $2, 'manual')",
+          [id, term],
+        );
+      }
+      await fetchTermList();
+      void emitEvent(VOCABULARY_CHANGED, {
+        action: "added",
+        term: toInsert[0] ?? "",
+      } satisfies VocabularyChangedPayload);
+      return { added: toInsert.length, skipped };
+    } catch (error) {
+      console.error(
+        `[vocabulary-store] importTerms failed: ${extractErrorMessage(error)}`,
+      );
+      captureError(error, { source: "vocabulary", step: "import" });
+      // 部分寫入後仍刷新，避免 UI 與 DB 不一致
+      try {
+        await fetchTermList();
+      } catch {
+        /* ignore refresh error */
+      }
+      throw error;
+    }
+  }
+
   return {
     termList,
     isLoading,
@@ -197,6 +261,7 @@ export const useVocabularyStore = defineStore("vocabulary", () => {
     addAiSuggestedTerm,
     batchIncrementWeights,
     getTopTermListByWeight,
+    importTerms,
     removeTerm,
   };
 });
