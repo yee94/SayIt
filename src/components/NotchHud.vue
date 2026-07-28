@@ -65,6 +65,8 @@ const WAVEFORM_ELEMENT_COUNT = 6;
 const MIN_BAR_HEIGHT = 4;
 const MAX_BAR_HEIGHT = 28;
 const ERROR_WITH_MESSAGE_HEIGHT = 72;
+/** 含即時字幕時的留海高度（上排 42 + 字幕列） */
+const LIVE_TRANSCRIPT_HEIGHT = 72;
 
 interface NotchShapeParams {
   width: number;
@@ -94,27 +96,56 @@ const hasErrorMessage = computed(
   () => visualMode.value === "error" && props.message !== "",
 );
 
-const isExpandedMode = computed(
-  () => hasErrorMessage.value || visualMode.value === "learned",
-);
+/**
+ * 字幕列顯示文字：
+ * - enhancing / editing：固定狀態文案（替換掉之前的即時 ASR 文本）
+ * - recording / 轉寫：顯示 liveTranscript
+ */
+const liveTranscriptDisplayText = computed(() => {
+  if (props.status === "enhancing") {
+    return t("voiceFlow.enhancing");
+  }
+  if (props.status === "editing") {
+    return t("voiceFlow.editing");
+  }
+  return props.liveTranscript?.trim() ?? "";
+});
 
-/** 轉寫流程中且有中間文本時，在留海下方顯示一行即時字幕 */
+/**
+ * 僅在「有實際文字」時才向下撐開留海。
+ * 轉寫中尚無 partial → 保持預設 42px，不預先展開。
+ * enhancing / editing：一律顯示狀態文案並撐開。
+ */
 const showLiveTranscript = computed(() => {
+  if (props.status === "enhancing" || props.status === "editing") {
+    return true;
+  }
   const text = props.liveTranscript?.trim() ?? "";
   if (!text) return false;
   const mode = visualMode.value;
   return (
+    mode === "recording" ||
     mode === "morphing" ||
     mode === "transcribing" ||
-    props.status === "transcribing" ||
-    props.status === "enhancing" ||
-    props.status === "editing"
+    props.status === "recording" ||
+    props.status === "transcribing"
   );
 });
 
+/** error / learned / 有字幕：同一塊黑底圓角向下擴展 */
+const isExpandedMode = computed(
+  () =>
+    hasErrorMessage.value ||
+    visualMode.value === "learned" ||
+    showLiveTranscript.value,
+);
+
 const notchStyle = computed(() => {
   let params = NOTCH_SHAPE_OVERRIDES[visualMode.value] ?? DEFAULT_NOTCH_SHAPE;
-  if (isExpandedMode.value) {
+  // 預設 42px；只有真的有字幕 / 錯誤訊息 / learned 才撐高
+  if (showLiveTranscript.value) {
+    params = { ...params, height: LIVE_TRANSCRIPT_HEIGHT };
+  } else if (hasErrorMessage.value || visualMode.value === "learned") {
     params = { ...params, height: ERROR_WITH_MESSAGE_HEIGHT };
   }
   return {
@@ -489,13 +520,19 @@ onUnmounted(() => {
       <div v-if="hasErrorMessage" class="error-message-row">
         <span class="error-message">{{ props.message }}</span>
       </div>
-    </div>
 
-    <!-- 留海下方：即時轉寫字幕（單行、居中、左側省略、高光閃過） -->
-    <div v-if="showLiveTranscript" class="live-transcript-row">
-      <span class="live-transcript-text">
-        <bdi class="live-transcript-bdi">{{ props.liveTranscript }}</bdi>
-      </span>
+      <!-- 即時轉寫字幕 / 整理中狀態：黑底圓角向下擴展的同一塊留海 -->
+      <div v-if="showLiveTranscript" class="live-transcript-row">
+        <span
+          class="live-transcript-text"
+          :class="{
+            'live-transcript-status':
+              props.status === 'enhancing' || props.status === 'editing',
+          }"
+        >
+          <bdi class="live-transcript-bdi">{{ liveTranscriptDisplayText }}</bdi>
+        </span>
+      </div>
     </div>
   </div>
 </template>
@@ -507,8 +544,7 @@ onUnmounted(() => {
   left: 0;
   width: 100%;
   display: flex;
-  flex-direction: column;
-  align-items: center;
+  justify-content: center;
   filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
   animation: notchEnter 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
@@ -518,10 +554,11 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+  /* height / clip-path 同步過渡：有字幕時「撐下來」的主動畫 */
   transition:
     width 0.35s cubic-bezier(0.32, 0.72, 0, 1),
-    height 0.35s cubic-bezier(0.32, 0.72, 0, 1),
-    clip-path 0.35s cubic-bezier(0.32, 0.72, 0, 1),
+    height 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    clip-path 0.32s cubic-bezier(0.22, 1, 0.36, 1),
     background 0.3s ease;
 }
 
@@ -876,31 +913,31 @@ onUnmounted(() => {
 /* ---- Retry Icon ---- */
 .retry-icon {
   color: #f97316;
-  font-size: 16px;
+  font-size: 14px;
   cursor: pointer;
 }
 
 /* ---- Collapsing: 內容淡出 ---- */
 .notch-collapsing .notch-content,
 .notch-collapsing .error-message-row,
-.notch-collapsing .learned-terms-row {
+.notch-collapsing .learned-terms-row,
+.notch-collapsing .live-transcript-row {
   opacity: 0;
   transition: opacity 0.15s ease;
 }
 
-/* ---- Live transcript（留海下方一行字幕） ---- */
+/* ---- Live transcript：黑底內第二行；等高度撐開後再淡入 ---- */
 .live-transcript-row {
   display: flex;
-  justify-content: center;
   align-items: center;
-  width: min(420px, calc(100% - 32px));
-  margin-top: 6px;
-  padding: 4px 16px;
+  justify-content: center;
+  width: 100%;
+  min-height: 0;
+  padding: 0 24px 8px;
   box-sizing: border-box;
   overflow: hidden;
-  animation: liveTranscriptFadeIn 0.25s ease-out both;
-  /* 不受 notch drop-shadow 影響可讀性：用自身 text-shadow */
-  filter: none;
+  /* 略晚於 notch height 過渡，避免字被 clip 裁切感 */
+  animation: liveTranscriptFadeIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both;
 }
 
 .live-transcript-text {
@@ -916,6 +953,13 @@ onUnmounted(() => {
   font-weight: 600;
   letter-spacing: 0.02em;
   line-height: 1.35;
+}
+
+/* 整理中 / 編輯中：狀態文案居中，不需要 rtl 省略 */
+.live-transcript-text.live-transcript-status {
+  direction: ltr;
+  text-align: center;
+  text-overflow: clip;
 }
 
 /* bdi 保持字元邏輯順序，避免 rtl 容器把中英混排弄反 */
@@ -937,9 +981,6 @@ onUnmounted(() => {
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  /* 桌面任意底色上的可讀性 */
-  filter: drop-shadow(0 0 8px rgba(120, 220, 255, 0.45))
-    drop-shadow(0 1px 3px rgba(0, 0, 0, 0.55));
   animation: liveTranscriptShine 2.4s linear infinite;
 }
 
@@ -955,7 +996,7 @@ onUnmounted(() => {
 @keyframes liveTranscriptFadeIn {
   from {
     opacity: 0;
-    transform: translateY(-4px);
+    transform: translateY(-6px);
   }
   to {
     opacity: 1;

@@ -63,6 +63,8 @@ pub struct StopRecordingResult {
 struct RecordingInner {
     samples: Mutex<Vec<i16>>,
     should_stop: AtomicBool,
+    /// 即時 ASR 訂閱：錄音 callback 會 clone 一段 mono PCM 送出（不阻塞主緩衝）
+    live_pcm_tx: Mutex<Option<std::sync::mpsc::SyncSender<Vec<i16>>>>,
 }
 
 struct RecordingHandle {
@@ -85,6 +87,37 @@ impl AudioRecorderState {
         }
     }
 
+    /// 掛上即時 PCM 訂閱（需已在錄音中）。回傳目前 sample_rate。
+    pub fn attach_live_pcm_sink(
+        &self,
+        tx: std::sync::mpsc::SyncSender<Vec<i16>>,
+    ) -> Result<u32, AudioRecorderError> {
+        let guard = self
+            .recording
+            .lock()
+            .map_err(|_| AudioRecorderError::LockPoisoned)?;
+        let handle = guard.as_ref().ok_or(AudioRecorderError::NotRecording)?;
+        let mut sink = handle
+            .inner
+            .live_pcm_tx
+            .lock()
+            .map_err(|_| AudioRecorderError::LockPoisoned)?;
+        *sink = Some(tx);
+        Ok(handle.sample_rate)
+    }
+
+    /// 卸下即時 PCM 訂閱（sender drop 後 live ASR 端會收到結束）
+    pub fn detach_live_pcm_sink(&self) {
+        let Ok(guard) = self.recording.lock() else {
+            return;
+        };
+        if let Some(handle) = guard.as_ref() {
+            if let Ok(mut sink) = handle.inner.live_pcm_tx.lock() {
+                *sink = None;
+            }
+        }
+    }
+
     pub fn shutdown(&self) {
         let mut guard = match self.recording.lock() {
             Ok(g) => g,
@@ -92,6 +125,9 @@ impl AudioRecorderState {
         };
         if let Some(mut handle) = guard.take() {
             handle.inner.should_stop.store(true, Ordering::SeqCst);
+            if let Ok(mut sink) = handle.inner.live_pcm_tx.lock() {
+                *sink = None;
+            }
             if let Some(thread) = handle.thread.take() {
                 let _ = thread.join();
             }
@@ -285,6 +321,7 @@ pub fn start_recording(
     let inner = Arc::new(RecordingInner {
         samples: Mutex::new(Vec::with_capacity(16000 * 30)),
         should_stop: AtomicBool::new(false),
+        live_pcm_tx: Mutex::new(None),
     });
 
     let inner_for_thread = inner.clone();
@@ -823,6 +860,13 @@ where
 
                 if let Ok(mut samples) = inner_for_callback.samples.lock() {
                     samples.extend_from_slice(&mono_batch);
+                }
+
+                // 即時 ASR：非阻塞送出本批 mono；滿了就丟這批，避免拖慢錄音 callback
+                if let Ok(sink) = inner_for_callback.live_pcm_tx.lock() {
+                    if let Some(tx) = sink.as_ref() {
+                        let _ = tx.try_send(mono_batch.clone());
+                    }
                 }
 
                 if total_mono_samples >= FFT_SIZE

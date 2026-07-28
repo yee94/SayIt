@@ -374,8 +374,9 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
   function setLiveTranscript(text: string) {
     const trimmed = text.trim();
     if (!trimmed) return;
-    // 轉寫 / 重送期間才更新，避免過期 partial 污染其他狀態
+    // 錄音 / 轉寫 / 重送期間才更新，避免過期 partial 污染其他狀態
     if (
+      status.value !== "recording" &&
       status.value !== "transcribing" &&
       status.value !== "enhancing" &&
       status.value !== "editing"
@@ -390,9 +391,8 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     clearCollapseHideTimer();
     status.value = nextStatus;
     message.value = nextMessage;
-    // 進入錄音或結束流程時清空字幕；轉寫 / 潤飾 / 編輯期間保留
+    // 結束流程時清空字幕；錄音 / 轉寫 / 潤飾 / 編輯期間保留（錄音中邊說邊出）
     if (
-      nextStatus === "recording" ||
       nextStatus === "idle" ||
       nextStatus === "error" ||
       nextStatus === "cancelled" ||
@@ -1030,8 +1030,12 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     isRecording.value = false;
 
     if (currentStatus === "recording") {
+      void invoke("cancel_live_asr").catch(() => {});
       void invoke("stop_recording").catch(() => {});
       stopElapsedTimer();
+    } else {
+      // 轉寫中途 ESC：也關掉 live session
+      void invoke("cancel_live_asr").catch(() => {});
     }
 
     // Resolve pending double-tap Promise (prevents handleStopRecording from hanging)
@@ -1068,6 +1072,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     isAborted.value = false;
     abortController = new AbortController();
     lastWasModified.value = null;
+    clearLiveTranscript();
 
     // 重置重送狀態（新錄音開始時清除上次失敗的重送資訊）
     lastFailedTranscriptionId.value = null;
@@ -1119,6 +1124,9 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       startElapsedTimer();
       transitionTo("recording", t("voiceFlow.recording"));
       writeInfoLog("useVoiceFlowStore: recording started");
+
+      // 邊說邊出：錄音開始後立刻掛上 live ASR（失敗不阻斷錄音）
+      void startLiveAsrIfPossible();
     } catch (error) {
       const errorMessage = getMicrophoneErrorMessage(error);
       const technicalErrorMessage = extractErrorMessage(error);
@@ -1127,6 +1135,42 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         `useVoiceFlowStore: start recording failed: ${technicalErrorMessage}`,
         error,
       );
+    }
+  }
+
+  /** 非阻塞啟動 live ASR；缺憑證 / 掛載失敗只 log，錄音繼續 */
+  async function startLiveAsrIfPossible() {
+    try {
+      const settingsStore = useSettingsStore();
+      let appId = settingsStore.getDoubaoAppId();
+      let accessKey = settingsStore.getDoubaoAccessKey();
+      if (!appId || !accessKey) {
+        await settingsStore.refreshApiKey();
+        appId = settingsStore.getDoubaoAppId();
+        accessKey = settingsStore.getDoubaoAccessKey();
+      }
+      if (!appId || !accessKey) {
+        writeInfoLog(
+          "useVoiceFlowStore: skip live ASR (missing Doubao credentials)",
+        );
+        return;
+      }
+      if (isAborted.value || !isRecording.value) return;
+
+      const vocabularyStore = useVocabularyStore();
+      const termList = await vocabularyStore.getTopTermListByWeight(50);
+      await invoke("start_live_asr", {
+        appId,
+        accessKey,
+        vocabularyTermList: termList.length > 0 ? termList : null,
+        language: settingsStore.getWhisperLanguageCode(),
+      });
+      writeInfoLog("useVoiceFlowStore: live ASR started");
+    } catch (err) {
+      writeErrorLog(
+        `useVoiceFlowStore: start_live_asr failed (non-blocking): ${extractErrorMessage(err)}`,
+      );
+      captureError(err, { source: "voice-flow", step: "start-live-asr" });
     }
   }
 
@@ -1146,6 +1190,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         stopElapsedTimer();
         clearDelayedMuteTimer();
         void restoreSystemAudio();
+        void invoke("cancel_live_asr").catch(() => {});
         void invoke("stop_recording").catch(() => {});
         applyDoubleTapModeSwitch();
         return;
@@ -1223,6 +1268,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
 
       const MINIMUM_RECORDING_DURATION_MS = 300;
       if (recordingDurationMs < MINIMUM_RECORDING_DURATION_MS) {
+        void invoke("cancel_live_asr").catch(() => {});
         // 錄音太短 → 寫入 failed 記錄，保留錄音檔
         const failedRecord = buildTranscriptionRecord({
           id: transcriptionId,
@@ -1256,6 +1302,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       }
 
       if (!appId || !accessKey) {
+        void invoke("cancel_live_asr").catch(() => {});
         failRecordingFlow(
           t("errors.apiKeyMissing"),
           "useVoiceFlowStore: missing Doubao ASR credentials while transcribing",
@@ -1267,12 +1314,24 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       const whisperTermList = await vocabularyStore.getTopTermListByWeight(50);
       const hasVocabulary = whisperTermList.length > 0;
 
-      const result = await invoke<TranscriptionResult>("transcribe_audio", {
-        appId,
-        accessKey,
-        vocabularyTermList: hasVocabulary ? whisperTermList : null,
-        language: settingsStore.getWhisperLanguageCode(),
-      });
+      // 優先收斂 live ASR（錄音中已流式推送）；失敗再 fallback 整段 WAV
+      let result: TranscriptionResult;
+      try {
+        result = await invoke<TranscriptionResult>("finish_live_asr");
+        writeInfoLog(
+          `useVoiceFlowStore: finish_live_asr ok (len=${result.rawText?.length ?? 0})`,
+        );
+      } catch (liveErr) {
+        writeInfoLog(
+          `useVoiceFlowStore: finish_live_asr fallback to transcribe_audio: ${extractErrorMessage(liveErr)}`,
+        );
+        result = await invoke<TranscriptionResult>("transcribe_audio", {
+          appId,
+          accessKey,
+          vocabularyTermList: hasVocabulary ? whisperTermList : null,
+          language: settingsStore.getWhisperLanguageCode(),
+        });
+      }
       if (isAborted.value) return;
 
       // #39：轉譯語言為繁中時，把 Whisper 的簡體輸出轉成繁體（落地前一次到位）

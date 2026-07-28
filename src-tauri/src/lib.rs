@@ -449,6 +449,9 @@ pub fn run() {
             plugins::transcription::transcribe_audio,
             plugins::transcription::retranscribe_from_file,
             plugins::transcription::test_asr_connection,
+            plugins::transcription::start_live_asr,
+            plugins::transcription::finish_live_asr,
+            plugins::transcription::cancel_live_asr,
             plugins::sound_feedback::play_start_sound,
             plugins::sound_feedback::play_stop_sound,
             plugins::sound_feedback::play_error_sound,
@@ -556,6 +559,10 @@ pub fn run() {
                     }
                     // 3. 停止 cpal 錄音（join thread, drop AudioUnit）
                     if let Some(state) = app_handle.try_state::<plugins::audio_recorder::AudioRecorderState>() {
+                        state.shutdown();
+                    }
+                    // 3b. 取消 live ASR WebSocket
+                    if let Some(state) = app_handle.try_state::<plugins::transcription::TranscriptionState>() {
                         state.shutdown();
                     }
                     // 4. 取消 keyboard monitor CGEventTap

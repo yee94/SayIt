@@ -1,4 +1,8 @@
 use std::io::Cursor;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc, Mutex,
+};
 use std::time::Instant;
 
 use futures_util::{SinkExt, StreamExt};
@@ -39,13 +43,41 @@ const COMPRESSION_NONE: u8 = 0b0000;
 
 // ========== State ==========
 
+/// 錄音中即時 ASR session（邊說邊出字幕）
+struct LiveAsrSession {
+    /// 設 true 後 worker 會送 final 包並收尾
+    finish: Arc<AtomicBool>,
+    /// 設 true 表示取消（ESC），不取最終結果
+    cancel: Arc<AtomicBool>,
+    /// worker 完成後寫入最終文本
+    result: Arc<Mutex<Option<Result<TranscriptionResult, String>>>>,
+    /// 等 worker 結束
+    done_rx: Mutex<Option<std::sync::mpsc::Receiver<()>>>,
+}
+
 pub struct TranscriptionState {
-    // Reserved for future shared clients / connection pooling.
+    live: Mutex<Option<LiveAsrSession>>,
 }
 
 impl TranscriptionState {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            live: Mutex::new(None),
+        }
+    }
+
+    pub fn shutdown(&self) {
+        if let Ok(mut guard) = self.live.lock() {
+            if let Some(session) = guard.take() {
+                session.cancel.store(true, Ordering::SeqCst);
+                session.finish.store(true, Ordering::SeqCst);
+                if let Ok(mut rx) = session.done_rx.lock() {
+                    if let Some(rx) = rx.take() {
+                        let _ = rx.recv_timeout(std::time::Duration::from_millis(500));
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -182,51 +214,94 @@ fn parse_server_error_message(buffer: &[u8]) -> Option<String> {
     Some(format!("error_code={error_code}: {raw}"))
 }
 
-/// 解析服务端 JSON 帧。布局对齐 byted-ailab / 有赞：
-/// `[headerSize*4][payload_size:4][sequence:4][payload]`
-fn parse_server_message(buffer: &[u8]) -> Option<serde_json::Value> {
-    if buffer.len() < 8 {
+/// 服务端 message_type_specific_flags 低位：
+/// - bit0 = 带 sequence（结果帧）
+/// - bit1 = last packet（会话结束）
+const SERVER_FLAG_HAS_SEQUENCE: u8 = 0b0001;
+const SERVER_FLAG_LAST_PACKET: u8 = 0b0010;
+
+/// 解析服务端 JSON 帧。
+///
+/// 实测 openspeech v3 bigmodel_async 布局：
+/// - 无 sequence（flags bit0=0，如 init ack）：
+///   `[headerSize*4][payload_size:4][payload]`
+/// - 有 sequence（flags bit0=1，流式/最终结果）：
+///   `[headerSize*4][sequence:4][payload_size:4][payload]`
+///
+/// 注意：旧实现把 size/sequence 顺序写反了，JSON 永远解析失败 → 空文本 →「未检测到语音」。
+fn parse_server_message_with_meta(buffer: &[u8]) -> Option<(serde_json::Value, bool)> {
+    if buffer.len() < 4 {
         return None;
     }
-    let header_size = (buffer[0] & 0x0f) as usize;
+    let header_size_words = (buffer[0] & 0x0f) as usize;
+    let header_bytes = header_size_words * 4;
+    if header_bytes == 0 || buffer.len() < header_bytes {
+        return None;
+    }
     let message_type = buffer[1] >> 4;
     if message_type == SERVER_ERROR_RESPONSE {
         return None;
     }
-    // payload_size (4) + sequence (4)
-    let payload_meta_len = 8usize;
-    let payload_start = header_size * 4 + payload_meta_len;
-    if buffer.len() < payload_start {
-        return None;
-    }
-    // payload_size 在 header 之后 4 字节
-    let size_offset = header_size * 4;
-    let payload_size = if buffer.len() >= size_offset + 4 {
-        u32::from_be_bytes([
-            buffer[size_offset],
-            buffer[size_offset + 1],
-            buffer[size_offset + 2],
-            buffer[size_offset + 3],
-        ]) as usize
+    let flags = buffer[1] & 0x0f;
+    let is_last = (flags & SERVER_FLAG_LAST_PACKET) != 0;
+    let has_sequence = (flags & SERVER_FLAG_HAS_SEQUENCE) != 0;
+
+    // 优先按 flags 选布局；失败再 fallback 另一种（兼容 ack / 结果帧）
+    let layouts: &[(bool,)] = if has_sequence {
+        &[(true,), (false,)]
     } else {
-        0
+        &[(false,), (true,)]
     };
 
-    let payload_end = if payload_size > 0 {
-        (payload_start + payload_size).min(buffer.len())
-    } else {
-        buffer.len()
-    };
-    if payload_end <= payload_start {
+    for (use_sequence,) in layouts {
+        if let Some(value) = try_parse_payload(buffer, header_bytes, *use_sequence) {
+            return Some((value, is_last));
+        }
+    }
+
+    // 最后兜底：从 header 后扫描 JSON `{`
+    if let Some(value) = find_json_object(&buffer[header_bytes..]) {
+        return Some((value, is_last));
+    }
+    None
+}
+
+fn try_parse_payload(
+    buffer: &[u8],
+    header_bytes: usize,
+    use_sequence: bool,
+) -> Option<serde_json::Value> {
+    let meta_len = if use_sequence { 8usize } else { 4usize };
+    if buffer.len() < header_bytes + meta_len {
         return None;
     }
-    let text = String::from_utf8_lossy(&buffer[payload_start..payload_end])
-        .trim()
-        .to_string();
+    let size_offset = if use_sequence {
+        header_bytes + 4
+    } else {
+        header_bytes
+    };
+    let payload_size = u32::from_be_bytes([
+        buffer[size_offset],
+        buffer[size_offset + 1],
+        buffer[size_offset + 2],
+        buffer[size_offset + 3],
+    ]) as usize;
+    let payload_start = header_bytes + meta_len;
+    if payload_size == 0 || buffer.len() < payload_start + payload_size {
+        return None;
+    }
+    let payload = &buffer[payload_start..payload_start + payload_size];
+    let text = std::str::from_utf8(payload).ok()?.trim();
     if text.is_empty() {
         return None;
     }
-    serde_json::from_str(&text).ok()
+    serde_json::from_str(text).ok()
+}
+
+fn find_json_object(bytes: &[u8]) -> Option<serde_json::Value> {
+    let start = bytes.iter().position(|&b| b == b'{')?;
+    let text = std::str::from_utf8(&bytes[start..]).ok()?.trim();
+    serde_json::from_str(text).ok()
 }
 
 /// 从服务端 JSON 提取当前累计文本 + 是否「会话级」结束。
@@ -436,36 +511,45 @@ fn build_session_config(
 // ========== Shared Transcription Logic ==========
 
 /// 处理一帧服务端 Binary 消息。
-/// 返回 Ok(None) = 继续；Ok(Some(err)) = 服务端业务错误（已 close）。
+/// 返回：
+/// - `Ok((None, false))` 继续
+/// - `Ok((None, true))` 会话 last packet / final（可结束读循环）
+/// - `Ok((Some(err), _))` 服务端业务错误（已 close）
 /// `on_partial` 在累计文本有更新时回调（供 HUD 即時字幕）。
 async fn handle_binary_frame(
     data: &[u8],
     accumulated_text: &mut String,
     write: &mut (impl SinkExt<Message> + Unpin),
     mut on_partial: impl FnMut(&str),
-) -> Result<Option<TranscriptionError>, TranscriptionError> {
+) -> Result<(Option<TranscriptionError>, bool), TranscriptionError> {
     if data.len() < 2 {
-        return Ok(None);
+        return Ok((None, false));
     }
     let message_type = data[1] >> 4;
     if message_type == SERVER_ERROR_RESPONSE {
         let msg = parse_server_error_message(data)
             .unwrap_or_else(|| "Unknown Doubao ASR server error".into());
         let _ = write.close().await;
-        return Ok(Some(TranscriptionError::ApiError(msg)));
+        return Ok((Some(TranscriptionError::ApiError(msg)), true));
     }
-    if let Some(parsed) = parse_server_message(data) {
-        let (text, _session_final) = extract_text_and_final(&parsed);
-        if text.trim().is_empty() {
-            return Ok(None);
+
+    let flags = data[1] & 0x0f;
+    let is_last_packet = (flags & SERVER_FLAG_LAST_PACKET) != 0;
+
+    if let Some((parsed, flag_last)) = parse_server_message_with_meta(data) {
+        let (text, session_final) = extract_text_and_final(&parsed);
+        if !text.trim().is_empty() {
+            let previous = accumulated_text.clone();
+            merge_transcript(accumulated_text, &text);
+            if !accumulated_text.is_empty() && *accumulated_text != previous {
+                on_partial(accumulated_text);
+            }
         }
-        let previous = accumulated_text.clone();
-        merge_transcript(accumulated_text, &text);
-        if !accumulated_text.is_empty() && *accumulated_text != previous {
-            on_partial(accumulated_text);
-        }
+        let done = is_last_packet || flag_last || session_final;
+        return Ok((None, done));
     }
-    Ok(None)
+
+    Ok((None, is_last_packet))
 }
 
 fn emit_transcription_partial<R: Runtime>(app: Option<&AppHandle<R>>, text: &str) {
@@ -586,18 +670,18 @@ async fn send_doubao_transcription_request<R: Runtime>(
             ));
         }
 
-        // 先尽量读掉已到达的服务端帧
+        // 先尽量读掉已到达的服务端帧（上传阶段若已 last packet 也先记着，发完再退出）
         loop {
             match tokio::time::timeout(std::time::Duration::from_millis(1), read.next()).await {
                 Ok(Some(Ok(Message::Binary(data)))) => {
-                    if let Some(err) = handle_binary_frame(
+                    let (err, _done) = handle_binary_frame(
                         &data,
                         &mut accumulated_text,
                         &mut write,
                         |text| emit_transcription_partial(app, text),
                     )
-                    .await?
-                    {
+                    .await?;
+                    if let Some(err) = err {
                         return Err(err);
                     }
                 }
@@ -663,30 +747,22 @@ async fn send_doubao_transcription_request<R: Runtime>(
         let next = tokio::time::timeout(remaining, read.next()).await;
         match next {
             Ok(Some(Ok(Message::Binary(data)))) => {
-                match handle_binary_frame(
+                let (err, done) = handle_binary_frame(
                     &data,
                     &mut accumulated_text,
                     &mut write,
                     |text| emit_transcription_partial(app, text),
                 )
-                .await?
-                {
-                    Some(err) => return Err(err),
-                    None => {
-                        // session final 已在 handle 里通过返回值区分不了；再解析一次判断
-                        if data.len() >= 2 && (data[1] >> 4) != SERVER_ERROR_RESPONSE {
-                            if let Some(parsed) = parse_server_message(&data) {
-                                let (_text, session_final) = extract_text_and_final(&parsed);
-                                if session_final && !accumulated_text.is_empty() {
-                                    println!(
-                                        "[transcription] Session final received (len={})",
-                                        accumulated_text.len()
-                                    );
-                                    break;
-                                }
-                            }
-                        }
-                    }
+                .await?;
+                if let Some(err) = err {
+                    return Err(err);
+                }
+                if done {
+                    println!(
+                        "[transcription] Session final / last packet received (len={})",
+                        accumulated_text.len()
+                    );
+                    break;
                 }
             }
             Ok(Some(Ok(Message::Close(_)))) | Ok(None) => break,
@@ -816,6 +892,441 @@ pub async fn test_asr_connection(
     .map(|_| ())
 }
 
+// ========== Live streaming ASR（邊說邊出） ==========
+
+/// 錄音開始後呼叫：掛上 PCM 訂閱 + 開 WS，持續 emit `transcription:partial`。
+#[command]
+pub fn start_live_asr(
+    app: AppHandle,
+    audio_state: State<'_, AudioRecorderState>,
+    transcription_state: State<'_, TranscriptionState>,
+    app_id: String,
+    access_key: String,
+    vocabulary_term_list: Option<Vec<String>>,
+    language: Option<String>,
+) -> Result<(), TranscriptionError> {
+    if app_id.trim().is_empty() || access_key.trim().is_empty() {
+        return Err(TranscriptionError::ApiKeyMissing);
+    }
+
+    // 取消上一輪殘留 session
+    cancel_live_session_inner(&transcription_state, &audio_state);
+
+    let (pcm_tx, pcm_rx) = std::sync::mpsc::sync_channel::<Vec<i16>>(32);
+    let sample_rate = audio_state
+        .attach_live_pcm_sink(pcm_tx)
+        .map_err(|e| TranscriptionError::RequestFailed(e.to_string()))?;
+
+    let finish = Arc::new(AtomicBool::new(false));
+    let cancel = Arc::new(AtomicBool::new(false));
+    let result: Arc<Mutex<Option<Result<TranscriptionResult, String>>>> =
+        Arc::new(Mutex::new(None));
+    let (done_tx, done_rx) = std::sync::mpsc::channel::<()>();
+
+    let finish_w = finish.clone();
+    let cancel_w = cancel.clone();
+    let result_w = result.clone();
+    let app_w = app.clone();
+
+    std::thread::Builder::new()
+        .name("live-asr".into())
+        .spawn(move || {
+            let rt = match tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+            {
+                Ok(rt) => rt,
+                Err(e) => {
+                    if let Ok(mut g) = result_w.lock() {
+                        *g = Some(Err(format!("Failed to create live ASR runtime: {e}")));
+                    }
+                    let _ = done_tx.send(());
+                    return;
+                }
+            };
+
+            let outcome = rt.block_on(run_live_asr_session(
+                app_w,
+                pcm_rx,
+                sample_rate,
+                app_id,
+                access_key,
+                vocabulary_term_list,
+                language,
+                finish_w,
+                cancel_w,
+            ));
+
+            if let Ok(mut g) = result_w.lock() {
+                *g = Some(outcome.map_err(|e| e.to_string()));
+            }
+            let _ = done_tx.send(());
+        })
+        .map_err(|e| TranscriptionError::RequestFailed(format!("live-asr spawn failed: {e}")))?;
+
+    let mut guard = transcription_state
+        .live
+        .lock()
+        .map_err(|_| TranscriptionError::LockPoisoned)?;
+    *guard = Some(LiveAsrSession {
+        finish,
+        cancel,
+        result,
+        done_rx: Mutex::new(Some(done_rx)),
+    });
+
+    println!("[transcription] Live ASR started (sample_rate={sample_rate})");
+    Ok(())
+}
+
+/// 停止錄音後呼叫：送 final、等結果。若 live session 不存在則回傳錯誤（前端可 fallback）。
+#[command]
+pub async fn finish_live_asr(
+    audio_state: State<'_, AudioRecorderState>,
+    transcription_state: State<'_, TranscriptionState>,
+) -> Result<TranscriptionResult, TranscriptionError> {
+    // 先卸 sink，錄音 callback 不再往 channel 塞
+    audio_state.detach_live_pcm_sink();
+
+    let session = {
+        let mut guard = transcription_state
+            .live
+            .lock()
+            .map_err(|_| TranscriptionError::LockPoisoned)?;
+        guard.take()
+    }
+    .ok_or(TranscriptionError::NoAudioData)?;
+
+    session.finish.store(true, Ordering::SeqCst);
+
+    // 等 worker（阻塞放 blocking 線程，避免卡 runtime）
+    let done_rx = session
+        .done_rx
+        .lock()
+        .map_err(|_| TranscriptionError::LockPoisoned)?
+        .take();
+    if let Some(rx) = done_rx {
+        let wait = tokio::task::spawn_blocking(move || {
+            // 最長等 REQUEST_TIMEOUT + final timeout
+            let _ = rx.recv_timeout(std::time::Duration::from_secs(REQUEST_TIMEOUT_SECS + 10));
+        })
+        .await;
+        if let Err(e) = wait {
+            return Err(TranscriptionError::RequestFailed(format!(
+                "live ASR join failed: {e}"
+            )));
+        }
+    }
+
+    let outcome = session
+        .result
+        .lock()
+        .map_err(|_| TranscriptionError::LockPoisoned)?
+        .take()
+        .unwrap_or_else(|| Err("Live ASR produced no result".into()));
+
+    match outcome {
+        Ok(r) => Ok(r),
+        Err(msg) => Err(TranscriptionError::RequestFailed(msg)),
+    }
+}
+
+/// ESC / 取消：關掉 live session，不取結果。
+#[command]
+pub fn cancel_live_asr(
+    audio_state: State<'_, AudioRecorderState>,
+    transcription_state: State<'_, TranscriptionState>,
+) -> Result<(), TranscriptionError> {
+    cancel_live_session_inner(&transcription_state, &audio_state);
+    Ok(())
+}
+
+fn cancel_live_session_inner(
+    transcription_state: &TranscriptionState,
+    audio_state: &AudioRecorderState,
+) {
+    audio_state.detach_live_pcm_sink();
+    if let Ok(mut guard) = transcription_state.live.lock() {
+        if let Some(session) = guard.take() {
+            session.cancel.store(true, Ordering::SeqCst);
+            session.finish.store(true, Ordering::SeqCst);
+            if let Ok(mut rx) = session.done_rx.lock() {
+                if let Some(rx) = rx.take() {
+                    let _ = rx.recv_timeout(std::time::Duration::from_millis(800));
+                }
+            }
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn run_live_asr_session(
+    app: AppHandle,
+    pcm_rx: std::sync::mpsc::Receiver<Vec<i16>>,
+    sample_rate: u32,
+    app_id: String,
+    access_key: String,
+    vocabulary_term_list: Option<Vec<String>>,
+    language: Option<String>,
+    finish: Arc<AtomicBool>,
+    cancel: Arc<AtomicBool>,
+) -> Result<TranscriptionResult, TranscriptionError> {
+    let start_time = Instant::now();
+    let session_config =
+        build_session_config(language.as_deref(), vocabulary_term_list.as_deref());
+    let connect_id = Uuid::new_v4().to_string();
+
+    let mut request = DEFAULT_WS_URL
+        .into_client_request()
+        .map_err(|e| TranscriptionError::RequestFailed(format!("Invalid WS URL: {e}")))?;
+    {
+        let headers = request.headers_mut();
+        headers.insert(
+            "X-Api-App-Key",
+            HeaderValue::from_str(&app_id)
+                .map_err(|e| TranscriptionError::RequestFailed(e.to_string()))?,
+        );
+        headers.insert(
+            "X-Api-Access-Key",
+            HeaderValue::from_str(&access_key)
+                .map_err(|e| TranscriptionError::RequestFailed(e.to_string()))?,
+        );
+        headers.insert(
+            "X-Api-Resource-Id",
+            HeaderValue::from_static(DEFAULT_RESOURCE_ID),
+        );
+        headers.insert(
+            "X-Api-Connect-Id",
+            HeaderValue::from_str(&connect_id)
+                .map_err(|e| TranscriptionError::RequestFailed(e.to_string()))?,
+        );
+        headers.insert(
+            "X-Api-Request-Id",
+            HeaderValue::from_str(&connect_id)
+                .map_err(|e| TranscriptionError::RequestFailed(e.to_string()))?,
+        );
+    }
+
+    let connect_result = tokio::time::timeout(
+        std::time::Duration::from_secs(REQUEST_TIMEOUT_SECS),
+        tokio_tungstenite::connect_async(request),
+    )
+    .await
+    .map_err(|_| TranscriptionError::RequestFailed("WebSocket connection timeout".into()))?
+    .map_err(|e| TranscriptionError::RequestFailed(format!("WebSocket connect failed: {e}")))?;
+
+    let (ws_stream, _response) = connect_result;
+    let (mut write, mut read) = ws_stream.split();
+
+    let init_buf = encode_full_client_request(&session_config);
+    write
+        .send(Message::Binary(init_buf.into()))
+        .await
+        .map_err(|e| TranscriptionError::RequestFailed(format!("Failed to send init: {e}")))?;
+
+    let mut accumulated_text = String::new();
+    let mut pcm_byte_buf: Vec<u8> = Vec::with_capacity(PCM_CHUNK_BYTES * 4);
+    // 目標：每 200ms 送一包 16k mono
+    let target_chunk_samples = (TARGET_SAMPLE_RATE as usize * PCM_CHUNK_MS as usize) / 1000;
+    let mut pending_samples: Vec<i16> = Vec::with_capacity(target_chunk_samples * 2);
+    let mut last_packet_sent = false;
+    let mut total_pcm_bytes: usize = 0;
+
+    // 錄音 device 可能不是 16k；累積原始 sample 後再線性重採樣送出
+    let from_rate = if sample_rate == 0 { TARGET_SAMPLE_RATE } else { sample_rate };
+
+    while !last_packet_sent {
+        if cancel.load(Ordering::SeqCst) {
+            let _ = write.close().await;
+            return Err(TranscriptionError::RequestFailed("Live ASR cancelled".into()));
+        }
+
+        // 先 drain 服務端 partial
+        loop {
+            match tokio::time::timeout(std::time::Duration::from_millis(1), read.next()).await {
+                Ok(Some(Ok(Message::Binary(data)))) => {
+                    let (err, _done) = handle_binary_frame(
+                        &data,
+                        &mut accumulated_text,
+                        &mut write,
+                        |text| emit_transcription_partial(Some(&app), text),
+                    )
+                    .await?;
+                    if let Some(err) = err {
+                        return Err(err);
+                    }
+                }
+                Ok(Some(Ok(Message::Close(_)))) | Ok(None) => {
+                    let _ = write.close().await;
+                    return Err(TranscriptionError::RequestFailed(
+                        "WebSocket closed during live ASR".into(),
+                    ));
+                }
+                Ok(Some(Ok(_))) => continue,
+                Ok(Some(Err(e))) => {
+                    let _ = write.close().await;
+                    return Err(TranscriptionError::RequestFailed(format!(
+                        "WebSocket read error: {e}"
+                    )));
+                }
+                Err(_) => break,
+            }
+        }
+
+        // 從錄音 channel 取 PCM（非阻塞 + 短超時，兼顧 finish 信號）
+        let finished = finish.load(Ordering::SeqCst);
+        match pcm_rx.recv_timeout(std::time::Duration::from_millis(if finished {
+            5
+        } else {
+            40
+        })) {
+            Ok(batch) => {
+                pending_samples.extend_from_slice(&batch);
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                // sink 已卸 / 錄音結束：視同 finish
+                finish.store(true, Ordering::SeqCst);
+            }
+        }
+
+        // 重採樣後湊滿 200ms 就送
+        if from_rate == TARGET_SAMPLE_RATE {
+            while pending_samples.len() >= target_chunk_samples {
+                let chunk: Vec<i16> = pending_samples.drain(..target_chunk_samples).collect();
+                pcm_byte_buf.clear();
+                for s in &chunk {
+                    pcm_byte_buf.extend_from_slice(&s.to_le_bytes());
+                }
+                total_pcm_bytes += pcm_byte_buf.len();
+                let packet = encode_audio_only_request(&pcm_byte_buf, false);
+                write
+                    .send(Message::Binary(packet.into()))
+                    .await
+                    .map_err(|e| {
+                        TranscriptionError::RequestFailed(format!("Failed to send audio: {e}"))
+                    })?;
+            }
+        } else {
+            // 非 16k：等夠一段再重採樣送（約 200ms 原始）
+            let need = ((target_chunk_samples as u64 * from_rate as u64)
+                / TARGET_SAMPLE_RATE as u64)
+                .max(1) as usize;
+            while pending_samples.len() >= need {
+                let raw: Vec<i16> = pending_samples.drain(..need).collect();
+                let resampled = resample_linear(&raw, from_rate, TARGET_SAMPLE_RATE);
+                pcm_byte_buf.clear();
+                for s in &resampled {
+                    pcm_byte_buf.extend_from_slice(&s.to_le_bytes());
+                }
+                total_pcm_bytes += pcm_byte_buf.len();
+                let packet = encode_audio_only_request(&pcm_byte_buf, false);
+                write
+                    .send(Message::Binary(packet.into()))
+                    .await
+                    .map_err(|e| {
+                        TranscriptionError::RequestFailed(format!("Failed to send audio: {e}"))
+                    })?;
+            }
+        }
+
+        if finish.load(Ordering::SeqCst) {
+            // 排空 channel 殘餘
+            while let Ok(batch) = pcm_rx.try_recv() {
+                pending_samples.extend_from_slice(&batch);
+            }
+            // 送尾段
+            if !pending_samples.is_empty() {
+                let resampled = if from_rate == TARGET_SAMPLE_RATE {
+                    pending_samples.clone()
+                } else {
+                    resample_linear(&pending_samples, from_rate, TARGET_SAMPLE_RATE)
+                };
+                pending_samples.clear();
+                pcm_byte_buf.clear();
+                for s in &resampled {
+                    pcm_byte_buf.extend_from_slice(&s.to_le_bytes());
+                }
+                total_pcm_bytes += pcm_byte_buf.len();
+                let packet = encode_audio_only_request(&pcm_byte_buf, false);
+                let _ = write.send(Message::Binary(packet.into())).await;
+            }
+            let final_packet = encode_audio_only_request(&[], true);
+            write
+                .send(Message::Binary(final_packet.into()))
+                .await
+                .map_err(|e| {
+                    TranscriptionError::RequestFailed(format!("Failed to send final: {e}"))
+                })?;
+            last_packet_sent = true;
+            println!(
+                "[transcription] Live ASR final packet sent ({} bytes PCM)",
+                total_pcm_bytes
+            );
+        }
+    }
+
+    if cancel.load(Ordering::SeqCst) {
+        let _ = write.close().await;
+        return Err(TranscriptionError::RequestFailed("Live ASR cancelled".into()));
+    }
+
+    // 等 final
+    let final_deadline =
+        tokio::time::Instant::now() + std::time::Duration::from_millis(FINAL_RESULT_TIMEOUT_MS);
+    loop {
+        if cancel.load(Ordering::SeqCst) {
+            let _ = write.close().await;
+            return Err(TranscriptionError::RequestFailed("Live ASR cancelled".into()));
+        }
+        let remaining = final_deadline.saturating_duration_since(tokio::time::Instant::now());
+        if remaining.is_zero() {
+            break;
+        }
+        match tokio::time::timeout(remaining, read.next()).await {
+            Ok(Some(Ok(Message::Binary(data)))) => {
+                let (err, done) = handle_binary_frame(
+                    &data,
+                    &mut accumulated_text,
+                    &mut write,
+                    |text| emit_transcription_partial(Some(&app), text),
+                )
+                .await?;
+                if let Some(err) = err {
+                    return Err(err);
+                }
+                if done {
+                    break;
+                }
+            }
+            Ok(Some(Ok(Message::Close(_)))) | Ok(None) => break,
+            Ok(Some(Ok(_))) => continue,
+            Ok(Some(Err(e))) => {
+                let _ = write.close().await;
+                return Err(TranscriptionError::RequestFailed(format!(
+                    "WebSocket read error: {e}"
+                )));
+            }
+            Err(_) => break,
+        }
+    }
+
+    let _ = write.close().await;
+    let transcription_duration_ms = start_time.elapsed().as_secs_f64() * 1000.0;
+    let raw_text = accumulated_text.trim().to_string();
+    let no_speech_probability = if raw_text.is_empty() { 1.0 } else { 0.0 };
+
+    println!(
+        "[transcription] Live ASR done in {transcription_duration_ms:.0}ms: \"{raw_text}\" (pcm={total_pcm_bytes})"
+    );
+
+    Ok(TranscriptionResult {
+        raw_text,
+        transcription_duration_ms,
+        no_speech_probability,
+    })
+}
+
 // ========== Tests ==========
 
 #[cfg(test)]
@@ -902,5 +1413,78 @@ mod tests {
         assert_eq!(cur, "你好世界");
         merge_transcript(&mut cur, "你");
         assert_eq!(cur, "你好世界");
+    }
+
+    /// 服务端结果帧：`[hdr][sequence:4][payload_size:4][json]`
+    /// 旧实现把 size/seq 写反，导致 JSON 解析失败 → 空文本。
+    #[test]
+    fn test_parse_server_message_sequence_then_size() {
+        let json =
+            r#"{"result":{"text":"嘿，哈喽，我们现在可以说一些话了吗？"}}"#.as_bytes();
+        let mut buf = vec![0u8; 4];
+        buf[0] = (PROTOCOL_VERSION << 4) | 1; // header_size=1 → 4 bytes
+        buf[1] = (0b1001 << 4) | SERVER_FLAG_HAS_SEQUENCE | SERVER_FLAG_LAST_PACKET; // mt=9
+        buf[2] = (SERIAL_JSON << 4) | COMPRESSION_NONE;
+        buf[3] = 0;
+        let sequence: i32 = 6;
+        buf.extend_from_slice(&sequence.to_be_bytes());
+        buf.extend_from_slice(&(json.len() as u32).to_be_bytes());
+        buf.extend_from_slice(json);
+
+        let (parsed, is_last) = parse_server_message_with_meta(&buf).expect("parse");
+        assert!(is_last);
+        let (text, _) = extract_text_and_final(&parsed);
+        assert!(text.contains("哈喽"));
+        assert!(text.contains("可以说一些话"));
+    }
+
+    /// 旧错误布局 size+seq 会把 payload 切坏；正确布局 seq+size 才能读出整句。
+    #[test]
+    fn test_wrong_size_seq_layout_fails_correct_succeeds() {
+        let json = r#"{"result":{"text":"完整句子内容"}}"#.as_bytes();
+        let mut buf = vec![0u8; 4];
+        buf[0] = (PROTOCOL_VERSION << 4) | 1;
+        buf[1] = (0b1001 << 4) | SERVER_FLAG_HAS_SEQUENCE;
+        buf[2] = (SERIAL_JSON << 4) | COMPRESSION_NONE;
+        buf[3] = 0;
+        let sequence: i32 = 2;
+        buf.extend_from_slice(&sequence.to_be_bytes());
+        buf.extend_from_slice(&(json.len() as u32).to_be_bytes());
+        buf.extend_from_slice(json);
+
+        // 旧逻辑：把 sequence 当成 size → 通常解析失败或取到残片
+        let header_bytes = 4usize;
+        let wrong_size = u32::from_be_bytes([buf[4], buf[5], buf[6], buf[7]]) as usize;
+        let wrong_start = header_bytes + 8;
+        let wrong_slice = if wrong_size > 0 && wrong_start + wrong_size <= buf.len() {
+            std::str::from_utf8(&buf[wrong_start..wrong_start + wrong_size]).ok()
+        } else {
+            None
+        };
+        assert!(
+            wrong_slice.and_then(|s| serde_json::from_str::<serde_json::Value>(s).ok()).is_none(),
+            "old size+seq layout should not parse valid JSON"
+        );
+
+        let (parsed, _) = parse_server_message_with_meta(&buf).expect("correct layout");
+        let (text, _) = extract_text_and_final(&parsed);
+        assert_eq!(text, "完整句子内容");
+    }
+
+    /// init ack：无 sequence，`[hdr][payload_size:4][json]`
+    #[test]
+    fn test_parse_server_message_size_only_ack() {
+        let json = br#"{"result":{"additions":{"log_id":"abc"}}}"#;
+        let mut buf = vec![0u8; 4];
+        buf[0] = (PROTOCOL_VERSION << 4) | 1;
+        buf[1] = (0b1001 << 4) | 0; // no sequence
+        buf[2] = (SERIAL_JSON << 4) | COMPRESSION_NONE;
+        buf[3] = 0;
+        buf.extend_from_slice(&(json.len() as u32).to_be_bytes());
+        buf.extend_from_slice(json);
+
+        let (parsed, is_last) = parse_server_message_with_meta(&buf).expect("parse ack");
+        assert!(!is_last);
+        assert!(parsed.pointer("/result/additions/log_id").is_some());
     }
 }

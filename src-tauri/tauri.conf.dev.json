@@ -1,0 +1,42 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicedoc/resources/main/tauri-conf-v2.json",
+  "productName": "SayIt Dev",
+  "identifier": "com.sayit.dev",
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "SayIt Dev",
+        "width": 470,
+        "height": 100,
+        "x": null,
+        "y": 0,
+        "center": true,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false,
+        "focus": false,
+        "resizable": false,
+        "shadow": false
+      },
+      {
+        "label": "main-window",
+        "title": "SayIt Dev",
+        "url": "main-window.html",
+        "width": 960,
+        "height": 680,
+        "visible": false,
+        "decorations": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "acceptFirstMouse": true,
+        "resizable": true,
+        "center": true,
+        "minWidth": 720,
+        "minHeight": 480
+      }
+    ]
+  }
+}

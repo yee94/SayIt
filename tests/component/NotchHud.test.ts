@@ -257,7 +257,7 @@ describe("NotchHud", () => {
     expect(mockUnlisten).toHaveBeenCalledTimes(1);
   });
 
-  it("[P0] transcribing 且有 liveTranscript 應在留海下方顯示一行字幕", async () => {
+  it("[P0] transcribing 且有 liveTranscript 應在留海內擴展顯示一行字幕", async () => {
     const wrapper = mountNotchHud({
       status: "transcribing",
       recordingElapsedSeconds: 0,
@@ -268,6 +268,13 @@ describe("NotchHud", () => {
     expect(wrapper.find(".live-transcript-row").exists()).toBe(true);
     expect(wrapper.find(".live-transcript-bdi").text()).toBe(
       "你好世界這是即時字幕",
+    );
+    // 與 error/learned 相同：黑底圓角向下擴展
+    expect(wrapper.find(".notch-hud").classes()).toContain(
+      "notch-hud-expanded",
+    );
+    expect(wrapper.find(".notch-hud").attributes("style") ?? "").toMatch(
+      /height:\s*72px/,
     );
   });
 
@@ -282,7 +289,7 @@ describe("NotchHud", () => {
     expect(wrapper.find(".live-transcript-row").exists()).toBe(false);
   });
 
-  it("[P0] transcribing 無 liveTranscript 不顯示字幕列", () => {
+  it("[P0] transcribing 無 liveTranscript 不顯示字幕列、保持預設高度", () => {
     const wrapper = mountNotchHud({
       status: "transcribing",
       recordingElapsedSeconds: 0,
@@ -291,5 +298,35 @@ describe("NotchHud", () => {
     });
 
     expect(wrapper.find(".live-transcript-row").exists()).toBe(false);
+    expect(wrapper.find(".notch-hud").classes()).not.toContain(
+      "notch-hud-expanded",
+    );
+    expect(wrapper.find(".notch-hud").attributes("style") ?? "").toMatch(
+      /height:\s*42px/,
+    );
+  });
+
+  it("[P0] 有 liveTranscript 後才從 42 撐到 72", async () => {
+    const wrapper = mountNotchHud({
+      status: "transcribing",
+      recordingElapsedSeconds: 0,
+      message: "",
+      liveTranscript: "",
+    });
+
+    expect(wrapper.find(".notch-hud").attributes("style") ?? "").toMatch(
+      /height:\s*42px/,
+    );
+
+    await wrapper.setProps({ liveTranscript: "第一句 partial" });
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find(".live-transcript-row").exists()).toBe(true);
+    expect(wrapper.find(".notch-hud").classes()).toContain(
+      "notch-hud-expanded",
+    );
+    expect(wrapper.find(".notch-hud").attributes("style") ?? "").toMatch(
+      /height:\s*72px/,
+    );
   });
 });

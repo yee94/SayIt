@@ -206,7 +206,7 @@
     "aiEnhanced": "AI 정리",
     "usageCount": "사용 횟수",
     "noRecords": "사용 기록이 없습니다",
-    "quotaWhisperRequests": "Whisper {used}/{limit} 회",
+    "quotaWhisperRequests": "음성 {used}/{limit} 회",
     "quotaAudio": "오디오 {used}/{limit}",
     "quotaLlmRequests": "LLM {used}/{limit} 회",
     "quotaLlmTokens": "LLM {used}/{limit} tokens",
@@ -216,7 +216,7 @@
     "dailyUsage": "오늘 사용량",
     "billedPlan": "유료",
     "billedNoFreeQuota": "유료 요금제 — 무료 할당량 없음",
-    "usageWhisper": "Whisper: {requests}회 · {audio}",
+    "usageWhisper": "음성: {requests}회 · {audio}",
     "usageLlm": "LLM: {requests}회 · {tokens} tokens"
   },
   "history": {

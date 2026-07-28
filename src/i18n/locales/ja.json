@@ -206,7 +206,7 @@
     "aiEnhanced": "AI 整理",
     "usageCount": "使用回数",
     "noRecords": "使用記録はまだありません",
-    "quotaWhisperRequests": "Whisper {used}/{limit} 回",
+    "quotaWhisperRequests": "音声 {used}/{limit} 回",
     "quotaAudio": "音声 {used}/{limit}",
     "quotaLlmRequests": "LLM {used}/{limit} 回",
     "quotaLlmTokens": "LLM {used}/{limit} tokens",
@@ -216,7 +216,7 @@
     "dailyUsage": "本日の使用量",
     "billedPlan": "従量課金",
     "billedNoFreeQuota": "従量課金 — 無料枠なし",
-    "usageWhisper": "Whisper：{requests} 回 · {audio}",
+    "usageWhisper": "音声：{requests} 回 · {audio}",
     "usageLlm": "LLM：{requests} 回 · {tokens} tokens"
   },
   "history": {

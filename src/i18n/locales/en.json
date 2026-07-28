@@ -206,7 +206,7 @@
     "aiEnhanced": "AI Enhanced",
     "usageCount": "Usage Count",
     "noRecords": "No records yet",
-    "quotaWhisperRequests": "Whisper {used}/{limit} req",
+    "quotaWhisperRequests": "Speech {used}/{limit} req",
     "quotaAudio": "Audio {used}/{limit}",
     "quotaLlmRequests": "LLM {used}/{limit} req",
     "quotaLlmTokens": "LLM {used}/{limit} tokens",
@@ -216,7 +216,7 @@
     "dailyUsage": "Today's Usage",
     "billedPlan": "Billed",
     "billedNoFreeQuota": "Pay-as-you-go — no free quota limit",
-    "usageWhisper": "Whisper: {requests} req · {audio}",
+    "usageWhisper": "Speech: {requests} req · {audio}",
     "usageLlm": "LLM: {requests} req · {tokens} tokens"
   },
   "history": {
