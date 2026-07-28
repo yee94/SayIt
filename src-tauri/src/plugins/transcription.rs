@@ -1335,38 +1335,6 @@ mod tests {
     use super::*;
 
     #[test]
-    #[ignore = "manual real-service probe"]
-    fn test_real_asr_connection_from_env() {
-        let app_id = std::env::var("SAYIT_ASR_APP_ID").expect("missing SAYIT_ASR_APP_ID");
-        let access_key =
-            std::env::var("SAYIT_ASR_ACCESS_KEY").expect("missing SAYIT_ASR_ACCESS_KEY");
-        let wav_data = match std::env::var("SAYIT_ASR_WAV_PATH") {
-            Ok(path) => std::fs::read(path).expect("read probe wav"),
-            Err(_) => {
-                let silence_samples = vec![0i16; 16_000];
-                super::super::audio_recorder::encode_wav(&silence_samples, 16_000)
-                    .expect("encode probe wav")
-            }
-        };
-        let runtime = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("create probe runtime");
-
-        let result = runtime
-            .block_on(send_doubao_transcription_request::<tauri::Wry>(
-                None,
-                wav_data,
-                &app_id,
-                &access_key,
-                None,
-                None,
-            ))
-            .expect("real ASR connection failed");
-        println!("[asr-probe] recognized_chars={}", result.raw_text.chars().count());
-    }
-
-    #[test]
     fn test_encode_full_client_request_header() {
         let payload = serde_json::json!({"a": 1});
         let buf = encode_full_client_request(&payload);

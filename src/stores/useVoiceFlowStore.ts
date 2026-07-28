@@ -1318,6 +1318,9 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       let result: TranscriptionResult;
       try {
         result = await invoke<TranscriptionResult>("finish_live_asr");
+        if (isEmptyTranscription(result.rawText)) {
+          throw new Error("Live ASR returned empty transcript");
+        }
         writeInfoLog(
           `useVoiceFlowStore: finish_live_asr ok (len=${result.rawText?.length ?? 0})`,
         );
@@ -1325,12 +1328,26 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         writeInfoLog(
           `useVoiceFlowStore: finish_live_asr fallback to transcribe_audio: ${extractErrorMessage(liveErr)}`,
         );
-        result = await invoke<TranscriptionResult>("transcribe_audio", {
-          appId,
-          accessKey,
-          vocabularyTermList: hasVocabulary ? whisperTermList : null,
-          language: settingsStore.getWhisperLanguageCode(),
-        });
+        try {
+          result = await invoke<TranscriptionResult>("transcribe_audio", {
+            appId,
+            accessKey,
+            vocabularyTermList: hasVocabulary ? whisperTermList : null,
+            language: settingsStore.getWhisperLanguageCode(),
+          });
+        } catch (bufferError) {
+          if (!audioFilePath) throw bufferError;
+          writeInfoLog(
+            `useVoiceFlowStore: transcribe_audio fallback to saved WAV: ${extractErrorMessage(bufferError)}`,
+          );
+          result = await invoke<TranscriptionResult>("retranscribe_from_file", {
+            filePath: audioFilePath,
+            appId,
+            accessKey,
+            vocabularyTermList: hasVocabulary ? whisperTermList : null,
+            language: settingsStore.getWhisperLanguageCode(),
+          });
+        }
       }
       if (isAborted.value) return;
 
