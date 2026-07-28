@@ -592,9 +592,7 @@ fn handle_recording_event_macos<R: Runtime>(
                 let last_kc = shared.recording.last_modifier_keycode.unwrap();
                 shared.recording.reset();
                 drop(shared);
-                println!(
-                    "[hotkey-listener] recording: captured single modifier keycode={last_kc}"
-                );
+                println!("[hotkey-listener] recording: captured single modifier keycode={last_kc}");
                 let _ = app_handle.emit(
                     "hotkey:recording-captured",
                     RecordingCapturedPayload {
@@ -632,9 +630,7 @@ fn handle_recording_event_macos<R: Runtime>(
                 .collect();
             shared.recording.reset();
             drop(shared);
-            println!(
-                "[hotkey-listener] recording: captured keycode={keycode}, modifiers={mods:?}"
-            );
+            println!("[hotkey-listener] recording: captured keycode={keycode}, modifiers={mods:?}");
             let _ = app_handle.emit(
                 "hotkey:recording-captured",
                 RecordingCapturedPayload {

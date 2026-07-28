@@ -88,7 +88,7 @@ const settingsStore = useSettingsStore();
 const historyStore = useHistoryStore();
 const { t } = useI18n();
 
-// ── 快捷鍵設定 ──────────────────────────────────────────────
+// ── 快捷键设定 ──────────────────────────────────────────────
 const isMac = navigator.userAgent.includes("Mac");
 
 const triggerKeyOptions = computed<{ value: PresetTriggerKey; label: string }[]>(() =>
@@ -112,7 +112,7 @@ const triggerKeyOptions = computed<{ value: PresetTriggerKey; label: string }[]>
 
 const hotkeyFeedback = useFeedbackMessage();
 
-// ── 兩層模式切換 ──────────────────────────────────────────
+// ── 两层模式切换 ──────────────────────────────────────────
 const isCustomMode = ref(false);
 const isRecording = ref(false);
 const recordingWarning = ref("");
@@ -380,7 +380,7 @@ const isPresetDirty = ref(false);
 
 const isConfirmingResetPrompt = ref(false);
 
-// Preset 模式下切語言時即時更新 textarea
+// Preset 模式下切语言时即时更新 textarea
 watch(
   [() => settingsStore.selectedLocale, () => settingsStore.selectedTranscriptionLocale],
   () => {
@@ -399,7 +399,7 @@ async function handleSavePrompt() {
   const previousMode = selectedPromptMode.value;
   try {
     isSubmittingPrompt.value = true;
-    // preset 模式下編輯 → 切到 custom
+    // preset 模式下编辑 → 切到 custom
     if (wasModeSwitch) {
       await settingsStore.savePromptMode("custom");
       selectedPromptMode.value = "custom";
@@ -467,7 +467,7 @@ async function handleResetPrompt() {
   }
 }
 
-// ── AI 整理門檻 ──────────────────────────────────────────────
+// ── AI 整理门槛 ──────────────────────────────────────────────
 const thresholdEnabled = ref(DEFAULT_ENHANCEMENT_THRESHOLD_ENABLED);
 const thresholdCharCount = ref(DEFAULT_ENHANCEMENT_THRESHOLD_CHAR_COUNT);
 const enhancementThresholdFeedback = useFeedbackMessage();
@@ -538,7 +538,7 @@ async function handleDeleteLlmApiKey() {
 }
 
 
-// ── 錄音自動靜音 ──────────────────────────────────────────────
+// ── 录音自动静音 ──────────────────────────────────────────────
 const muteOnRecordingFeedback = useFeedbackMessage();
 
 async function handleToggleMuteOnRecording(newValue: boolean) {
@@ -569,10 +569,10 @@ async function handleToggleSoundFeedback(newValue: boolean) {
   }
 }
 
-// ── 隱藏 Dock 圖示 (gh-56，僅 macOS) ──────────────────────────
+// ── 隐藏 Dock 图示 (gh-56，仅 macOS) ──────────────────────────
 const hideDockIconFeedback = useFeedbackMessage();
-// macOS 對「Dock 顯示後 1 秒內的隱藏請求」會靜默忽略（Tao 防重複圖示守衛），
-// 切換後短暫鎖住開關，避免快速連按造成 UI 與實際 Dock 狀態脫節
+// macOS 对「Dock 显示后 1 秒内的隐藏请求」会静默忽略（Tao 防重复图示守卫），
+// 切换后短暂锁住开关，避免快速连按造成 UI 与实际 Dock 状态脱节
 const isHideDockIconPending = ref(false);
 let hideDockIconPendingTimeoutId: ReturnType<typeof setTimeout> | undefined;
 
@@ -595,7 +595,7 @@ async function handleToggleHideDockIcon(newValue: boolean) {
   }
 }
 
-// ── 轉錄文字是否複製到剪貼簿 (gh-35) ──────────────────────────
+// ── 转录文字是否复制到剪贴簿 (gh-35) ──────────────────────────
 const copyTranscriptionToClipboardFeedback = useFeedbackMessage();
 
 async function handleToggleCopyTranscriptionToClipboard(newValue: boolean) {
@@ -615,7 +615,7 @@ async function handleToggleCopyTranscriptionToClipboard(newValue: boolean) {
   }
 }
 
-// ── 介面語言 ──────────────────────────────────────────────
+// ── 介面语言 ──────────────────────────────────────────────
 const localeFeedback = useFeedbackMessage();
 
 async function handleLocaleChange(newLocale: SupportedLocale) {
@@ -627,7 +627,7 @@ async function handleLocaleChange(newLocale: SupportedLocale) {
   }
 }
 
-// ── 轉錄語言 ──────────────────────────────────────────────
+// ── 转录语言 ──────────────────────────────────────────────
 const transcriptionLocaleFeedback = useFeedbackMessage();
 
 async function handleTranscriptionLocaleChange(newLocale: TranscriptionLocale) {
@@ -639,7 +639,7 @@ async function handleTranscriptionLocaleChange(newLocale: TranscriptionLocale) {
   }
 }
 
-// ── 智慧字典學習 ────────────────────────────────────────────
+// ── 智慧字典学习 ────────────────────────────────────────────
 const smartDictionaryFeedback = useFeedbackMessage();
 
 async function handleToggleSmartDictionary(newValue: boolean) {
@@ -651,7 +651,7 @@ async function handleToggleSmartDictionary(newValue: boolean) {
   }
 }
 
-// ── 錄音儲存管理 ──────────────────────────────────────────
+// ── 录音储存管理 ──────────────────────────────────────────
 const recordingCleanupFeedback = useFeedbackMessage();
 const recordingAutoCleanupEnabled = ref(false);
 const recordingAutoCleanupDays = ref(7);
@@ -705,7 +705,7 @@ async function handleDeleteAllRecordings() {
   }
 }
 
-// ── 應用程式 ────────────────────────────────────────────────
+// ── 应用程式 ────────────────────────────────────────────────
 const autoStartFeedback = useFeedbackMessage();
 const isTogglingAutoStart = ref(false);
 
@@ -724,7 +724,7 @@ async function handleToggleAutoStart() {
   }
 }
 
-// ── 輸入裝置 ──────────────────────────────────────────────
+// ── 输入装置 ──────────────────────────────────────────────
 const audioInputDeviceList = ref<AudioInputDeviceInfo[]>([]);
 const defaultInputDeviceName = ref<string | null>(null);
 const isRefreshingDeviceList = ref(false);
@@ -775,7 +775,7 @@ async function handleAudioInputDeviceChange(deviceName: string) {
 }
 
 onMounted(async () => {
-  // F5 fix: 先載入裝置列表，完成後再啟動預覽（避免 cpal 並行 host 查詢）
+  // F5 fix: 先载入装置列表，完成后再启动预览（避免 cpal 并行 host 查询）
   void loadAudioInputDeviceList().then(() => {
     void startPreview(settingsStore.selectedAudioInputDeviceName);
   });
@@ -829,13 +829,13 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="settings-page space-y-5 text-foreground">
-    <!-- 快捷鍵設定 -->
+    <!-- 快捷键设定 -->
     <Card>
       <CardHeader class="border-b border-border">
         <CardTitle class="text-base">{{ $t("settings.hotkey.title") }}</CardTitle>
       </CardHeader>
       <CardContent class="space-y-4">
-        <!-- 簡易 / 自訂 模式切換 -->
+        <!-- 简易 / 自订 模式切换 -->
         <div class="flex items-center justify-between">
           <Label>{{ $t("settings.hotkey.triggerKeyMode") }}</Label>
           <div class="flex rounded-lg border border-border overflow-hidden">
@@ -866,7 +866,7 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <!-- 簡易模式：Select 下拉 -->
+        <!-- 简易模式：Select 下拉 -->
         <div v-if="!isCustomMode" class="flex items-center justify-between">
           <Label for="trigger-key">{{ $t("settings.hotkey.triggerKey") }}</Label>
           <Select
@@ -888,7 +888,7 @@ onBeforeUnmount(() => {
           </Select>
         </div>
 
-        <!-- 自訂模式：錄製按鍵 -->
+        <!-- 自订模式：录制按键 -->
         <div v-else class="space-y-3">
           <div class="flex items-center justify-between">
             <Label>{{ $t("settings.hotkey.customTriggerKey") }}</Label>
@@ -911,18 +911,18 @@ onBeforeUnmount(() => {
             {{ $t("settings.hotkey.systemKeyHint") }}
           </p>
 
-          <!-- 警告訊息（黃色） -->
+          <!-- 警告讯息（黄色） -->
           <p v-if="recordingWarning" class="text-sm text-destructive">
             {{ recordingWarning }}
           </p>
 
-          <!-- 提示訊息（藍色） -->
+          <!-- 提示讯息（蓝色） -->
           <p v-if="recordingHint" class="text-sm text-muted-foreground">
             {{ recordingHint }}
           </p>
         </div>
 
-        <!-- 觸發模式 -->
+        <!-- 触发模式 -->
         <div class="flex items-center justify-between">
           <Label for="trigger-mode">{{ $t("settings.hotkey.triggerMode") }}</Label>
           <div class="flex rounded-lg border border-border overflow-hidden">
@@ -1182,7 +1182,7 @@ onBeforeUnmount(() => {
           {{ $t("settings.prompt.description") }}
         </p>
 
-        <!-- 模式選擇器 -->
+        <!-- 模式选择器 -->
         <div class="space-y-2">
           <Label>{{ $t("settings.prompt.modeTitle") }}</Label>
           <RadioGroup
@@ -1265,7 +1265,7 @@ onBeforeUnmount(() => {
       </CardContent>
     </Card>
 
-    <!-- 短文字門檻 -->
+    <!-- 短文字门槛 -->
     <Card>
       <CardHeader class="border-b border-border">
         <CardTitle class="text-base">{{ $t("settings.threshold.title") }}</CardTitle>
@@ -1318,7 +1318,7 @@ onBeforeUnmount(() => {
       </CardContent>
     </Card>
 
-    <!-- 智慧字典學習（macOS: AXUIElement；Windows: UI Automation） -->
+    <!-- 智慧字典学习（macOS: AXUIElement；Windows: UI Automation） -->
     <Card>
       <CardHeader class="border-b border-border">
         <CardTitle class="text-base">{{ $t("settings.smartDictionary.title") }}</CardTitle>
@@ -1357,7 +1357,7 @@ onBeforeUnmount(() => {
       </CardContent>
     </Card>
 
-    <!-- 輸入裝置 -->
+    <!-- 输入装置 -->
     <Card>
       <CardHeader class="border-b border-border">
         <CardTitle class="text-base">{{ $t("settings.audioInput.title") }}</CardTitle>
@@ -1434,7 +1434,7 @@ onBeforeUnmount(() => {
       </CardContent>
     </Card>
 
-    <!-- 錄音儲存管理 -->
+    <!-- 录音储存管理 -->
     <Card>
       <CardHeader class="border-b border-border">
         <CardTitle class="text-base">{{ $t("settings.recording.title") }}</CardTitle>
@@ -1519,13 +1519,13 @@ onBeforeUnmount(() => {
       </CardContent>
     </Card>
 
-    <!-- 應用程式 -->
+    <!-- 应用程式 -->
     <Card>
       <CardHeader class="border-b border-border">
         <CardTitle class="text-base">{{ $t("settings.app.title") }}</CardTitle>
       </CardHeader>
       <CardContent class="space-y-4">
-        <!-- 介面語言 -->
+        <!-- 介面语言 -->
         <div class="flex items-center justify-between">
           <Label for="locale-select">{{ $t("settings.app.language") }}</Label>
           <Select
@@ -1561,7 +1561,7 @@ onBeforeUnmount(() => {
           </p>
         </transition>
 
-        <!-- 轉錄語言 -->
+        <!-- 转录语言 -->
         <div class="flex items-center justify-between">
           <div>
             <Label for="transcription-locale-select">{{ $t("settings.app.transcriptionLanguage") }}</Label>

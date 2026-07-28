@@ -3,15 +3,15 @@ use std::thread;
 use std::time::Duration;
 use tauri::{AppHandle, Runtime, State};
 
-/// 貼上指令觸發後等多久才把剪貼簿還原成原內容（毫秒）。
-/// 太短：目標 app 還沒消費完 paste，會貼到舊內容；太長：使用者感受得到延遲。
-/// 200ms 在實測下對絕大部分 app 足夠。
+/// 贴上指令触发后等多久才把剪贴簿还原成原内容（毫秒）。
+/// 太短：目标 app 还没消费完 paste，会贴到旧内容；太长：使用者感受得到延迟。
+/// 200ms 在实测下对绝大部分 app 足够。
 const RESTORE_DELAY_MS: u64 = 200;
 
 // ========== Focus State ==========
 
-/// 儲存使用者啟動錄音前的前景視窗，貼上時恢復焦點。
-/// Windows 上 SendInput 會送到當前前景視窗，若 HUD 搶了焦點，Ctrl+V 會進 HUD 而非目標 app。
+/// 储存使用者启动录音前的前景视窗，贴上时恢复焦点。
+/// Windows 上 SendInput 会送到当前前景视窗，若 HUD 抢了焦点，Ctrl+V 会进 HUD 而非目标 app。
 pub struct FocusState {
     #[cfg(target_os = "windows")]
     target_hwnd: std::sync::Mutex<isize>,
@@ -45,12 +45,12 @@ impl serde::Serialize for ClipboardError {
     }
 }
 
-/// 透過 CGEvent 模擬 Cmd+V 鍵盤事件來觸發貼上。
+/// 透过 CGEvent 模拟 Cmd+V 键盘事件来触发贴上。
 ///
 /// 事件序列：Cmd↓ → V↓ → V↑ → Cmd↑
 /// keycodes: Command_L=55, V=9
-/// 需要 Accessibility 權限（已有）。
-/// 4 事件完整配對，paste 場景下幽靈按鍵風險趨近於零。
+/// 需要 Accessibility 权限（已有）。
+/// 4 事件完整配对，paste 场景下幽灵按键风险趋近于零。
 #[cfg(target_os = "macos")]
 fn simulate_paste_via_cgevent() -> Result<(), String> {
     use core_graphics::event::{CGEvent, CGEventFlags, CGEventTapLocation};
@@ -59,8 +59,8 @@ fn simulate_paste_via_cgevent() -> Result<(), String> {
     const KEYCODE_COMMAND_L: u16 = 55;
     const KEYCODE_V: u16 = 9;
 
-    // Private source：隔離的事件源，不繼承物理鍵盤的 modifier 狀態
-    // 解決 Toggle 模式下右 Option 殘留 Alternate flag 導致重複貼上的問題
+    // Private source：隔离的事件源，不继承物理键盘的 modifier 状态
+    // 解决 Toggle 模式下右 Option 残留 Alternate flag 导致重复贴上的问题
     let source = CGEventSource::new(CGEventSourceStateID::Private)
         .map_err(|_| "Failed to create CGEventSource".to_string())?;
 
@@ -84,7 +84,7 @@ fn simulate_paste_via_cgevent() -> Result<(), String> {
         .map_err(|_| "Failed to create Cmd up event".to_string())?;
     cmd_up.set_flags(CGEventFlags::CGEventFlagNull);
 
-    // Post events in sequence (Session 層：避免新版 macOS HID 管線重複投遞)
+    // Post events in sequence (Session 层：避免新版 macOS HID 管线重复投递)
     cmd_down.post(CGEventTapLocation::Session);
     v_down.post(CGEventTapLocation::Session);
     v_up.post(CGEventTapLocation::Session);
@@ -93,7 +93,7 @@ fn simulate_paste_via_cgevent() -> Result<(), String> {
     Ok(())
 }
 
-/// 透過 CGEvent 模擬 Cmd+C 鍵盤事件來觸發複製。
+/// 透过 CGEvent 模拟 Cmd+C 键盘事件来触发复制。
 ///
 /// 事件序列：Cmd↓ → C↓ → C↑ → Cmd↑
 /// keycodes: Command_L=55, C=8
@@ -132,7 +132,7 @@ fn simulate_copy_via_cgevent() -> Result<(), String> {
     Ok(())
 }
 
-/// 透過 SendInput 模擬 Ctrl+C 按鍵來觸發複製。
+/// 透过 SendInput 模拟 Ctrl+C 按键来触发复制。
 #[cfg(target_os = "windows")]
 fn simulate_copy_via_keyboard() -> Result<(), String> {
     use std::mem;
@@ -164,10 +164,10 @@ fn simulate_copy_via_keyboard() -> Result<(), String> {
     Ok(())
 }
 
-/// 透過 SendInput 模擬 Ctrl+V 按鍵來觸發貼上。
+/// 透过 SendInput 模拟 Ctrl+V 按键来触发贴上。
 ///
-/// Windows 不像 macOS 有 CGEvent 殘留問題，SendInput 是標準做法。
-/// SendInput 會送到當前前景視窗，因此呼叫前必須確保目標視窗已是前景。
+/// Windows 不像 macOS 有 CGEvent 残留问题，SendInput 是标准做法。
+/// SendInput 会送到当前前景视窗，因此呼叫前必须确保目标视窗已是前景。
 #[cfg(target_os = "windows")]
 fn simulate_paste_via_keyboard() -> Result<(), String> {
     use std::mem;
@@ -203,8 +203,8 @@ fn simulate_paste_via_keyboard() -> Result<(), String> {
     Ok(())
 }
 
-/// 恢復先前捕獲的前景視窗焦點。
-/// 使用 AttachThreadInput 技巧繞過 Windows 對 SetForegroundWindow 的限制。
+/// 恢复先前捕获的前景视窗焦点。
+/// 使用 AttachThreadInput 技巧绕过 Windows 对 SetForegroundWindow 的限制。
 #[cfg(target_os = "windows")]
 fn restore_target_window(hwnd_value: isize) {
     use windows::Win32::Foundation::HWND;
@@ -218,7 +218,7 @@ fn restore_target_window(hwnd_value: isize) {
         let current_fg = GetForegroundWindow();
 
         if current_fg == target {
-            return; // 已是前景，無需操作
+            return; // 已是前景，无需操作
         }
 
         let current_thread = GetWindowThreadProcessId(current_fg, None);
@@ -236,8 +236,8 @@ fn restore_target_window(hwnd_value: isize) {
     }
 }
 
-/// 捕獲當前前景視窗，供後續 paste_text 恢復焦點。
-/// 應在 hotkey 觸發時（HUD 顯示前）呼叫。
+/// 捕获当前前景视窗，供后续 paste_text 恢复焦点。
+/// 应在 hotkey 触发时（HUD 显示前）呼叫。
 #[tauri::command]
 pub fn capture_target_window(state: State<'_, FocusState>) {
     #[cfg(target_os = "windows")]
@@ -257,20 +257,20 @@ pub fn capture_target_window(state: State<'_, FocusState>) {
     }
 }
 
-/// 透過模擬 Cmd+C（macOS）/ Ctrl+C（Windows）擷取當前選取的文字。
+/// 透过模拟 Cmd+C（macOS）/ Ctrl+C（Windows）撷取当前选取的文字。
 ///
-/// 流程：儲存剪貼簿 → 清空 → 模擬複製 → 等待 → 讀取 → 還原 → 回傳。
-/// 對任何支援 Cmd+C 的 app 都有效，不依賴 Accessibility API。
+/// 流程：储存剪贴簿 → 清空 → 模拟复制 → 等待 → 读取 → 还原 → 回传。
+/// 对任何支援 Cmd+C 的 app 都有效，不依赖 Accessibility API。
 pub fn capture_selected_text_via_clipboard() -> Result<Option<String>, String> {
     let mut clipboard = Clipboard::new().map_err(|e| e.to_string())?;
 
-    // 1. 儲存當前剪貼簿文字
+    // 1. 储存当前剪贴簿文字
     let original_text = clipboard.get_text().ok();
 
-    // 2. 清空剪貼簿作為哨兵值
+    // 2. 清空剪贴簿作为哨兵值
     clipboard.set_text("").map_err(|e| e.to_string())?;
 
-    // 3. 模擬 Cmd+C / Ctrl+C（失敗時先還原剪貼簿再 return）
+    // 3. 模拟 Cmd+C / Ctrl+C（失败时先还原剪贴簿再 return）
     let copy_result = {
         #[cfg(target_os = "macos")]
         {
@@ -286,16 +286,16 @@ pub fn capture_selected_text_via_clipboard() -> Result<Option<String>, String> {
         return Err(e);
     }
 
-    // 4. 等待剪貼簿更新
+    // 4. 等待剪贴簿更新
     thread::sleep(Duration::from_millis(100));
 
-    // 5. 讀取剪貼簿
+    // 5. 读取剪贴簿
     let copied_text = clipboard.get_text().ok().filter(|t| !t.is_empty());
 
-    // 6. 還原剪貼簿
+    // 6. 还原剪贴簿
     restore_clipboard_text(&mut clipboard, &original_text);
 
-    // 7. 回傳
+    // 7. 回传
     match copied_text {
         Some(text) => {
             eprintln!(
@@ -336,7 +336,7 @@ pub fn paste_text<R: Runtime>(
     text: String,
     restore_clipboard: bool,
 ) -> Result<(), ClipboardError> {
-    // DEBUG: 追蹤 paste_text 被呼叫次數
+    // DEBUG: 追踪 paste_text 被呼叫次数
     use std::sync::atomic::AtomicU32;
     static PASTE_CALL_COUNT: AtomicU32 = AtomicU32::new(0);
     let call_id = PASTE_CALL_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
@@ -358,7 +358,7 @@ pub fn paste_text<R: Runtime>(
     let mut clipboard =
         Clipboard::new().map_err(|e| ClipboardError::ClipboardAccess(e.to_string()))?;
 
-    // 若使用者要求還原，先抓快照。Err 涵蓋非文字內容／暫時鎖等情況，視為「無可還原」
+    // 若使用者要求还原，先抓快照。Err 涵盖非文字内容／暂时锁等情况，视为「无可还原」
     let original_text = if restore_clipboard {
         match clipboard.get_text() {
             Ok(t) if !t.is_empty() => {
@@ -373,9 +373,7 @@ pub fn paste_text<R: Runtime>(
                 None
             }
             Err(e) => {
-                eprintln!(
-                    "[clipboard-paste] Snapshot: read failed (likely non-text content): {e}"
-                );
+                eprintln!("[clipboard-paste] Snapshot: read failed (likely non-text content): {e}");
                 None
             }
         }
@@ -390,12 +388,12 @@ pub fn paste_text<R: Runtime>(
 
     thread::sleep(Duration::from_millis(50));
 
-    // 捕獲錯誤而非 ?-propagate：要先跑完還原才回報錯誤，避免轉錄文字遺留在剪貼簿
+    // 捕获错误而非 ?-propagate：要先跑完还原才回报错误，避免转录文字遗留在剪贴簿
     let mut paste_err: Option<String> = None;
 
     #[cfg(target_os = "macos")]
     {
-        let _ = &focus_state; // macOS 不需要焦點恢復（CGEvent 是進程級）
+        let _ = &focus_state; // macOS 不需要焦点恢复（CGEvent 是进程级）
         match simulate_paste_via_cgevent() {
             Ok(()) => println!("[clipboard-paste] Paste triggered via CGEvent (Cmd+V)"),
             Err(e) => {
@@ -407,7 +405,7 @@ pub fn paste_text<R: Runtime>(
 
     #[cfg(target_os = "windows")]
     {
-        // 恢復錄音前的前景視窗，確保 SendInput 送到正確目標
+        // 恢复录音前的前景视窗，确保 SendInput 送到正确目标
         let saved_hwnd = focus_state.target_hwnd.lock().ok().map(|g| *g).unwrap_or(0);
         if saved_hwnd != 0 {
             restore_target_window(saved_hwnd);
@@ -428,7 +426,7 @@ pub fn paste_text<R: Runtime>(
         compile_error!("paste_text keyboard simulation is not implemented for this platform");
     }
 
-    // 即使 paste 失敗也要還原，避免轉錄文字遺留在剪貼簿
+    // 即使 paste 失败也要还原，避免转录文字遗留在剪贴簿
     if restore_clipboard {
         thread::sleep(Duration::from_millis(RESTORE_DELAY_MS));
         restore_clipboard_text(&mut clipboard, &original_text);
@@ -447,7 +445,7 @@ mod tests {
     use super::*;
 
     // ============================================================
-    // ClipboardError Display 格式化測試
+    // ClipboardError Display 格式化测试
     // ============================================================
 
     #[test]
@@ -476,15 +474,15 @@ mod tests {
 
     #[test]
     fn test_keyboard_simulation_error_display_unicode() {
-        let error = ClipboardError::KeyboardSimulation("鍵盤模擬失敗".to_string());
+        let error = ClipboardError::KeyboardSimulation("键盘模拟失败".to_string());
         assert_eq!(
             error.to_string(),
-            "Keyboard simulation failed: 鍵盤模擬失敗"
+            "Keyboard simulation failed: 键盘模拟失败"
         );
     }
 
     // ============================================================
-    // ClipboardError Serialize 測試
+    // ClipboardError Serialize 测试
     // ============================================================
 
     #[test]
@@ -506,14 +504,14 @@ mod tests {
 
     #[test]
     fn test_error_serialize_roundtrip_is_string() {
-        // ClipboardError 序列化後應為純字串，非物件
+        // ClipboardError 序列化后应为纯字串，非物件
         let error = ClipboardError::ClipboardAccess("test".to_string());
         let value: serde_json::Value = serde_json::to_value(&error).unwrap();
-        assert!(value.is_string(), "序列化結果應為 JSON 字串，非物件");
+        assert!(value.is_string(), "序列化结果应为 JSON 字串，非物件");
     }
 
     // ============================================================
-    // ClipboardError Debug trait 測試
+    // ClipboardError Debug trait 测试
     // ============================================================
 
     #[test]
@@ -532,13 +530,13 @@ mod tests {
         assert!(debug_str.contains("sim fail"));
     }
 
-    /// 還原延遲區間守門：避免改成 0（還沒貼完就還原）或數秒（使用者感受到延遲）。
-    /// 改動延遲值前須做手動實測，僅靠單元測試無法保證真實 paste 已消費完。
+    /// 还原延迟区间守门：避免改成 0（还没贴完就还原）或数秒（使用者感受到延迟）。
+    /// 改动延迟值前须做手动实测，仅靠单元测试无法保证真实 paste 已消费完。
     #[test]
     fn test_restore_delay_ms_within_sane_range() {
         assert!(
             (50..=1000).contains(&RESTORE_DELAY_MS),
-            "RESTORE_DELAY_MS={RESTORE_DELAY_MS} 應落在 50ms..=1000ms 之間"
+            "RESTORE_DELAY_MS={RESTORE_DELAY_MS} 应落在 50ms..=1000ms 之间"
         );
     }
 }

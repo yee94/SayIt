@@ -2,12 +2,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import DashboardView from "../../src/views/DashboardView.vue";
-import zhTW from "../../src/i18n/locales/zh-TW.json";
+import zhCN from "../../src/i18n/locales/zh-CN.json";
 
 const i18n = createI18n({
   legacy: false,
-  locale: "zh-TW",
-  messages: { "zh-TW": zhTW },
+  locale: "zh-CN",
+  messages: { "zh-CN": zhCN },
 });
 
 let historyState: ReturnType<typeof makeHistory>;
@@ -83,7 +83,7 @@ function mountDashboard(renderTooltip = false) {
 
 describe("DashboardView 额度卡片", () => {
   beforeEach(() => {
-    i18n.global.locale.value = "zh-TW";
+    i18n.global.locale.value = "zh-CN";
     historyState = makeHistory({ whisperRequestCount: 10, llmRequestCount: 5 });
     settingsState = makeSettings();
   });

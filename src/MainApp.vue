@@ -66,17 +66,17 @@ const currentPageTitle = computed(() => {
   return item?.label ?? "SayIt";
 });
 
-// 必須在 app.mount() 後讀取 — setDatabaseInitError 在 bootstrap catch 中已設定
+// 必须在 app.mount() 后读取 — setDatabaseInitError 在 bootstrap catch 中已设定
 const databaseError = ref(getDatabaseInitError());
 const showAccessibilityGuide = ref(false);
 
-// ── 更新相關狀態 ──
+// ── 更新相关状态 ──
 type UpdateUiState = "idle" | "checking" | "downloading" | "ready-to-install" | "installing";
 const updateState = ref<UpdateUiState>("idle");
 const availableVersion = ref("");
 const updateFeedback = useFeedbackMessage();
 const AUTO_CHECK_INITIAL_DELAY_MS = 5_000;
-const AUTO_CHECK_INTERVAL_MS = 15 * 60_000; // 15 分鐘
+const AUTO_CHECK_INTERVAL_MS = 15 * 60_000; // 15 分钟
 let autoCheckTimeoutId: ReturnType<typeof setTimeout> | null = null;
 let autoCheckIntervalId: ReturnType<typeof setInterval> | null = null;
 
@@ -84,10 +84,10 @@ let autoCheckIntervalId: ReturnType<typeof setInterval> | null = null;
 const showManualUpdateDialog = ref(false);
 const showAutoInstallDialog = ref(false);
 
-// 升級提示（watch 而非 onMounted，因為 loadSettings 在 mount 之後才執行）
+// 升级提示（watch 而非 onMounted，因为 loadSettings 在 mount 之后才执行）
 const settingsStore = useSettingsStore();
 const showUpgradeNoticeDialog = ref(false);
-const upgradeNoticeItemCount = 5;
+const upgradeNoticeItemCount = 3;
 watch(() => settingsStore.showPromptUpgradeNotice, (shouldShow) => {
   if (shouldShow) {
     showUpgradeNoticeDialog.value = true;
@@ -95,7 +95,7 @@ watch(() => settingsStore.showPromptUpgradeNotice, (shouldShow) => {
   }
 });
 
-// ── 流程 1：自動偵測（靜默檢查 → 靜默下載 → 通知安裝） ──
+// ── 流程 1：自动侦测（静默检查 → 静默下载 → 通知安装） ──
 async function autoCheckAndDownload() {
   if (updateState.value !== "idle") return;
 
@@ -112,7 +112,7 @@ async function autoCheckAndDownload() {
 
     updateState.value = "ready-to-install";
 
-    // 確保 Dashboard 可見再彈 dialog
+    // 确保 Dashboard 可见再弹 dialog
     const currentWindow = getCurrentWindow();
     await currentWindow.show();
     await currentWindow.setFocus();
@@ -125,7 +125,7 @@ async function autoCheckAndDownload() {
   }
 }
 
-// 使用者在自動流程的 AlertDialog 中點「安裝並重啟」
+// 使用者在自动流程的 AlertDialog 中点「安装并重启」
 async function handleAutoInstall() {
   showAutoInstallDialog.value = false;
   updateState.value = "installing";
@@ -140,22 +140,22 @@ async function handleAutoInstall() {
   }
 }
 
-// 使用者在自動流程的 AlertDialog 中點「稍後」
+// 使用者在自动流程的 AlertDialog 中点「稍后」
 function handleAutoInstallLater() {
   showAutoInstallDialog.value = false;
-  // 保持 ready-to-install 狀態，sidebar 仍顯示「立即安裝」按鈕
+  // 保持 ready-to-install 状态，sidebar 仍显示「立即安装」按钮
 }
 
-// sidebar footer 的「立即安裝」按鈕（自動下載完成後顯示）
+// sidebar footer 的「立即安装」按钮（自动下载完成后显示）
 async function handleSidebarInstall() {
   showAutoInstallDialog.value = true;
 }
 
-// ── 流程 2：手動檢查更新 ──
+// ── 流程 2：手动检查更新 ──
 async function handleManualCheck() {
   if (updateState.value !== "idle" && updateState.value !== "ready-to-install") return;
 
-  // 如果已有待安裝的更新，直接彈 dialog
+  // 如果已有待安装的更新，直接弹 dialog
   if (updateState.value === "ready-to-install") {
     showAutoInstallDialog.value = true;
     return;
@@ -188,7 +188,7 @@ function handleManualCheckResult(result: UpdateCheckResult) {
   }
 }
 
-// 使用者在手動流程的 AlertDialog 中點「開始更新」
+// 使用者在手动流程的 AlertDialog 中点「开始更新」
 async function handleManualUpdate() {
   showManualUpdateDialog.value = false;
   updateState.value = "downloading";
@@ -203,7 +203,7 @@ async function handleManualUpdate() {
   }
 }
 
-// ── Sidebar footer 顯示邏輯 ──
+// ── Sidebar footer 显示逻辑 ──
 const updateButtonLabel = computed(() => {
   switch (updateState.value) {
     case "checking": return t("mainApp.update.checking");
@@ -224,13 +224,13 @@ const vocabularyStore = useVocabularyStore();
 let unlistenVocabularyChanged: UnlistenFn | null = null;
 
 onMounted(async () => {
-  // 監聽詞彙變更（HUD 視窗 AI 新增詞彙時同步 Dashboard）
+  // 监听词汇变更（HUD 视窗 AI 新增词汇时同步 Dashboard）
   unlistenVocabularyChanged = await listenToEvent(VOCABULARY_CHANGED, () => {
     console.log("[main-window] VOCABULARY_CHANGED received, refreshing termList");
     void vocabularyStore.fetchTermList();
   });
 
-  // macOS 無障礙權限檢查
+  // macOS 无障碍权限检查
   const isMacOS = navigator.userAgent.includes("Macintosh");
   if (isMacOS) {
     try {
@@ -247,7 +247,7 @@ onMounted(async () => {
     }
   }
 
-  // 自動檢查更新：啟動 5 秒後首次檢查，之後每 15 分鐘重查
+  // 自动检查更新：启动 5 秒后首次检查，之后每 15 分钟重查
   autoCheckTimeoutId = setTimeout(() => {
     autoCheckAndDownload();
     autoCheckIntervalId = setInterval(autoCheckAndDownload, AUTO_CHECK_INTERVAL_MS);
@@ -262,7 +262,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <!-- macOS Overlay 自訂標題列：fixed z-20 蓋住 Sidebar(z-10)，整條可拖動 -->
+  <!-- macOS Overlay 自订标题列：fixed z-20 盖住 Sidebar(z-10)，整条可拖动 -->
   <div
     data-tauri-drag-region
     class="fixed top-0 left-0 right-0 z-20 flex h-9 items-center justify-center border-b border-border bg-background"
@@ -299,7 +299,7 @@ onUnmounted(() => {
       <SidebarFooter class="border-t border-sidebar-border px-4 py-3">
         <div class="flex items-center justify-between">
           <span class="text-xs text-muted-foreground">v{{ appVersion }}</span>
-          <!-- ready-to-install 時不顯示檢查按鈕，改顯示安裝提示 -->
+          <!-- ready-to-install 时不显示检查按钮，改显示安装提示 -->
           <Button
             v-if="updateState !== 'ready-to-install'"
             variant="link"
@@ -310,7 +310,7 @@ onUnmounted(() => {
             {{ updateButtonLabel }}
           </Button>
         </div>
-        <!-- 自動下載完成：顯示持久的安裝提示 -->
+        <!-- 自动下载完成：显示持久的安装提示 -->
         <div v-if="updateState === 'ready-to-install'" class="mt-1.5 flex items-center justify-between rounded-md bg-primary/10 px-2 py-1.5">
           <span class="text-xs font-medium text-primary">v{{ availableVersion }} {{ $t("mainApp.update.ready") }}</span>
           <Button
@@ -352,7 +352,7 @@ onUnmounted(() => {
     @close="showAccessibilityGuide = false"
   />
 
-  <!-- 自動流程 AlertDialog：更新已下載，詢問是否安裝重啟 -->
+  <!-- 自动流程 AlertDialog：更新已下载，询问是否安装重启 -->
   <AlertDialog :open="showAutoInstallDialog">
     <AlertDialogContent>
       <AlertDialogHeader>
@@ -368,7 +368,7 @@ onUnmounted(() => {
     </AlertDialogContent>
   </AlertDialog>
 
-  <!-- 升級提示 AlertDialog -->
+  <!-- 升级提示 AlertDialog -->
   <AlertDialog :open="showUpgradeNoticeDialog">
     <AlertDialogContent>
       <AlertDialogHeader>
@@ -387,7 +387,7 @@ onUnmounted(() => {
     </AlertDialogContent>
   </AlertDialog>
 
-  <!-- 手動流程 AlertDialog：發現新版本，詢問是否開始更新 -->
+  <!-- 手动流程 AlertDialog：发现新版本，询问是否开始更新 -->
   <AlertDialog :open="showManualUpdateDialog">
     <AlertDialogContent>
       <AlertDialogHeader>

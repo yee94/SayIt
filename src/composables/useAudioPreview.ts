@@ -29,7 +29,7 @@ export function useAudioPreview() {
     const currentRequestId = ++startRequestId;
     await stopPreview();
 
-    // F12 fix: 如果在 stopPreview 期間有新的 startPreview 呼叫，放棄本次
+    // F12 fix: 如果在 stopPreview 期间有新的 startPreview 呼叫，放弃本次
     if (currentRequestId !== startRequestId) return;
 
     try {
@@ -43,7 +43,7 @@ export function useAudioPreview() {
         },
       );
 
-      // 再次檢查：如果期間被取消，立即清理新建的 listener
+      // 再次检查：如果期间被取消，立即清理新建的 listener
       if (currentRequestId !== startRequestId) {
         nextUnlisten();
         return;

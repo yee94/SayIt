@@ -1,11 +1,11 @@
 # Deployment Guide
 
-> CI/CD pipeline、無開發者認證建構、自動更新簽名、發版流程
-> 掃描日期：2026-05-08 · 版本：0.9.5
+> CI/CD pipeline、无开发者认证建构、自动更新签名、发版流程
+> 扫描日期：2026-05-08 · 版本：0.9.5
 
 ---
 
-## 一、CI/CD 概覽
+## 一、CI/CD 概览
 
 ```
 push/PR to main           push tag v*
@@ -20,12 +20,12 @@ push/PR to main           push tag v*
  │ rust test│         │  Job: build (matrix · 3)        │
  └──────────┘         │   ├── macOS arm64（ad-hoc）     │
                       │   ├── macOS x64（ad-hoc）       │
-                      │   └── Windows x64（未簽名）     │
+                      │   └── Windows x64（未签名）     │
                       │  + tauri-action                 │
                       │   - Updater .sig                │
                       │  + Sentry sourcemap upload      │
                       │     (mac arm64 only)            │
-                      │  + 上傳穩定檔名（gh release）   │
+                      │  + 上传稳定档名（gh release）   │
                       │                                 │
                       │  Job: publish-release           │
                       │   gh release edit --draft=false │
@@ -39,10 +39,10 @@ push/PR to main           push tag v*
 ### 2.1 Frontend job (`check`, ubuntu-latest)
 ```
 1. checkout
-2. setup-node (從 .nvmrc → 24)
+2. setup-node (从 .nvmrc → 24)
 3. pnpm setup
 4. pnpm install --frozen-lockfile
-5. npx vue-tsc --noEmit       ← 型別檢查
+5. npx vue-tsc --noEmit       ← 型别检查
 6. pnpm test                  ← Vitest unit + component
 ```
 
@@ -59,15 +59,15 @@ steps:
   4. cargo check (working-directory: src-tauri)
 ```
 
-### 2.3 Release 品質門禁
+### 2.3 Release 品质门禁
 
-`release.yml` 會重跑 vue-tsc、ESLint、Vitest，以及 macOS/Windows 的 Cargo clippy 與 Cargo test。三平台安裝包只有在全部檢查通過後才開始建構。
+`release.yml` 会重跑 vue-tsc、ESLint、Vitest，以及 macOS/Windows 的 Cargo clippy 与 Cargo test。三平台安装包只有在全部检查通过后才开始建构。
 
 ---
 
 ## 三、release.yml（tag push v*）
 
-### 3.1 觸發
+### 3.1 触发
 
 ```yaml
 on:
@@ -78,18 +78,18 @@ on:
       tag: { description: 'Tag to build (e.g. v0.2.0)', required: true }
 ```
 
-### 3.2 Build matrix（3 個平台）
+### 3.2 Build matrix（3 个平台）
 
 | Platform        | Args                              | Stable Name                  | Sourcemaps |
 | --------------- | --------------------------------- | ---------------------------- | ---------- |
-| macos-latest    | `--target aarch64-apple-darwin`   | `SayIt-mac-arm64.dmg`        | **true**（唯一上傳） |
+| macos-latest    | `--target aarch64-apple-darwin`   | `SayIt-mac-arm64.dmg`        | **true**（唯一上传） |
 | macos-latest    | `--target x86_64-apple-darwin`    | `SayIt-mac-x64.dmg`          | false      |
 | windows-latest  | （空）                             | `SayIt-windows-x64.exe`      | false      |
 
 ### 3.3 Release metadata 解析
 
 ```bash
-# 從 tag 或 workflow_dispatch input 取
+# 从 tag 或 workflow_dispatch input 取
 RAW_TAG="${tag#refs/tags/}"
 RELEASE_VERSION="${RAW_TAG#v}"
 
@@ -105,8 +105,8 @@ VITE_SENTRY_RELEASE=sayit@0.9.5
 注入下列 env：
 
 ```
-TAURI_SIGNING_PRIVATE_KEY              ← Updater 簽署私鑰
-TAURI_SIGNING_PRIVATE_KEY_PASSWORD     ← 私鑰密碼
+TAURI_SIGNING_PRIVATE_KEY              ← Updater 签署私钥
+TAURI_SIGNING_PRIVATE_KEY_PASSWORD     ← 私钥密码
 
 # Sentry
 SENTRY_DSN, VITE_SENTRY_DSN
@@ -123,7 +123,7 @@ with：
 tagName: ${{ env.RELEASE_TAG }}
 releaseName: "SayIt v${{ env.RELEASE_VERSION }}"
 releaseBody: "See the assets to download and install this version."
-releaseDraft: true              ← 先建 Draft，最後一個 job 才 publish
+releaseDraft: true              ← 先建 Draft，最后一个 job 才 publish
 prerelease: false
 args: ${{ matrix.args }}
 ```
@@ -140,13 +140,13 @@ npx @sentry/cli sourcemaps upload dist/assets \
 npx @sentry/cli releases finalize "$SENTRY_RELEASE" || true
 ```
 
-> 為什麼只在 mac arm64 跑？避免重複上傳同份 sourcemap（兩個 mac build 與 Windows build 共用同一份前端 bundle）。
+> 为什么只在 mac arm64 跑？避免重复上传同份 sourcemap（两个 mac build 与 Windows build 共用同一份前端 bundle）。
 
-### 3.6 上傳穩定檔名
+### 3.6 上传稳定档名
 
-GitHub Release 的 default asset 命名為 `SayIt_0.9.5_aarch64.dmg` 等版本號內嵌格式 — 這對「永遠最新版」連結（`releases/latest/download/...`）不友善。
+GitHub Release 的 default asset 命名为 `SayIt_0.9.5_aarch64.dmg` 等版本号内嵌格式 — 这对「永远最新版」连结（`releases/latest/download/...`）不友善。
 
-額外步驟把 dmg / exe 重新命名後上傳：
+额外步骤把 dmg / exe 重新命名后上传：
 
 ```bash
 # macOS
@@ -166,16 +166,16 @@ gh release upload "$env:RELEASE_TAG" "${{ matrix.stable_name }}" --clobber
 gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false
 ```
 
-> 等 build job 全跑完再 publish — 確保不會出現「半完成」release。
+> 等 build job 全跑完再 publish — 确保不会出现「半完成」release。
 
 ---
 
-## 四、發版流程（人工 + 自動）
+## 四、发版流程（人工 + 自动）
 
-### 4.1 前置作業
+### 4.1 前置作业
 
 ```
-1. 確認 main 上的所有 PR 都已合併
+1. 确认 main 上的所有 PR 都已合并
 2. 更新 CHANGELOG.md：
    ## [0.9.5] - 2026-05-01
    ### Added
@@ -185,114 +185,114 @@ gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false
 4. git push
 ```
 
-### 4.2 執行 release 腳本
+### 4.2 执行 release 脚本
 
 ```bash
 ./scripts/release.sh 0.9.5
 ```
 
-腳本會：
-1. 驗證版本號格式 `^[0-9]+\.[0-9]+\.[0-9]+$`
-2. 確認 CHANGELOG.md 包含 `## [0.9.5]` 區塊
-3. 確認 working tree 乾淨
-4. 確認 tag `v0.9.5` 不存在
-5. 確認在 git branch 上（非 detached HEAD）
-6. **同步更新四個檔案**的版本號：
+脚本会：
+1. 验证版本号格式 `^[0-9]+\.[0-9]+\.[0-9]+$`
+2. 确认 CHANGELOG.md 包含 `## [0.9.5]` 区块
+3. 确认 working tree 干净
+4. 确认 tag `v0.9.5` 不存在
+5. 确认在 git branch 上（非 detached HEAD）
+6. **同步更新四个档案**的版本号：
    - `package.json`
    - `src-tauri/tauri.conf.json`
    - `src-tauri/Cargo.toml`
    - `src-tauri/Cargo.lock`（搜 `name = "sayit"\nversion = "..."`）
 7. `git commit -m "chore: bump version to 0.9.5"`
 8. `git tag v0.9.5`
-9. `git push origin <branch>` + `git push origin v0.9.5`（**分開 push**，避免 GitHub Actions tag 事件遺失）
+9. `git push origin <branch>` + `git push origin v0.9.5`（**分开 push**，避免 GitHub Actions tag 事件遗失）
 
-### 4.3 自動建構（GitHub Actions）
+### 4.3 自动建构（GitHub Actions）
 
-tag push 後自動觸發 `release.yml`：
-- 三個 build job 平行跑（mac arm64 / mac x64 / windows）
-- 完成後 `publish-release` job 把 Draft Release 改為 Published
+tag push 后自动触发 `release.yml`：
+- 三个 build job 平行跑（mac arm64 / mac x64 / windows）
+- 完成后 `publish-release` job 把 Draft Release 改为 Published
 
-時間：依 GitHub Actions runner 與跨平台測試、建構速度而定。
+时间：依 GitHub Actions runner 与跨平台测试、建构速度而定。
 
-### 4.4 驗證 Release
+### 4.4 验证 Release
 
 ```
-1. GitHub Releases 頁面確認 v0.9.5 已 Published
-2. 檢查附件：
-   - SayIt-mac-arm64.dmg（穩定檔名）
+1. GitHub Releases 页面确认 v0.9.5 已 Published
+2. 检查附件：
+   - SayIt-mac-arm64.dmg（稳定档名）
    - SayIt-mac-x64.dmg
    - SayIt-windows-x64.exe
-   - 自動命名版（SayIt_0.9.5_*.dmg / .exe）
+   - 自动命名版（SayIt_0.9.5_*.dmg / .exe）
    - latest.json（updater）
-   - 對應的 .sig 檔（updater 簽名）
-3. 下載 .dmg → 開啟 → 用 Finder 右鍵「打開」完成首次授權
-4. 檢查 Sentry：
-   - Releases 頁面看到 sayit@0.9.5
-   - Sourcemaps 已上傳（前端 stack trace 應該有原始檔名）
-5. 啟動 app → 設定頁面確認版本號顯示 0.9.5
+   - 对应的 .sig 档（updater 签名）
+3. 下载 .dmg → 开启 → 用 Finder 右键「打开」完成首次授权
+4. 检查 Sentry：
+   - Releases 页面看到 sayit@0.9.5
+   - Sourcemaps 已上传（前端 stack trace 应该有原始档名）
+5. 启动 app → 设定页面确认版本号显示 0.9.5
 ```
 
 ---
 
-## 五、無開發者認證的安裝包
+## 五、无开发者认证的安装包
 
-### 5.1 macOS ad-hoc 簽名
+### 5.1 macOS ad-hoc 签名
 
 - `src-tauri/tauri.conf.json` 固定使用 `"signingIdentity": "-"`。
-- 建構流程不使用 Apple Developer ID，也不提交 notarization。
-- 從網路下載後，macOS 會顯示未認證開發者警告；使用者需透過 Finder 右鍵「打開」，或在「隱私權與安全性」中允許。
+- 建构流程不使用 Apple Developer ID，也不提交 notarization。
+- 从网路下载后，macOS 会显示未认证开发者警告；使用者需透过 Finder 右键「打开」，或在「隐私权与安全性」中允许。
 
-### 5.2 Windows 未簽名安裝包
+### 5.2 Windows 未签名安装包
 
-- Windows 安裝器不使用 Authenticode 憑證。
-- SmartScreen 可能顯示未知發行者警告，使用者可選擇繼續安裝。
+- Windows 安装器不使用 Authenticode 凭证。
+- SmartScreen 可能显示未知发行者警告，使用者可选择继续安装。
 
 ### 5.3 必要 entitlements（`src-tauri/Entitlements.plist`）
 
-要的權限（節錄）：
-- `com.apple.security.device.audio-input`（麥克風）
+要的权限（节录）：
+- `com.apple.security.device.audio-input`（麦克风）
 - `com.apple.security.automation.apple-events`（Apple Events）
 
-### 5.4 自動更新簽名
+### 5.4 自动更新签名
 
-`tauri-plugin-updater` 用 minisign 簽名：
+`tauri-plugin-updater` 用 minisign 签名：
 
-- 私鑰只存放在 GitHub Secrets，本機路徑與密碼不得寫入版本庫
-- 公鑰：嵌入 `tauri.conf.json` 的 `plugins.updater.pubkey`
+- 私钥只存放在 GitHub Secrets，本机路径与密码不得写入版本库
+- 公钥：嵌入 `tauri.conf.json` 的 `plugins.updater.pubkey`
 - Updater endpoint：`https://github.com/yee94/SayIt/releases/latest/download/latest.json`
 
-每次 release.yml 跑時：
-- tauri-action 用 `TAURI_SIGNING_PRIVATE_KEY` + 密碼產 `latest.json` + 各平台 `.sig` 檔
-- 上傳到 GitHub Release
+每次 release.yml 跑时：
+- tauri-action 用 `TAURI_SIGNING_PRIVATE_KEY` + 密码产 `latest.json` + 各平台 `.sig` 档
+- 上传到 GitHub Release
 
 ---
 
-## 六、GitHub Secrets（7 個）
+## 六、GitHub Secrets（7 个）
 
 | Secret                                  | 用途                                            |
 | --------------------------------------- | ----------------------------------------------- |
-| `TAURI_SIGNING_PRIVATE_KEY`             | Updater 簽署私鑰                                |
-| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`    | 私鑰密碼                                        |
+| `TAURI_SIGNING_PRIVATE_KEY`             | Updater 签署私钥                                |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`    | 私钥密码                                        |
 | `SENTRY_DSN`                            | Rust 正式版 Sentry DSN                          |
 | `VITE_SENTRY_DSN`                       | Frontend 正式版 Sentry DSN                      |
 | `SENTRY_AUTH_TOKEN`                     | Sentry sourcemap upload token                   |
 | `SENTRY_ORG`                            | Sentry organization slug                        |
 | `SENTRY_PROJECT`                        | Sentry project slug                             |
 
-> dev / staging 環境用本機 `.env`（不入版本）；secrets 只在 release.yml 注入。
+> dev / staging 环境用本机 `.env`（不入版本）；secrets 只在 release.yml 注入。
 
 ---
 
-## 七、Sentry Release 規則（硬規則）
+## 七、Sentry Release 规则（硬规则）
 
-1. **Release 名稱固定**：`sayit@<version>`（前端 + 後端必須相同）
-2. **正式版 Sentry release 一律由 release.yml 產生**，前端與 Rust **不可** 各自手動指定不同名稱
-3. **Sourcemap upload 只能走 release.yml 的 mac arm64 job**，不可繞過 workflow 手動上傳
-4. **dev / staging 不上報**：Rust 端 `is_sentry_enabled()` 檢查 `production`；前端 `initSentryFor*()` 檢查 DSN
+1. **Release 名称固定**：`sayit@<version>`（前端 + 后端必须相同）
+2. **正式版 Sentry release 一律由 release.yml 产生**，前端与 Rust **不可** 各自手动指定不同名称
+3. **Sourcemap upload 只能走 release.yml 的 mac arm64 job**，不可绕过 workflow 手动上传
+4. **dev / staging 不上报**：Rust 端 `is_sentry_enabled()` 检查 `production`；前端 `initSentryFor*()` 检查 DSN
 
 ---
 
-## 八、固定下載 URL（官網連結）
+## 八、固定下载 URL（官网连结）
 
 ```
 macOS ARM:
@@ -310,33 +310,33 @@ Updater latest.json:
 
 ---
 
-## 九、回滾 / 撤回 release
+## 九、回滚 / 撤回 release
 
 ```bash
-# 1. 標記為 prerelease（不在 latest 連結）
+# 1. 标记为 prerelease（不在 latest 连结）
 gh release edit v0.9.5 --prerelease
 
-# 2. 完全刪除（極端情況，會破壞 updater）
+# 2. 完全删除（极端情况，会破坏 updater）
 gh release delete v0.9.5
 git push --delete origin v0.9.5
 ```
 
-> ⚠️ 不要直接刪除 release — `tauri-plugin-updater` 已下載這個版本的使用者下次檢查更新會 404，而非降級。優先做法是發 v0.9.6 修復後通知使用者更新。
+> ⚠️ 不要直接删除 release — `tauri-plugin-updater` 已下载这个版本的使用者下次检查更新会 404，而非降级。优先做法是发 v0.9.6 修复后通知使用者更新。
 
 ---
 
-## 十、發版前的硬性檢查
+## 十、发版前的硬性检查
 
 ```
 □ git tag v<version> 不存在
-□ package.json / tauri.conf.json / Cargo.toml / Cargo.lock 版本號一致
-□ CHANGELOG.md 有 [<version>] 區塊
-□ working tree 乾淨
-□ CI 全綠（main 分支）
-□ GitHub Secrets 7 個齊全
-□ ./scripts/release.sh 執行成功
-□ release.yml 三個 build job 全跑完
+□ package.json / tauri.conf.json / Cargo.toml / Cargo.lock 版本号一致
+□ CHANGELOG.md 有 [<version>] 区块
+□ working tree 干净
+□ CI 全绿（main 分支）
+□ GitHub Secrets 7 个齐全
+□ ./scripts/release.sh 执行成功
+□ release.yml 三个 build job 全跑完
 □ publish-release job 完成（Draft → Published）
-□ 下載 .dmg / .exe 實機測試
-□ Sentry sourcemap 已上傳（mac arm64）
+□ 下载 .dmg / .exe 实机测试
+□ Sentry sourcemap 已上传（mac arm64）
 ```

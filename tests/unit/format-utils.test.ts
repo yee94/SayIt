@@ -13,67 +13,67 @@ import type { TranscriptionRecord } from "../../src/types/transcription";
 
 describe("formatUtils.ts", () => {
   describe("formatTimestamp", () => {
-    it("應格式化有效的 timestamp", () => {
+    it("应格式化有效的 timestamp", () => {
       const result = formatTimestamp(1700000000000);
       expect(result).toBeTruthy();
       expect(result).not.toBe("-");
     });
 
-    it("NaN 應回傳 '-'", () => {
+    it("NaN 应回传 '-'", () => {
       expect(formatTimestamp(NaN)).toBe("-");
     });
 
-    it("Infinity 應回傳 '-'", () => {
+    it("Infinity 应回传 '-'", () => {
       expect(formatTimestamp(Infinity)).toBe("-");
     });
 
-    it("-Infinity 應回傳 '-'", () => {
+    it("-Infinity 应回传 '-'", () => {
       expect(formatTimestamp(-Infinity)).toBe("-");
     });
 
-    it("0 應回傳 '-'", () => {
+    it("0 应回传 '-'", () => {
       expect(formatTimestamp(0)).toBe("-");
     });
 
-    it("負數應回傳 '-'", () => {
+    it("负数应回传 '-'", () => {
       expect(formatTimestamp(-1)).toBe("-");
     });
   });
 
   describe("truncateText", () => {
-    it("短文字不應截斷", () => {
+    it("短文字不应截断", () => {
       expect(truncateText("短文字")).toBe("短文字");
     });
 
-    it("超過 maxLength 應截斷並加省略號", () => {
+    it("超过 maxLength 应截断并加省略号", () => {
       const longText = "a".repeat(60);
       const result = truncateText(longText, 50);
       expect(result).toBe("a".repeat(50) + "...");
     });
 
-    it("空字串應回傳空字串", () => {
+    it("空字串应回传空字串", () => {
       expect(truncateText("")).toBe("");
     });
 
-    it("自訂 maxLength 應正確運作", () => {
+    it("自订 maxLength 应正确运作", () => {
       expect(truncateText("12345678", 5)).toBe("12345...");
     });
 
-    it("恰好等於 maxLength 不應截斷", () => {
+    it("恰好等于 maxLength 不应截断", () => {
       expect(truncateText("12345", 5)).toBe("12345");
     });
   });
 
   describe("getDisplayText", () => {
-    it("有 processedText 時應回傳 processedText", () => {
+    it("有 processedText 时应回传 processedText", () => {
       const record = {
         rawText: "原始",
-        processedText: "處理後",
+        processedText: "处理后",
       } as TranscriptionRecord;
-      expect(getDisplayText(record)).toBe("處理後");
+      expect(getDisplayText(record)).toBe("处理后");
     });
 
-    it("processedText 為 null 時應回傳 rawText", () => {
+    it("processedText 为 null 时应回传 rawText", () => {
       const record = {
         rawText: "原始",
         processedText: null,
@@ -105,51 +105,51 @@ describe("formatUtils.ts", () => {
   });
 
   describe("formatDuration", () => {
-    it("500ms 應回傳 '1 秒'", () => {
+    it("500ms 应回传 '1 秒'", () => {
       expect(formatDuration(500)).toBe("1 秒");
     });
 
-    it("5000ms 應回傳 '5 秒'", () => {
+    it("5000ms 应回传 '5 秒'", () => {
       expect(formatDuration(5000)).toBe("5 秒");
     });
 
-    it("90000ms 應回傳 '1:30'", () => {
+    it("90000ms 应回传 '1:30'", () => {
       expect(formatDuration(90000)).toBe("1:30");
     });
 
-    it("65000ms 應回傳 '1:05'", () => {
+    it("65000ms 应回传 '1:05'", () => {
       expect(formatDuration(65000)).toBe("1:05");
     });
   });
 
   describe("formatDurationMs", () => {
-    it("500ms 應回傳 '500 ms'", () => {
+    it("500ms 应回传 '500 ms'", () => {
       expect(formatDurationMs(500)).toBe("500 ms");
     });
 
-    it("1500ms 應回傳 '1.5 秒'", () => {
+    it("1500ms 应回传 '1.5 秒'", () => {
       expect(formatDurationMs(1500)).toBe("1.5 秒");
     });
 
-    it("0ms 應回傳 '0 ms'", () => {
+    it("0ms 应回传 '0 ms'", () => {
       expect(formatDurationMs(0)).toBe("0 ms");
     });
 
-    it("999ms 應回傳 '999 ms'", () => {
+    it("999ms 应回传 '999 ms'", () => {
       expect(formatDurationMs(999)).toBe("999 ms");
     });
   });
 
   describe("formatNumber", () => {
-    it("0 應格式化為 '0'", () => {
+    it("0 应格式化为 '0'", () => {
       expect(formatNumber(0)).toBe("0");
     });
 
-    it("小數字不應加分隔符", () => {
+    it("小数字不应加分隔符", () => {
       expect(formatNumber(999)).toBe("999");
     });
 
-    it("千位以上應加分隔符", () => {
+    it("千位以上应加分隔符", () => {
       const result = formatNumber(1234567);
       expect(result).toContain("1");
       expect(result).toContain("234");
@@ -159,19 +159,19 @@ describe("formatUtils.ts", () => {
   });
 
   describe("formatCostCeiling", () => {
-    it("費用為 0 時應回傳 '$0'", () => {
+    it("费用为 0 时应回传 '$0'", () => {
       expect(formatCostCeiling(0)).toBe("$0");
     });
 
-    it("正數費用應回傳帶 ≤ 前綴的四位小數", () => {
+    it("正数费用应回传带 ≤ 前缀的四位小数", () => {
       expect(formatCostCeiling(0.0042)).toBe("≤ $0.0042");
     });
 
-    it("極小費用應正確顯示四位小數", () => {
+    it("极小费用应正确显示四位小数", () => {
       expect(formatCostCeiling(0.000308)).toBe("≤ $0.0003");
     });
 
-    it("較大費用應正確顯示", () => {
+    it("较大费用应正确显示", () => {
       expect(formatCostCeiling(1.5)).toBe("≤ $1.5000");
     });
   });

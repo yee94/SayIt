@@ -8,11 +8,11 @@ import {
 } from "../../src/lib/modelRegistry";
 
 describe("modelRegistry (custom LLM + Doubao ASR)", () => {
-  it("[P0] 自訂 model id 原樣保留", () => {
+  it("[P0] 自订 model id 原样保留", () => {
     expect(getEffectiveLlmModelId("my-proxy-model")).toBe("my-proxy-model");
   });
 
-  it("[P0] null / 空字串 fallback 到預設 LLM", () => {
+  it("[P0] null / 空字串 fallback 到预设 LLM", () => {
     expect(getEffectiveLlmModelId(null)).toBe(DEFAULT_LLM_MODEL_ID);
     expect(getEffectiveLlmModelId("")).toBe(DEFAULT_LLM_MODEL_ID);
     expect(getEffectiveLlmModelId("   ")).toBe(DEFAULT_LLM_MODEL_ID);

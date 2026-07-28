@@ -44,6 +44,8 @@ import {
   detectSystemLocale,
   getHtmlLangForLocale,
   getWhisperCodeForTranscriptionLocale,
+  normalizeSupportedLocale,
+  normalizeTranscriptionLocale,
 } from "../i18n/languageConfig";
 import { emitEvent, SETTINGS_UPDATED } from "../composables/useTauriEvents";
 import type { SettingsUpdatedPayload } from "../types/events";
@@ -66,7 +68,7 @@ const STORE_NAME = "settings.json";
 export const DEFAULT_ENHANCEMENT_THRESHOLD_ENABLED = false;
 export const DEFAULT_ENHANCEMENT_THRESHOLD_CHAR_COUNT = 10;
 export const DEFAULT_MUTE_ON_RECORDING = true;
-const DEFAULT_SMART_DICTIONARY_ENABLED = navigator.userAgent.includes("Mac"); // macOS only — Windows 尚未支援 text field 讀取
+const DEFAULT_SMART_DICTIONARY_ENABLED = navigator.userAgent.includes("Mac"); // macOS only — Windows 尚未支援 text field 读取
 const DEFAULT_SOUND_EFFECTS_ENABLED = true;
 const DEFAULT_PROMPT_MODE: PromptMode = "minimal";
 const DEFAULT_RECORDING_AUTO_CLEANUP_ENABLED = false;
@@ -228,10 +230,16 @@ export const useSettingsStore = defineStore("settings", () => {
         customTriggerKeyDomCode.value = savedCustomDomCode ?? "";
       }
 
-      // Load locale (first launch: detect system language, upgrade: fallback to zh-TW)
-      const savedLocale = await store.get<SupportedLocale>("selectedLocale");
-      if (savedLocale) {
-        selectedLocale.value = savedLocale;
+      // Load locale（首次启动检测系统语言；历史 zh-TW / 非法值迁移为 zh-CN）
+      const rawSavedLocale = await store.get<string>("selectedLocale");
+      if (rawSavedLocale != null) {
+        const normalizedLocale =
+          normalizeSupportedLocale(rawSavedLocale) ?? FALLBACK_LOCALE;
+        selectedLocale.value = normalizedLocale;
+        if (normalizedLocale !== rawSavedLocale) {
+          await store.set("selectedLocale", normalizedLocale);
+          await store.save();
+        }
       } else {
         const detected = detectSystemLocale();
         selectedLocale.value = detected;
@@ -243,12 +251,22 @@ export const useSettingsStore = defineStore("settings", () => {
         selectedLocale.value,
       );
 
-      // Load transcription locale (migration: default to UI locale if missing)
-      const savedTranscriptionLocale = await store.get<TranscriptionLocale>(
+      // Load transcription locale（历史 zh-TW / 非法值迁移；缺失则默认 UI 语言）
+      const rawSavedTranscriptionLocale = await store.get<string>(
         "selectedTranscriptionLocale",
       );
-      if (savedTranscriptionLocale) {
-        selectedTranscriptionLocale.value = savedTranscriptionLocale;
+      if (rawSavedTranscriptionLocale != null) {
+        const normalizedTranscriptionLocale =
+          normalizeTranscriptionLocale(rawSavedTranscriptionLocale) ??
+          selectedLocale.value;
+        selectedTranscriptionLocale.value = normalizedTranscriptionLocale;
+        if (normalizedTranscriptionLocale !== rawSavedTranscriptionLocale) {
+          await store.set(
+            "selectedTranscriptionLocale",
+            normalizedTranscriptionLocale,
+          );
+          await store.save();
+        }
       } else {
         selectedTranscriptionLocale.value = selectedLocale.value;
         await store.set("selectedTranscriptionLocale", selectedLocale.value);
@@ -267,7 +285,7 @@ export const useSettingsStore = defineStore("settings", () => {
       ) {
         promptMode.value = savedPromptMode as PromptMode;
       } else if (!savedPromptMode) {
-        // 舊版升級遷移
+        // 旧版升级迁移
         if (!trimmedSavedPrompt || isKnownDefaultPrompt(trimmedSavedPrompt)) {
           promptMode.value = "minimal";
         } else {
@@ -596,14 +614,14 @@ export const useSettingsStore = defineStore("settings", () => {
     }
   }
 
-  /** 只由 Dashboard (main-window.ts) 呼叫，比對版本號決定是否顯示升級提示 */
+  /** 只由 Dashboard (main-window.ts) 呼叫，比对版本号决定是否显示升级提示 */
   async function consumeUpgradeNotice() {
     try {
       const store = await load(STORE_NAME);
       const lastSeenVersion = await store.get<string>("lastSeenVersion");
 
       if (lastSeenVersion === null || lastSeenVersion === undefined) {
-        // 區分首次安裝 vs 舊版升級：有任何憑證 = 老使用者
+        // 区分首次安装 vs 旧版升级：有任何凭证 = 老使用者
         const existingApiKey =
           (await store.get<string>("doubaoAccessKey")) ??
           (await store.get<string>("llmApiKey")) ??
@@ -999,7 +1017,7 @@ export const useSettingsStore = defineStore("settings", () => {
     }
   }
 
-  // 僅 macOS 生效；失敗不影響已持久化的設定，重啟後由 Rust 端套用
+  // 仅 macOS 生效；失败不影响已持久化的设定，重启后由 Rust 端套用
   async function applyDockVisibility(hidden: boolean) {
     if (!IS_MACOS) return;
     try {
@@ -1201,18 +1219,36 @@ export const useSettingsStore = defineStore("settings", () => {
         ? (savedCustomDomCode ?? "")
         : "";
       // Locale + transcription locale must be synced first — aiPrompt fallback depends on them
-      const savedLocale = await store.get<SupportedLocale>("selectedLocale");
-      selectedLocale.value = savedLocale ?? FALLBACK_LOCALE;
+      const rawSavedLocale = await store.get<string>("selectedLocale");
+      const normalizedLocale =
+        normalizeSupportedLocale(rawSavedLocale) ?? FALLBACK_LOCALE;
+      selectedLocale.value = normalizedLocale;
+      if (rawSavedLocale != null && normalizedLocale !== rawSavedLocale) {
+        await store.set("selectedLocale", normalizedLocale);
+        await store.save();
+      }
       i18n.global.locale.value = selectedLocale.value;
       document.documentElement.lang = getHtmlLangForLocale(
         selectedLocale.value,
       );
 
-      const savedTranscriptionLocale = await store.get<TranscriptionLocale>(
+      const rawSavedTranscriptionLocale = await store.get<string>(
         "selectedTranscriptionLocale",
       );
-      selectedTranscriptionLocale.value =
-        savedTranscriptionLocale ?? selectedLocale.value;
+      const normalizedTranscriptionLocale =
+        normalizeTranscriptionLocale(rawSavedTranscriptionLocale) ??
+        selectedLocale.value;
+      selectedTranscriptionLocale.value = normalizedTranscriptionLocale;
+      if (
+        rawSavedTranscriptionLocale != null &&
+        normalizedTranscriptionLocale !== rawSavedTranscriptionLocale
+      ) {
+        await store.set(
+          "selectedTranscriptionLocale",
+          normalizedTranscriptionLocale,
+        );
+        await store.save();
+      }
 
       // Prompt mode (with runtime validation)
       const savedPromptMode = await store.get<string>("promptMode");

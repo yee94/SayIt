@@ -31,7 +31,7 @@ const props = withDefaults(
     status: HudStatus;
     recordingElapsedSeconds: number;
     message: string;
-    /** ASR 串流中間文本（留海下方即時字幕） */
+    /** ASR 串流中间文本（留海下方即时字幕） */
     liveTranscript?: string;
     canRetry: boolean;
     promptModeLabel: string;
@@ -65,7 +65,7 @@ const WAVEFORM_ELEMENT_COUNT = 6;
 const MIN_BAR_HEIGHT = 4;
 const MAX_BAR_HEIGHT = 28;
 const ERROR_WITH_MESSAGE_HEIGHT = 72;
-/** 含即時字幕時的留海高度（上排 42 + 字幕列） */
+/** 含即时字幕时的留海高度（上排 42 + 字幕列） */
 const LIVE_TRANSCRIPT_HEIGHT = 72;
 
 interface NotchShapeParams {
@@ -97,9 +97,9 @@ const hasErrorMessage = computed(
 );
 
 /**
- * 字幕列顯示文字：
- * - enhancing / editing：固定狀態文案（替換掉之前的即時 ASR 文本）
- * - recording / 轉寫：顯示 liveTranscript
+ * 字幕列显示文字：
+ * - enhancing / editing：固定状态文案（替换掉之前的即时 ASR 文本）
+ * - recording / 转写：显示 liveTranscript
  */
 const liveTranscriptDisplayText = computed(() => {
   if (props.status === "enhancing") {
@@ -112,9 +112,9 @@ const liveTranscriptDisplayText = computed(() => {
 });
 
 /**
- * 僅在「有實際文字」時才向下撐開留海。
- * 轉寫中尚無 partial → 保持預設 42px，不預先展開。
- * enhancing / editing：一律顯示狀態文案並撐開。
+ * 仅在「有实际文字」时才向下撑开留海。
+ * 转写中尚无 partial → 保持预设 42px，不预先展开。
+ * enhancing / editing：一律显示状态文案并撑开。
  */
 const showLiveTranscript = computed(() => {
   if (props.status === "enhancing" || props.status === "editing") {
@@ -132,7 +132,7 @@ const showLiveTranscript = computed(() => {
   );
 });
 
-/** error / learned / 有字幕：同一塊黑底圓角向下擴展 */
+/** error / learned / 有字幕：同一块黑底圆角向下扩展 */
 const isExpandedMode = computed(
   () =>
     hasErrorMessage.value ||
@@ -142,7 +142,7 @@ const isExpandedMode = computed(
 
 const notchStyle = computed(() => {
   let params = NOTCH_SHAPE_OVERRIDES[visualMode.value] ?? DEFAULT_NOTCH_SHAPE;
-  // 預設 42px；只有真的有字幕 / 錯誤訊息 / learned 才撐高
+  // 预设 42px；只有真的有字幕 / 错误讯息 / learned 才撑高
   if (showLiveTranscript.value) {
     params = { ...params, height: LIVE_TRANSCRIPT_HEIGHT };
   } else if (hasErrorMessage.value || visualMode.value === "learned") {
@@ -521,7 +521,7 @@ onUnmounted(() => {
         <span class="error-message">{{ props.message }}</span>
       </div>
 
-      <!-- 即時轉寫字幕 / 整理中狀態：黑底圓角向下擴展的同一塊留海 -->
+      <!-- 即时转写字幕 / 整理中状态：黑底圆角向下扩展的同一块留海 -->
       <div v-if="showLiveTranscript" class="live-transcript-row">
         <span
           class="live-transcript-text"
@@ -554,7 +554,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  /* height / clip-path 同步過渡：有字幕時「撐下來」的主動畫 */
+  /* height / clip-path 同步过渡：有字幕时「撑下来」的主动画 */
   transition:
     width 0.35s cubic-bezier(0.32, 0.72, 0, 1),
     height 0.32s cubic-bezier(0.22, 1, 0.36, 1),
@@ -917,7 +917,7 @@ onUnmounted(() => {
   cursor: pointer;
 }
 
-/* ---- Collapsing: 內容淡出 ---- */
+/* ---- Collapsing: 内容淡出 ---- */
 .notch-collapsing .notch-content,
 .notch-collapsing .error-message-row,
 .notch-collapsing .learned-terms-row,
@@ -926,7 +926,7 @@ onUnmounted(() => {
   transition: opacity 0.15s ease;
 }
 
-/* ---- Live transcript：黑底內第二行；等高度撐開後再淡入 ---- */
+/* ---- Live transcript：黑底内第二行；等高度撑开后再淡入 ---- */
 .live-transcript-row {
   display: flex;
   align-items: center;
@@ -936,7 +936,7 @@ onUnmounted(() => {
   padding: 0 24px 8px;
   box-sizing: border-box;
   overflow: hidden;
-  /* 略晚於 notch height 過渡，避免字被 clip 裁切感 */
+  /* 略晚于 notch height 过渡，避免字被 clip 裁切感 */
   animation: liveTranscriptFadeIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both;
 }
 
@@ -946,7 +946,7 @@ onUnmounted(() => {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  /* 左側省略：overflow 時保留尾部（最新）文字 */
+  /* 左侧省略：overflow 时保留尾部（最新）文字 */
   direction: rtl;
   text-align: center;
   font-size: 16px;
@@ -955,18 +955,18 @@ onUnmounted(() => {
   line-height: 1.35;
 }
 
-/* 整理中 / 編輯中：狀態文案居中，不需要 rtl 省略 */
+/* 整理中 / 编辑中：状态文案居中，不需要 rtl 省略 */
 .live-transcript-text.live-transcript-status {
   direction: ltr;
   text-align: center;
   text-overflow: clip;
 }
 
-/* bdi 保持字元邏輯順序，避免 rtl 容器把中英混排弄反 */
+/* bdi 保持字元逻辑顺序，避免 rtl 容器把中英混排弄反 */
 .live-transcript-bdi {
   direction: ltr;
   unicode-bidi: embed;
-  /* 高光閃過（參考 wxa-agent-plaza speech-overlay think-shine） */
+  /* 高光闪过（参考 wxa-agent-plaza speech-overlay think-shine） */
   background-image: linear-gradient(
     100deg,
     rgba(230, 242, 255, 0.88) 0%,

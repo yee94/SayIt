@@ -1,7 +1,7 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, vi } from "vitest";
 import { createI18n } from "vue-i18n";
-import zhTW from "../../src/i18n/locales/zh-TW.json";
+import zhCN from "../../src/i18n/locales/zh-CN.json";
 import en from "../../src/i18n/locales/en.json";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -14,8 +14,8 @@ describe("i18n smoke test", () => {
   it("[P0] 切换 locale 后 UI 文字应更新为对应语言", async () => {
     const i18n = createI18n({
       legacy: false,
-      locale: "zh-TW",
-      messages: { "zh-TW": zhTW, en },
+      locale: "zh-CN",
+      messages: { "zh-CN": zhCN, en },
     });
 
     const wrapper = mount(AccessibilityGuide, {
@@ -23,17 +23,17 @@ describe("i18n smoke test", () => {
       global: { plugins: [i18n] },
     });
 
-    // 验证 zh-TW 文字已正确渲染（现与简体文案对齐）
+    // 验证 zh-CN 文字已正确渲染
     expect(wrapper.text()).toContain("需要辅助使用权限");
     const buttonListZh = wrapper.findAll("button");
     expect(buttonListZh[0].text()).toBe("打开系统设置");
     expect(buttonListZh[1].text()).toBe("稍后设置");
 
-    // 切換到 English
+    // 切换到 English
     i18n.global.locale.value = "en";
     await wrapper.vm.$nextTick();
 
-    // 驗證 English 文字已正確渲染
+    // 验证 English 文字已正确渲染
     expect(wrapper.text()).toContain("Accessibility Permission Required");
     const buttonListEn = wrapper.findAll("button");
     expect(buttonListEn[0].text()).toBe("Open System Settings");

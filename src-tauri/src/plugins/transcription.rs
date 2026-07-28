@@ -43,15 +43,15 @@ const COMPRESSION_NONE: u8 = 0b0000;
 
 // ========== State ==========
 
-/// 錄音中即時 ASR session（邊說邊出字幕）
+/// 录音中实时 ASR session（边说边出字幕）
 struct LiveAsrSession {
-    /// 設 true 後 worker 會送 final 包並收尾
+    /// 设为 true 后 worker 会发送 final 包并收尾
     finish: Arc<AtomicBool>,
-    /// 設 true 表示取消（ESC），不取最終結果
+    /// 设为 true 表示取消（ESC），不取最终结果
     cancel: Arc<AtomicBool>,
-    /// worker 完成後寫入最終文本
+    /// worker 完成后写入最终文本
     result: Arc<Mutex<Option<Result<TranscriptionResult, String>>>>,
-    /// 等 worker 結束
+    /// 等待 worker 结束
     done_rx: Mutex<Option<std::sync::mpsc::Receiver<()>>>,
 }
 
@@ -122,7 +122,7 @@ pub struct TranscriptionResult {
     pub no_speech_probability: f64,
 }
 
-/// 串流中間結果（供 HUD 即時字幕）
+/// 流式中间结果（供 HUD 实时字幕）
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TranscriptionPartialPayload {
@@ -457,40 +457,20 @@ fn build_session_config(
         audio["language"] = serde_json::Value::String(mapped);
     }
 
+    // 热词：corpus.context 必须是 **JSON 字符串**（不是嵌套对象）。
+    // 官方/社区正确形态：
+    //   "corpus": { "context": "{\"hotwords\":[{\"word\":\"xxx\"}]}" }
+    // 旧实现把 context 传成对象 + context_data，会触发
+    // error_code=55000000（proto: invalid value for string type: {）。
+    // 双向流式优化版限约 100 tokens，这里按词条数截断到 MAX_HOTWORDS。
     let mut corpus = serde_json::Map::new();
-    if let Some(terms) = vocabulary_term_list {
-        let hotwords: Vec<serde_json::Value> = terms
-            .iter()
-            .take(MAX_HOTWORDS)
-            .filter_map(|t| {
-                let word = t.trim();
-                if word.is_empty() {
-                    None
-                } else {
-                    Some(serde_json::json!({ "word": word }))
-                }
-            })
-            .collect();
-        if !hotwords.is_empty() {
-            corpus.insert("boosting_table_name".into(), serde_json::json!(""));
-            // context with hotwords as text hints
-            let context_items: Vec<serde_json::Value> = hotwords
-                .iter()
-                .filter_map(|h| h.get("word").and_then(|w| w.as_str()))
-                .map(|w| serde_json::json!({ "text": w }))
-                .collect();
-            if !context_items.is_empty() {
-                corpus.insert(
-                    "context".into(),
-                    serde_json::json!({ "context_data": context_items }),
-                );
-            }
-        }
+    if let Some(context_str) = build_hotwords_context_string(vocabulary_term_list) {
+        corpus.insert("context".into(), serde_json::Value::String(context_str));
     }
 
     // enable_nonstream：离线整段录音场景，服务端会在收完音频后做一次非流式精修，
     // 与有赞 asrService 对齐，避免只拿到流式过程中的前几句。
-    let request = serde_json::json!({
+    let mut request = serde_json::json!({
         "model_name": "bigmodel",
         "show_utterances": true,
         "enable_nonstream": true,
@@ -498,14 +478,39 @@ fn build_session_config(
         "enable_ddc": true,
         "enable_lid": true,
         "request_id": Uuid::new_v4().to_string(),
-        "corpus": corpus,
     });
+    if !corpus.is_empty() {
+        request["corpus"] = serde_json::Value::Object(corpus);
+    }
 
     serde_json::json!({
         "user": { "uid": uid },
         "audio": audio,
         "request": request,
     })
+}
+
+/// 把词表序列化为豆包要求的 context JSON 字符串。
+/// 格式：`{"hotwords":[{"word":"xxx"},...]}`；空词表返回 None。
+fn build_hotwords_context_string(vocabulary_term_list: Option<&[String]>) -> Option<String> {
+    let terms = vocabulary_term_list?;
+    let hotwords: Vec<serde_json::Value> = terms
+        .iter()
+        .take(MAX_HOTWORDS)
+        .filter_map(|t| {
+            let word = t.trim();
+            if word.is_empty() {
+                None
+            } else {
+                Some(serde_json::json!({ "word": word }))
+            }
+        })
+        .collect();
+    if hotwords.is_empty() {
+        return None;
+    }
+    let payload = serde_json::json!({ "hotwords": hotwords });
+    serde_json::to_string(&payload).ok()
 }
 
 // ========== Shared Transcription Logic ==========
@@ -516,7 +521,7 @@ fn build_session_config(
 /// - `Ok((None, true))` 会话 last packet / final（可结束读循环）
 /// - `Ok((Some(err), _))` 服务端业务错误（已 close）
 ///
-/// `on_partial` 在累计文本有更新时回调（供 HUD 即時字幕）。
+/// `on_partial` 在累计文本有更新时回调（供 HUD 实时字幕）。
 async fn handle_binary_frame(
     data: &[u8],
     accumulated_text: &mut String,
@@ -675,13 +680,11 @@ async fn send_doubao_transcription_request<R: Runtime>(
         loop {
             match tokio::time::timeout(std::time::Duration::from_millis(1), read.next()).await {
                 Ok(Some(Ok(Message::Binary(data)))) => {
-                    let (err, _done) = handle_binary_frame(
-                        &data,
-                        &mut accumulated_text,
-                        &mut write,
-                        |text| emit_transcription_partial(app, text),
-                    )
-                    .await?;
+                    let (err, _done) =
+                        handle_binary_frame(&data, &mut accumulated_text, &mut write, |text| {
+                            emit_transcription_partial(app, text)
+                        })
+                        .await?;
                     if let Some(err) = err {
                         return Err(err);
                     }
@@ -707,9 +710,12 @@ async fn send_doubao_transcription_request<R: Runtime>(
             let end = (offset + PCM_CHUNK_BYTES).min(pcm.len());
             let chunk = &pcm[offset..end];
             let packet = encode_audio_only_request(chunk, false);
-            write.send(Message::Binary(packet.into())).await.map_err(|e| {
-                TranscriptionError::RequestFailed(format!("Failed to send audio: {e}"))
-            })?;
+            write
+                .send(Message::Binary(packet.into()))
+                .await
+                .map_err(|e| {
+                    TranscriptionError::RequestFailed(format!("Failed to send audio: {e}"))
+                })?;
             offset = end;
             // 离线整段回放：不按实时 200ms 节流（否则 30 秒录音要传 30 秒）。
             // 每包 yield 一次让读侧能 drain partial / 反压。
@@ -748,13 +754,11 @@ async fn send_doubao_transcription_request<R: Runtime>(
         let next = tokio::time::timeout(remaining, read.next()).await;
         match next {
             Ok(Some(Ok(Message::Binary(data)))) => {
-                let (err, done) = handle_binary_frame(
-                    &data,
-                    &mut accumulated_text,
-                    &mut write,
-                    |text| emit_transcription_partial(app, text),
-                )
-                .await?;
+                let (err, done) =
+                    handle_binary_frame(&data, &mut accumulated_text, &mut write, |text| {
+                        emit_transcription_partial(app, text)
+                    })
+                    .await?;
                 if let Some(err) = err {
                     return Err(err);
                 }
@@ -845,9 +849,8 @@ pub async fn retranscribe_from_file(
         return Err(TranscriptionError::ApiKeyMissing);
     }
 
-    let wav_data = std::fs::read(&file_path).map_err(|e| {
-        TranscriptionError::RequestFailed(format!("Failed to read WAV file: {e}"))
-    })?;
+    let wav_data = std::fs::read(&file_path)
+        .map_err(|e| TranscriptionError::RequestFailed(format!("Failed to read WAV file: {e}")))?;
 
     println!(
         "[transcription] Retranscribing from file: {} ({} bytes)",
@@ -893,9 +896,9 @@ pub async fn test_asr_connection(
     .map(|_| ())
 }
 
-// ========== Live streaming ASR（邊說邊出） ==========
+// ========== Live streaming ASR（边说边出） ==========
 
-/// 錄音開始後呼叫：掛上 PCM 訂閱 + 開 WS，持續 emit `transcription:partial`。
+/// 录音开始后调用：挂上 PCM 订阅 + 开启 WS，持续 emit `transcription:partial`。
 #[command]
 pub fn start_live_asr(
     app: AppHandle,
@@ -910,7 +913,7 @@ pub fn start_live_asr(
         return Err(TranscriptionError::ApiKeyMissing);
     }
 
-    // 取消上一輪殘留 session
+    // 取消上一轮残留 session
     cancel_live_session_inner(&transcription_state, &audio_state);
 
     let (pcm_tx, pcm_rx) = std::sync::mpsc::sync_channel::<Vec<i16>>(32);
@@ -980,13 +983,13 @@ pub fn start_live_asr(
     Ok(())
 }
 
-/// 停止錄音後呼叫：送 final、等結果。若 live session 不存在則回傳錯誤（前端可 fallback）。
+/// 停止录音后调用：发送 final、等待结果。若 live session 不存在则返回错误（前端可 fallback）。
 #[command]
 pub async fn finish_live_asr(
     audio_state: State<'_, AudioRecorderState>,
     transcription_state: State<'_, TranscriptionState>,
 ) -> Result<TranscriptionResult, TranscriptionError> {
-    // 先卸 sink，錄音 callback 不再往 channel 塞
+    // 先卸载 sink，录音 callback 不再向 channel 填充数据
     audio_state.detach_live_pcm_sink();
 
     let session = {
@@ -1000,7 +1003,7 @@ pub async fn finish_live_asr(
 
     session.finish.store(true, Ordering::SeqCst);
 
-    // 等 worker（阻塞放 blocking 線程，避免卡 runtime）
+    // 等待 worker（阻塞放 blocking 线程，避免卡住 runtime）
     let done_rx = session
         .done_rx
         .lock()
@@ -1008,7 +1011,7 @@ pub async fn finish_live_asr(
         .take();
     if let Some(rx) = done_rx {
         let wait = tokio::task::spawn_blocking(move || {
-            // 最長等 REQUEST_TIMEOUT + final timeout
+            // 最长等待 REQUEST_TIMEOUT + final timeout
             let _ = rx.recv_timeout(std::time::Duration::from_secs(REQUEST_TIMEOUT_SECS + 10));
         })
         .await;
@@ -1032,7 +1035,7 @@ pub async fn finish_live_asr(
     }
 }
 
-/// ESC / 取消：關掉 live session，不取結果。
+/// ESC / 取消：关闭 live session，不取结果。
 #[command]
 pub fn cancel_live_asr(
     audio_state: State<'_, AudioRecorderState>,
@@ -1073,8 +1076,7 @@ async fn run_live_asr_session(
     cancel: Arc<AtomicBool>,
 ) -> Result<TranscriptionResult, TranscriptionError> {
     let start_time = Instant::now();
-    let session_config =
-        build_session_config(language.as_deref(), vocabulary_term_list.as_deref());
+    let session_config = build_session_config(language.as_deref(), vocabulary_term_list.as_deref());
     let connect_id = Uuid::new_v4().to_string();
 
     let mut request = DEFAULT_WS_URL
@@ -1127,32 +1129,36 @@ async fn run_live_asr_session(
 
     let mut accumulated_text = String::new();
     let mut pcm_byte_buf: Vec<u8> = Vec::with_capacity(PCM_CHUNK_BYTES * 4);
-    // 目標：每 200ms 送一包 16k mono
+    // 目标：每 200ms 发送一包 16k mono
     let target_chunk_samples = (TARGET_SAMPLE_RATE as usize * PCM_CHUNK_MS as usize) / 1000;
     let mut pending_samples: Vec<i16> = Vec::with_capacity(target_chunk_samples * 2);
     let mut last_packet_sent = false;
     let mut total_pcm_bytes: usize = 0;
 
-    // 錄音 device 可能不是 16k；累積原始 sample 後再線性重採樣送出
-    let from_rate = if sample_rate == 0 { TARGET_SAMPLE_RATE } else { sample_rate };
+    // 录音 device 采样率可能不是 16k；累积原始 sample 后再线性重采样发送
+    let from_rate = if sample_rate == 0 {
+        TARGET_SAMPLE_RATE
+    } else {
+        sample_rate
+    };
 
     while !last_packet_sent {
         if cancel.load(Ordering::SeqCst) {
             let _ = write.close().await;
-            return Err(TranscriptionError::RequestFailed("Live ASR cancelled".into()));
+            return Err(TranscriptionError::RequestFailed(
+                "Live ASR cancelled".into(),
+            ));
         }
 
-        // 先 drain 服務端 partial
+        // 先 drain 服务端 partial
         loop {
             match tokio::time::timeout(std::time::Duration::from_millis(1), read.next()).await {
                 Ok(Some(Ok(Message::Binary(data)))) => {
-                    let (err, _done) = handle_binary_frame(
-                        &data,
-                        &mut accumulated_text,
-                        &mut write,
-                        |text| emit_transcription_partial(Some(&app), text),
-                    )
-                    .await?;
+                    let (err, _done) =
+                        handle_binary_frame(&data, &mut accumulated_text, &mut write, |text| {
+                            emit_transcription_partial(Some(&app), text)
+                        })
+                        .await?;
                     if let Some(err) = err {
                         return Err(err);
                     }
@@ -1174,7 +1180,7 @@ async fn run_live_asr_session(
             }
         }
 
-        // 從錄音 channel 取 PCM（非阻塞 + 短超時，兼顧 finish 信號）
+        // 从录音 channel 取 PCM（非阻塞 + 短超时，同时处理 finish 信号）
         let finished = finish.load(Ordering::SeqCst);
         match pcm_rx.recv_timeout(std::time::Duration::from_millis(if finished {
             5
@@ -1186,12 +1192,12 @@ async fn run_live_asr_session(
             }
             Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
             Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
-                // sink 已卸 / 錄音結束：視同 finish
+                // sink 已卸载 / 录音结束：视为 finish
                 finish.store(true, Ordering::SeqCst);
             }
         }
 
-        // 重採樣後湊滿 200ms 就送
+        // 重采样后凑满 200ms 即发送
         if from_rate == TARGET_SAMPLE_RATE {
             while pending_samples.len() >= target_chunk_samples {
                 let chunk: Vec<i16> = pending_samples.drain(..target_chunk_samples).collect();
@@ -1209,7 +1215,7 @@ async fn run_live_asr_session(
                     })?;
             }
         } else {
-            // 非 16k：等夠一段再重採樣送（約 200ms 原始）
+            // 非 16k：等待足够长度后再重采样发送（约 200ms 原始音频）
             let need = ((target_chunk_samples as u64 * from_rate as u64)
                 / TARGET_SAMPLE_RATE as u64)
                 .max(1) as usize;
@@ -1232,7 +1238,7 @@ async fn run_live_asr_session(
         }
 
         if finish.load(Ordering::SeqCst) {
-            // 排空 channel 殘餘
+            // 排空 channel 残余数据
             while let Ok(batch) = pcm_rx.try_recv() {
                 pending_samples.extend_from_slice(&batch);
             }
@@ -1269,7 +1275,9 @@ async fn run_live_asr_session(
 
     if cancel.load(Ordering::SeqCst) {
         let _ = write.close().await;
-        return Err(TranscriptionError::RequestFailed("Live ASR cancelled".into()));
+        return Err(TranscriptionError::RequestFailed(
+            "Live ASR cancelled".into(),
+        ));
     }
 
     // 等 final
@@ -1278,7 +1286,9 @@ async fn run_live_asr_session(
     loop {
         if cancel.load(Ordering::SeqCst) {
             let _ = write.close().await;
-            return Err(TranscriptionError::RequestFailed("Live ASR cancelled".into()));
+            return Err(TranscriptionError::RequestFailed(
+                "Live ASR cancelled".into(),
+            ));
         }
         let remaining = final_deadline.saturating_duration_since(tokio::time::Instant::now());
         if remaining.is_zero() {
@@ -1286,13 +1296,11 @@ async fn run_live_asr_session(
         }
         match tokio::time::timeout(remaining, read.next()).await {
             Ok(Some(Ok(Message::Binary(data)))) => {
-                let (err, done) = handle_binary_frame(
-                    &data,
-                    &mut accumulated_text,
-                    &mut write,
-                    |text| emit_transcription_partial(Some(&app), text),
-                )
-                .await?;
+                let (err, done) =
+                    handle_binary_frame(&data, &mut accumulated_text, &mut write, |text| {
+                        emit_transcription_partial(Some(&app), text)
+                    })
+                    .await?;
                 if let Some(err) = err {
                     return Err(err);
                 }
@@ -1416,12 +1424,53 @@ mod tests {
         assert_eq!(cur, "你好世界");
     }
 
+    #[test]
+    fn test_build_hotwords_context_string_is_json_string_payload() {
+        let terms = vec!["SayIt".to_string(), "  GMV ".to_string(), "".to_string()];
+        let ctx = build_hotwords_context_string(Some(&terms)).expect("context");
+        // 必须是可再解析的 JSON 字符串，形态为 {"hotwords":[{"word":...}]}
+        let parsed: serde_json::Value = serde_json::from_str(&ctx).expect("parse context");
+        let words = parsed
+            .pointer("/hotwords")
+            .and_then(|v| v.as_array())
+            .expect("hotwords array");
+        assert_eq!(words.len(), 2);
+        assert_eq!(words[0].get("word").and_then(|v| v.as_str()), Some("SayIt"));
+        assert_eq!(words[1].get("word").and_then(|v| v.as_str()), Some("GMV"));
+    }
+
+    #[test]
+    fn test_build_session_config_context_is_string_not_object() {
+        let terms = vec!["Typeless".to_string(), "SayIt".to_string()];
+        let cfg = build_session_config(Some("zh"), Some(&terms));
+        let context = cfg
+            .pointer("/request/corpus/context")
+            .expect("corpus.context present");
+        assert!(
+            context.is_string(),
+            "corpus.context must be a JSON string, got {context}"
+        );
+        // 不应再出现旧的 context_data 对象形态
+        assert!(cfg
+            .pointer("/request/corpus/context/context_data")
+            .is_none());
+        assert!(cfg.pointer("/request/corpus/boosting_table_name").is_none());
+    }
+
+    #[test]
+    fn test_build_session_config_omits_corpus_when_no_terms() {
+        let cfg = build_session_config(Some("zh"), None);
+        assert!(
+            cfg.pointer("/request/corpus").is_none(),
+            "empty hotwords should omit corpus entirely"
+        );
+    }
+
     /// 服务端结果帧：`[hdr][sequence:4][payload_size:4][json]`
     /// 旧实现把 size/seq 写反，导致 JSON 解析失败 → 空文本。
     #[test]
     fn test_parse_server_message_sequence_then_size() {
-        let json =
-            r#"{"result":{"text":"嘿，哈喽，我们现在可以说一些话了吗？"}}"#.as_bytes();
+        let json = r#"{"result":{"text":"嘿，哈喽，我们现在可以说一些话了吗？"}}"#.as_bytes();
         let mut buf = vec![0u8; 4];
         buf[0] = (PROTOCOL_VERSION << 4) | 1; // header_size=1 → 4 bytes
         buf[1] = (0b1001 << 4) | SERVER_FLAG_HAS_SEQUENCE | SERVER_FLAG_LAST_PACKET; // mt=9
@@ -1463,7 +1512,9 @@ mod tests {
             None
         };
         assert!(
-            wrong_slice.and_then(|s| serde_json::from_str::<serde_json::Value>(s).ok()).is_none(),
+            wrong_slice
+                .and_then(|s| serde_json::from_str::<serde_json::Value>(s).ok())
+                .is_none(),
             "old size+seq layout should not parse valid JSON"
         );
 

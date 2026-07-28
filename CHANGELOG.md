@@ -1,134 +1,148 @@
 # Changelog
 
-SayIt 版本更新紀錄。
+SayIt 版本更新纪录。
+
+## [0.12.0] - 2026-07-28
+
+### Added
+
+- 录音时实时显示识别字幕：豆包 SeedASR 改为录音期间持续流式传输，HUD 会随语音更新文字；停止录音后直接收取 final 结果，连接异常时仍会回退到原本的整段转录流程
+- Typeless 词典一键导入（macOS）：可读取本机已登录的 Typeless 词典，批量加入 SayIt 自定义字典；既有词条与大小写重复项会自动跳过，Windows 会显示平台支持提示
+- 简体中文成为新安装默认语言：系统语言为裸 `zh` 时默认使用 `zh-CN`，界面、格式化文字、默认 Prompt 与错误信息同步采用简体中文
+
+### Improved
+
+- 发布流程改为无开发者认证构建：macOS 使用 ad-hoc 签名，Windows 产出未签名安装程序；保留 Tauri Updater minisign 验证，更新来源切换至 `yee94/SayIt`
+- Release 加入完整质量门禁：Vue 类型、ESLint、Vitest，以及 macOS／Windows Rust Clippy 和测试全部通过后，才开始建立三平台安装包并自动公开 GitHub Release
+- App 品牌、设置页与项目说明更新为当前的豆包 SeedASR、OpenAI 兼容 LLM 和四语产品状态
 
 ## [0.11.0] - 2026-07-12
 
 ### Added
 
-- 「隱藏 Dock 圖示」設定（macOS）（#56）：啟用後 App 只留選單列圖示；切換即時生效（內建 `setDockVisibility` + capability），啟動時由 Rust 端讀取設定套用，全程 non-fatal
-- Azure 之外四家供應商模型清單全面遷移（#68）：因應 Groq 2026-07-17 起下架舊模型與 claude-3-5-haiku retired，換上八個最新經濟型模型（Groq 預設 qwen3.6-27b、Gemini 預設 3.5-flash、OpenAI 預設 gpt-5.6-luna、Anthropic haiku-4-5）；`DECOMMISSIONED_MODEL_MAP` 鏈式解析讓舊設定自動遷移、不需重新設定
-- 語意守衛 `hallucinationDetector`（#43）：偵測 AI 整理輸出與逐字稿語意脫鉤時自動改貼原始逐字稿，不再憑空輸出
-- 轉譯結果簡→繁確定性轉換 `simplifiedToTraditional`（#39）
-- 語音轉文字自動重試（#10）：429 尊重 `Retry-After`（上限 10 秒）、5xx／連線失敗走 1s/2s backoff、最多 3 次嘗試；timeout 與 4xx 不重試；連線測試不受影響
-- 儀表板顯示付費 LLM 供應商今日用量（#62，@lettucebo）；用量趨勢圖零值補齊 + 稀疏資料座標軸修正（#59，@lettucebo）
-- Windows UIA text-field reader + fail-closed guard，智慧字典基礎建設（#64，@lettucebo）
-- 每次更新後首次開啟 Dashboard 彈出「更新摘要」，列出本版重點（沿用升級提示機制、五語系）
+- 「隐藏 Dock 图示」设定（macOS）（#56）：启用后 App 只留选单列图示；切换即时生效（内建 `setDockVisibility` + capability），启动时由 Rust 端读取设定套用，全程 non-fatal
+- Azure 之外四家供应商模型清单全面迁移（#68）：因应 Groq 2026-07-17 起下架旧模型与 claude-3-5-haiku retired，换上八个最新经济型模型（Groq 预设 qwen3.6-27b、Gemini 预设 3.5-flash、OpenAI 预设 gpt-5.6-luna、Anthropic haiku-4-5）；`DECOMMISSIONED_MODEL_MAP` 链式解析让旧设定自动迁移、不需重新设定
+- 语意守卫 `hallucinationDetector`（#43）：侦测 AI 整理输出与逐字稿语意脱钩时自动改贴原始逐字稿，不再凭空输出
+- 转译结果简→繁确定性转换 `simplifiedToTraditional`（#39）
+- 语音转文字自动重试（#10）：429 尊重 `Retry-After`（上限 10 秒）、5xx／连线失败走 1s/2s backoff、最多 3 次尝试；timeout 与 4xx 不重试；连线测试不受影响
+- 仪表板显示付费 LLM 供应商今日用量（#62，@lettucebo）；用量趋势图零值补齐 + 稀疏资料座标轴修正（#59，@lettucebo）
+- Windows UIA text-field reader + fail-closed guard，智慧字典基础建设（#64，@lettucebo）
+- 每次更新后首次开启 Dashboard 弹出「更新摘要」，列出本版重点（沿用升级提示机制、四语系）
 
 ### Fixed
 
-- 編輯模式選取偵測全面重寫（#24、#25、#36）：以 macOS Accessibility 被動查詢（`read_selection_state` 三態）取代「錄音開始就模擬 Cmd+C」，根治無選取誤觸發編輯模式與按住觸發鍵冒出「c」字的問題；AX 不可用的 App（如 Heptabase）自動退到「停止錄音後 250ms 剪貼簿後備」；錄音世代編號防跨錄音狀態污染
-- 轉譯錯誤全被標成「操作失敗」的問題（#37、#38）：錯誤分類改能處理字串型錯誤並比對真實訊息，429／5xx／網路問題現在分級顯示
-- OpenAI GPT-5.x 整理必定失敗的問題：停送 `temperature`、改送 `reasoning_effort: "none"`（5.6 世代已移除 `minimal`）；Gemini 3.x 以 `thinkingConfig.thinkingLevel: "MINIMAL"` 壓制思考輸出
-- DB 遷移在 connection pool 下的競態（#65，@lettucebo）：connection-pool-safe migrations + `DATABASE_READY` handshake
-- 轉譯 HTTP client 改用 rustls（#63，@lettucebo）：解決部分環境 TLS 連線問題
-- Windows 端既有 clippy lint 錯誤清理（#57，@lettucebo）
+- 编辑模式选取侦测全面重写（#24、#25、#36）：以 macOS Accessibility 被动查询（`read_selection_state` 三态）取代「录音开始就模拟 Cmd+C」，根治无选取误触发编辑模式与按住触发键冒出「c」字的问题；AX 不可用的 App（如 Heptabase）自动退到「停止录音后 250ms 剪贴簿后备」；录音世代编号防跨录音状态污染
+- 转译错误全被标成「操作失败」的问题（#37、#38）：错误分类改能处理字串型错误并比对真实讯息，429／5xx／网路问题现在分级显示
+- OpenAI GPT-5.x 整理必定失败的问题：停送 `temperature`、改送 `reasoning_effort: "none"`（5.6 世代已移除 `minimal`）；Gemini 3.x 以 `thinkingConfig.thinkingLevel: "MINIMAL"` 压制思考输出
+- DB 迁移在 connection pool 下的竞态（#65，@lettucebo）：connection-pool-safe migrations + `DATABASE_READY` handshake
+- 转译 HTTP client 改用 rustls（#63，@lettucebo）：解决部分环境 TLS 连线问题
+- Windows 端既有 clippy lint 错误清理（#57，@lettucebo）
 
 ### Improved
 
-- API 用量 fallback 單價更新為 gemini-3.5-flash 天花板；Gemini 免費額度顯示改為「已使用 N 次」純用量（不再顯示誤導的剩餘進度條）
+- API 用量 fallback 单价更新为 gemini-3.5-flash 天花板；Gemini 免费额度显示改为「已使用 N 次」纯用量（不再显示误导的剩余进度条）
 
 ### Added
 
-- 設定中的「測試連線」按鈕：可即時驗證當前 LLM Provider / Whisper 模型的 API key 與連線是否正常，失敗時顯示具體原因（API key 無效 / 額度不足 / 服務端問題 / 網路問題），讓使用者能自助 debug 設定問題（#34）
-- 設定可選擇「自動貼上後還原原本剪貼簿內容」：之前 SayIt 把轉錄文字寫進剪貼簿後就留在那裡，使用者原本複製的東西被覆蓋。新增「將轉錄文字複製到剪貼簿」toggle（設定 → 一般），預設 ON 保留現行行為（避免回歸），關閉時 SayIt 會在貼上後 200ms 還原使用者原本的剪貼簿（純文字場景；圖片/檔案因 arboard 無法無損 snapshot 而保持不動）（#35）
+- 设定中的「测试连线」按钮：可即时验证当前 LLM Provider / Whisper 模型的 API key 与连线是否正常，失败时显示具体原因（API key 无效 / 额度不足 / 服务端问题 / 网路问题），让使用者能自助 debug 设定问题（#34）
+- 设定可选择「自动贴上后还原原本剪贴簿内容」：之前 SayIt 把转录文字写进剪贴簿后就留在那里，使用者原本复制的东西被覆盖。新增「将转录文字复制到剪贴簿」toggle（设定 → 一般），预设 ON 保留现行行为（避免回归），关闭时 SayIt 会在贴上后 200ms 还原使用者原本的剪贴簿（纯文字场景；图片/档案因 arboard 无法无损 snapshot 而保持不动）（#35）
 
 ### Fixed
 
-- Gemini 2.5 系列做 AI 整理時長轉錄文字被截斷的問題（#23、#34）：根因是 Gemini 把 thinking tokens 計入 `maxOutputTokens` 配額，原本對所有 provider 統一給 2048 token 預算被 thinking 吃掉一部分後不夠用。改為 per-provider 預設：Gemini / OpenAI 16384、Anthropic / Groq 8192（後者模型上限 8192，給 16384 會被 API reject）
-- 使用 OpenAI 或 Anthropic 整理時被 Content Security Policy 阻擋的問題：`connect-src` 加入 `api.openai.com` 與 `api.anthropic.com`
-- 轉錄失敗 catch path 沒寫入 `rmsEnergyLevel` 的問題：補上 assignment，避免幻覺偵測 fallback 邏輯收到 undefined
+- Gemini 2.5 系列做 AI 整理时长转录文字被截断的问题（#23、#34）：根因是 Gemini 把 thinking tokens 计入 `maxOutputTokens` 配额，原本对所有 provider 统一给 2048 token 预算被 thinking 吃掉一部分后不够用。改为 per-provider 预设：Gemini / OpenAI 16384、Anthropic / Groq 8192（后者模型上限 8192，给 16384 会被 API reject）
+- 使用 OpenAI 或 Anthropic 整理时被 Content Security Policy 阻挡的问题：`connect-src` 加入 `api.openai.com` 与 `api.anthropic.com`
+- 转录失败 catch path 没写入 `rmsEnergyLevel` 的问题：补上 assignment，避免幻觉侦测 fallback 逻辑收到 undefined
 
 ### Improved
 
-- LlmProviderId switch 加上 exhaustiveness assertion：未來新增 provider 時編譯期會抓到漏處理的 case
-- 錯誤傳遞鏈保留 `cause`：debug 時能看到完整堆疊
-- CI 升級：push/PR 觸發 ESLint + cargo clippy + cargo test，避免 lint/test 倒退被 merge
+- LlmProviderId switch 加上 exhaustiveness assertion：未来新增 provider 时编译期会抓到漏处理的 case
+- 错误传递链保留 `cause`：debug 时能看到完整堆叠
+- CI 升级：push/PR 触发 ESLint + cargo clippy + cargo test，避免 lint/test 倒退被 merge
 
 ## [0.9.5] - 2026-05-01
 
 ### Fixed
 
-- 同時啟動多個 SayIt 實例造成熱鍵觸發後重複錄音、重複貼上的問題（Windows 受影響，macOS 因 Launch Services 預設單例較少觸發）：導入 `tauri-plugin-single-instance`，第二個實例啟動時立即退出，並把現有實例的 Dashboard 視窗叫到前景
+- 同时启动多个 SayIt 实例造成热键触发后重复录音、重复贴上的问题（Windows 受影响，macOS 因 Launch Services 预设单例较少触发）：导入 `tauri-plugin-single-instance`，第二个实例启动时立即退出，并把现有实例的 Dashboard 视窗叫到前景
 
 ## [0.9.4] - 2026-04-07
 
 ### Fixed
 
-- 自訂字典在某些 Windows 環境下新增詞彙時報「table vocabulary has no column named source」的問題（#27）：在 DB 初始化的關鍵表驗證階段新增冪等的 vocabulary column 自我修復邏輯，無論 schema_version 為何都會檢查並補上缺失的 weight/source 欄位
+- 自订字典在某些 Windows 环境下新增词汇时报「table vocabulary has no column named source」的问题（#27）：在 DB 初始化的关键表验证阶段新增幂等的 vocabulary column 自我修复逻辑，无论 schema_version 为何都会检查并补上缺失的 weight/source 栏位
 
 ## [0.9.3] - 2026-03-28
 
 ### Fixed
 
-- 簡易模式 Fn 快捷鍵在 Globe 鍵 MacBook 上一觸發就馬上送出的問題：FlagsChanged handler 從 toggle-based 改為 flag-based 偵測，只回應 keycode 63 事件
+- 简易模式 Fn 快捷键在 Globe 键 MacBook 上一触发就马上送出的问题：FlagsChanged handler 从 toggle-based 改为 flag-based 侦测，只回应 keycode 63 事件
 
 ## [0.9.2] - 2026-03-28
 
 ### Added
 
-- Google Gemini LLM Provider：支援 Gemini 2.5 Flash 和 Flash-Lite（有免費額度），新增 API Key 管理、request/response 格式轉換
-- Gemini SAFETY block 偵測：`finishReason` 非 STOP 時拋出有意義的錯誤，不再靜默 fallback
-- Gemini 單元測試：buildFetchParams + parseProviderResponse + helpers（6 個測試）
+- Google Gemini LLM Provider：支援 Gemini 2.5 Flash 和 Flash-Lite（有免费额度），新增 API Key 管理、request/response 格式转换
+- Gemini SAFETY block 侦测：`finishReason` 非 STOP 时抛出有意义的错误，不再静默 fallback
+- Gemini 单元测试：buildFetchParams + parseProviderResponse + helpers（6 个测试）
 - Tauri HTTP scope + CSP 加入 `generativelanguage.googleapis.com`
-- 升級通知合併 LLM provider 項目，新增 Gemini 說明
-- OpenAI 標示「推薦」（5 語系）
+- 升级通知合并 LLM provider 项目，新增 Gemini 说明
+- OpenAI 标示「推荐」（4 语系）
 
 ### Changed
 
-- Provider 排序：Groq → Gemini → OpenAI → Anthropic（免費的在前面）
-- Provider RadioGroup 從 3 欄改 2 欄（4 個 provider 排 2×2）
-- 5 語系 provider description 加入 Gemini 有免費額度
+- Provider 排序：Groq → Gemini → OpenAI → Anthropic（免费的在前面）
+- Provider RadioGroup 从 3 栏改 2 栏（4 个 provider 排 2×2）
+- 4 语系 provider description 加入 Gemini 有免费额度
 
 ## [0.9.1] - 2026-03-28
 
 ### Fixed
 
-- HUD notch 寬度加寬（350→420px），避免錄音中模式標籤被 MacBook camera 區域遮擋
-- mode-switch notch 寬度加寬（200→350px），確保切換模式標籤完整顯示
-- mode-switch 消失時新增 collapsing 縮小動畫（原為直接淡出）
-- Tauri HUD 視窗與 Rust 定位常數同步更新（400→470px）
+- HUD notch 宽度加宽（350→420px），避免录音中模式标签被 MacBook camera 区域遮挡
+- mode-switch notch 宽度加宽（200→350px），确保切换模式标签完整显示
+- mode-switch 消失时新增 collapsing 缩小动画（原为直接淡出）
+- Tauri HUD 视窗与 Rust 定位常数同步更新（400→470px）
 
 ## [0.9.0] - 2026-03-28
 
 ### Added
 
-- 編輯選取文字功能：選取文字後觸發 SayIt，語音變成 AI 指令（翻譯、改寫、摘要等），處理結果直接取代原文
-- Rust `read_selected_text` command：macOS AXSelectedText 讀取選取文字，共用 `FocusedElementContext` AX 走訪結構
-- 功能介紹頁面：側邊欄新增「功能介紹」（Lightbulb icon），展示 8 個操作功能卡片
-- Edit mode prompt 模板：五語系編輯模式專用 prompt（`EDIT_MODE_PROMPTS`）
-- `EnhanceOptions.maxTokens`：edit mode 使用 4096（既有增強為 2048）
-- DB migration v7→v8：`is_edit_mode`、`edit_source_text` 欄位
-- HUD 琥珀色「編輯」badge + `HudStatus: "editing"` 狀態
-- 升級通知新增 item9（編輯選取文字）並依亮點重新排序
+- 编辑选取文字功能：选取文字后触发 SayIt，语音变成 AI 指令（翻译、改写、摘要等），处理结果直接取代原文
+- Rust `read_selected_text` command：macOS AXSelectedText 读取选取文字，共用 `FocusedElementContext` AX 走访结构
+- 功能介绍页面：侧边栏新增「功能介绍」（Lightbulb icon），展示 8 个操作功能卡片
+- Edit mode prompt 模板：四语系编辑模式专用 prompt（`EDIT_MODE_PROMPTS`）
+- `EnhanceOptions.maxTokens`：edit mode 使用 4096（既有增强为 2048）
+- DB migration v7→v8：`is_edit_mode`、`edit_source_text` 栏位
+- HUD 琥珀色「编辑」badge + `HudStatus: "editing"` 状态
+- 升级通知新增 item9（编辑选取文字）并依亮点重新排序
 
 ### Improved
 
-- Rust `text_field_reader.rs` 重構：提取 `FocusedElementContext` struct 消除 ~50 行重複 AX 走訪邏輯
-- `isEditMode` 改為 computed（從 `editSourceText` 推導），消除冗餘 state
-- `read_selected_text` 非阻塞偵測（`.then()`），不延遲開始音效
+- Rust `text_field_reader.rs` 重构：提取 `FocusedElementContext` struct 消除 ~50 行重复 AX 走访逻辑
+- `isEditMode` 改为 computed（从 `editSourceText` 推导），消除冗余 state
+- `read_selected_text` 非阻塞侦测（`.then()`），不延迟开始音效
 - HUD badge CSS 提取 `.hud-badge` 共用 base class
-- `useHistoryStore` SQL SELECT 欄位提取 `TRANSCRIPTION_SELECT_COLUMNS` 常數
-- 功能介紹文案改為生活化口吻（五語系）
+- `useHistoryStore` SQL SELECT 栏位提取 `TRANSCRIPTION_SELECT_COLUMNS` 常数
+- 功能介绍文案改为生活化口吻（四语系）
 
 ## [0.8.9] - 2026-03-19
 
 ### Fixed
 
-- 修正 macOS 上選擇特定麥克風後停止錄音，麥克風指示燈（橘色圓點）不消失的安全問題：cpal 0.15.3 CoreAudio backend 對非預設裝置建立 disconnect listener 造成 Arc 循環引用，AudioUnit 永不釋放。修正方式為優先使用 default_input_device() 避免循環引用，並在停止時顯式呼叫 stream.pause() 作為兜底防禦
+- 修正 macOS 上选择特定麦克风后停止录音，麦克风指示灯（橘色圆点）不消失的安全问题：cpal 0.15.3 CoreAudio backend 对非预设装置建立 disconnect listener 造成 Arc 循环引用，AudioUnit 永不释放。修正方式为优先使用 default_input_device() 避免循环引用，并在停止时显式呼叫 stream.pause() 作为兜底防御
 
 ## [0.8.8] - 2026-03-18
 
 ### Added
 
-- 麥克風選擇功能：設定中可指定錄音使用的輸入裝置（Rust `list_audio_input_devices` + `start_recording` 接受 `device_name`）
-- Enhancement anomaly 偵測：LLM 輸出異常時自動重試（最多 3 次），仍異常則 fallback 到原始文字
+- 麦克风选择功能：设定中可指定录音使用的输入装置（Rust `list_audio_input_devices` + `start_recording` 接受 `device_name`）
+- Enhancement anomaly 侦测：LLM 输出异常时自动重试（最多 3 次），仍异常则 fallback 到原始文字
 
 ### Improved
 
-- Layer 2b peak energy escape hatch：peak >= 0.03 時跳過 RMS+NSP 檢查，減少小聲說話「未偵測到語音」誤報
-- Enhancer temperature 從 0.3 降至 0.1，輸出更穩定
-- Active prompt 規則：合併重複表達時保留語氣（問句仍是問句），新增禁止將問句改寫為肯定句
+- Layer 2b peak energy escape hatch：peak >= 0.03 时跳过 RMS+NSP 检查，减少小声说话「未侦测到语音」误报
+- Enhancer temperature 从 0.3 降至 0.1，输出更稳定
+- Active prompt 规则：合并重复表达时保留语气（问句仍是问句），新增禁止将问句改写为肯定句
 
 ### Fixed
 
@@ -138,237 +152,237 @@ SayIt 版本更新紀錄。
 
 ### Changed
 
-- AI 整理預設模型切換為 Kimi K2（既有使用者首次更新自動遷移，可在設定中改回）
-- 重寫積極模式 prompt（五語言）：修正 AI 整理會回答逐字稿中的問題而非整理文字
+- AI 整理预设模型切换为 Kimi K2（既有使用者首次更新自动迁移，可在设定中改回）
+- 重写积极模式 prompt（四语言）：修正 AI 整理会回答逐字稿中的问题而非整理文字
 
 ### Improved
 
-- 簡化幻覺偵測系統：移除幻覺字典和自動學習機制，改為純物理信號二層偵測（語速異常 + 無人聲），不再誤判正常語句
-- 移除 RMS 單獨判斷，所有 RMS 偵測需搭配 Whisper NSP 聯合確認，避免小聲說話被誤判
+- 简化幻觉侦测系统：移除幻觉字典和自动学习机制，改为纯物理信号二层侦测（语速异常 + 无人声），不再误判正常语句
+- 移除 RMS 单独判断，所有 RMS 侦测需搭配 Whisper NSP 联合确认，避免小声说话被误判
 
 ### Removed
 
-- 移除幻覺字典功能（DB table、Store、管理頁面、Sidebar 導航、自動學習、HUD 通知）
+- 移除幻觉字典功能（DB table、Store、管理页面、Sidebar 导航、自动学习、HUD 通知）
 
 ## [0.8.6](https://github.com/yee94/SayIt/releases/tag/v0.8.6) - 2026-03-16
 
 ### Fixed
 
-- 修正歷史紀錄播放錄音在正式版（production build）無聲的問題：macOS 上 convertFileSrc 產生的 asset:// URL 被 CSP 阻擋，改用 Rust IPC 讀取位元組 + Blob URL 播放，dev/production 行為一致
-- 修正快速連點不同紀錄時播放與 UI 狀態不同步的 race condition
-- 播放失敗時新增 Sentry 錯誤回報（原本靜默吞錯）
-- 修正 read_recording_file command 的安全性：改為接受 id 參數，Rust 端組合路徑，避免任意檔案讀取風險
+- 修正历史纪录播放录音在正式版（production build）无声的问题：macOS 上 convertFileSrc 产生的 asset:// URL 被 CSP 阻挡，改用 Rust IPC 读取位元组 + Blob URL 播放，dev/production 行为一致
+- 修正快速连点不同纪录时播放与 UI 状态不同步的 race condition
+- 播放失败时新增 Sentry 错误回报（原本静默吞错）
+- 修正 read_recording_file command 的安全性：改为接受 id 参数，Rust 端组合路径，避免任意档案读取风险
 
 ## [0.8.5](https://github.com/yee94/SayIt/releases/tag/v0.8.5) - 2026-03-16
 
 ### Fixed
 
-- 徹底修正版本升級後資料庫初始化失敗（database is locked / no such table）：HUD 視窗不再呼叫 Database.load()，改用 connectToDatabase() 等待 Dashboard 建好連線池後複用，從架構層面消除連線池覆蓋的競態條件
-- 自動恢復先前版本損壞導致遺失的 api_usage 表
-- 升級提示彈窗新增資料庫修復說明
+- 彻底修正版本升级后资料库初始化失败（database is locked / no such table）：HUD 视窗不再呼叫 Database.load()，改用 connectToDatabase() 等待 Dashboard 建好连线池后复用，从架构层面消除连线池覆盖的竞态条件
+- 自动恢复先前版本损坏导致遗失的 api_usage 表
+- 升级提示弹窗新增资料库修复说明
 
 ## [0.8.4](https://github.com/yee94/SayIt/releases/tag/v0.8.4) - 2026-03-16
 
 ### Fixed
 
-- 修正版本升級後「no such table: api_usage」錯誤：HUD 視窗的 Database.load() 覆蓋 Dashboard 的連線池，導致 migration 中的 DROP TABLE 失去 transaction 保護
-- 防止連線池覆蓋：第二個視窗改用 Database.get() 複用既有連線池
-- 自動恢復遺失的 api_usage 表：migration 結束後驗證關鍵表是否存在，不存在則重建
+- 修正版本升级后「no such table: api_usage」错误：HUD 视窗的 Database.load() 覆盖 Dashboard 的连线池，导致 migration 中的 DROP TABLE 失去 transaction 保护
+- 防止连线池覆盖：第二个视窗改用 Database.get() 复用既有连线池
+- 自动恢复遗失的 api_usage 表：migration 结束后验证关键表是否存在，不存在则重建
 
 ## [0.8.3](https://github.com/yee94/SayIt/releases/tag/v0.8.3) - 2026-03-16
 
 ### Fixed
 
-- 修正版本升級後首次啟動出現「database is locked (code: 5)」錯誤：HUD 與 Dashboard 雙視窗同時初始化資料庫導致競態條件，加入 Promise lock 序列化初始化 + PRAGMA busy_timeout 防護
+- 修正版本升级后首次启动出现「database is locked (code: 5)」错误：HUD 与 Dashboard 双视窗同时初始化资料库导致竞态条件，加入 Promise lock 序列化初始化 + PRAGMA busy_timeout 防护
 
 ## [0.8.2](https://github.com/yee94/SayIt/releases/tag/v0.8.2) - 2026-03-16
 
 ### Fixed
 
-- 修正舊版升級（v0.6.0 以前、v0.7.x）資料庫初始化失敗：ALTER TABLE ADD COLUMN 在 transaction 內對後續語句不可見，導致 "no such column: weight" 或 "no such column: status" 錯誤
-- 修正儀表板「平均每次字數」偏高：改用原始辨識字數計算，不再受 AI 整理後文字膨脹影響
-- 修正儀表板「節省時間」高估：公式改為（打字時間 − 口述時間），而非僅計算打字時間
+- 修正旧版升级（v0.6.0 以前、v0.7.x）资料库初始化失败：ALTER TABLE ADD COLUMN 在 transaction 内对后续语句不可见，导致 "no such column: weight" 或 "no such column: status" 错误
+- 修正仪表板「平均每次字数」偏高：改用原始辨识字数计算，不再受 AI 整理后文字膨胀影响
+- 修正仪表板「节省时间」高估：公式改为（打字时间 − 口述时间），而非仅计算打字时间
 
 ## [0.8.1](https://github.com/yee94/SayIt/releases/tag/v0.8.1) - 2026-03-16
 
 ### Fixed
 
-- 修正資料庫升級（v2→v3、v3→v4）可能因重複欄位名而失敗，導致歷史記錄無法顯示的問題
-- 修正語音辨識幻覺偵測誤判：Whisper noSpeechProbability 聚合策略從 MAX 改為 MIN，避免有說話卻被判定為「未偵測到語音」
-- 修正升級後更新摘要未顯示：改為版本號比對機制，所有升級的使用者都能看到更新內容
-- 修正自動更新通知彈在隱藏視窗：下載完成後自動顯示 Dashboard 視窗
-- 修正自動更新只在啟動時檢查一次：恢復定時檢查機制（每 15 分鐘）
+- 修正资料库升级（v2→v3、v3→v4）可能因重复栏位名而失败，导致历史记录无法显示的问题
+- 修正语音辨识幻觉侦测误判：Whisper noSpeechProbability 聚合策略从 MAX 改为 MIN，避免有说话却被判定为「未侦测到语音」
+- 修正升级后更新摘要未显示：改为版本号比对机制，所有升级的使用者都能看到更新内容
+- 修正自动更新通知弹在隐藏视窗：下载完成后自动显示 Dashboard 视窗
+- 修正自动更新只在启动时检查一次：恢复定时检查机制（每 15 分钟）
 
 ## [0.8.0](https://github.com/yee94/SayIt/releases/tag/v0.8.0) - 2026-03-16
 
-### AI 整理模式切換
+### AI 整理模式切换
 
-新增三種 AI 整理模式，可在設定頁快速切換：
+新增三种 AI 整理模式，可在设定页快速切换：
 
-- **精簡模式**：修錯字、去贅詞、補標點，保持原句結構
-- **積極模式**（類似 Typeless）：理解語意後重新排版，以段落和列點呈現
-- **自訂模式**：使用自訂 Prompt
+- **精简模式**：修错字、去赘词、补标点，保持原句结构
+- **积极模式**（类似 Typeless）：理解语意后重新排版，以段落和列点呈现
+- **自订模式**：使用自订 Prompt
 
-舊版使用者升級後，自訂 Prompt 會自動保留；使用預設值的使用者將自動遷移至精簡模式。
+旧版使用者升级后，自订 Prompt 会自动保留；使用预设值的使用者将自动迁移至精简模式。
 
 ### Added
 
-- 錄音檔自動儲存，歷史記錄可播放與重新轉錄
-- Whisper 幻覺偵測與自動學習，減少無聲時的錯誤文字
-- 按 ESC 可隨時取消錄音、轉錄或 AI 整理
-- 音效回饋：錄音開始、結束及錯誤時播放提示音（可在設定中開關）
-- 歷史記錄展開後原始文字旁新增複製按鈕
-- 升級提示 Dialog：舊版使用者首次開啟時顯示更新摘要
+- 录音档自动储存，历史记录可播放与重新转录
+- Whisper 幻觉侦测与自动学习，减少无声时的错误文字
+- 按 ESC 可随时取消录音、转录或 AI 整理
+- 音效回馈：录音开始、结束及错误时播放提示音（可在设定中开关）
+- 历史记录展开后原始文字旁新增复制按钮
+- 升级提示 Dialog：旧版使用者首次开启时显示更新摘要
 
 ### Changed
 
-- HUD 狀態顯示優化與輔助使用權限引導改善
-- 幻覺偵測升級為 RMS 能量 + 4 層偵測機制，移除內建詞庫
+- HUD 状态显示优化与辅助使用权限引导改善
+- 幻觉侦测升级为 RMS 能量 + 4 层侦测机制，移除内建词库
 
 ## [0.7.3](https://github.com/yee94/SayIt/releases/tag/v0.7.3) - 2026-03-13
 
 ### Fixed
 
-- 修復英文語句含重複冠詞（the、and 等）被誤判為「未偵測到語音」的問題
-- 移除 Whisper 幻聽攔截機制，非空轉錄結果一律貼上，讓使用者自行判斷模型輸出品質
+- 修复英文语句含重复冠词（the、and 等）被误判为「未侦测到语音」的问题
+- 移除 Whisper 幻听拦截机制，非空转录结果一律贴上，让使用者自行判断模型输出品质
 
 ## [0.7.2](https://github.com/yee94/SayIt/releases/tag/v0.7.2) - 2026-03-11
 
 ### Added
 
-- 字典分析模型獨立設定：文字整理與字典分析可分別選用最適合的 AI 模型
-- 新增 Kimi K2 Instruct 模型選項（文字整理 + 字典分析皆可選）
-- 模型下拉選單新增特色標籤（平衡 · 預設 / 穩定可靠 · 成本高 / 最快 · 最便宜 / 最聰明 · 較慢）
+- 字典分析模型独立设定：文字整理与字典分析可分别选用最适合的 AI 模型
+- 新增 Kimi K2 Instruct 模型选项（文字整理 + 字典分析皆可选）
+- 模型下拉选单新增特色标签（平衡 · 预设 / 稳定可靠 · 成本高 / 最快 · 最便宜 / 最聪明 · 较慢）
 
 ### Fixed
 
-- 修復模型下拉選單選中後 Badge 文字與模型名稱黏在一起的問題
+- 修复模型下拉选单选中后 Badge 文字与模型名称黏在一起的问题
 
 ## [0.7.1](https://github.com/yee94/SayIt/releases/tag/v0.7.1) - 2026-03-10
 
 ### Fixed
 
-- 移除已下架的 Llama 4 Maverick 17B 模型選項（Groq 已停用），已選用的使用者自動遷移至 Qwen3 32B
+- 移除已下架的 Llama 4 Maverick 17B 模型选项（Groq 已停用），已选用的使用者自动迁移至 Qwen3 32B
 
 ## [0.7.0](https://github.com/yee94/SayIt/releases/tag/v0.7.0) - 2026-03-10
 
-### 智慧字典學習
+### 智慧字典学习
 
-SayIt 現在會自動從你的修正中學習。每次語音輸入貼上後，如果你修改了文字，系統會偵測修正內容並透過 AI 分析，將專有名詞和術語自動加入字典。字典越豐富，語音辨識就越準確——你用得越多，它就越懂你。
+SayIt 现在会自动从你的修正中学习。每次语音输入贴上后，如果你修改了文字，系统会侦测修正内容并透过 AI 分析，将专有名词和术语自动加入字典。字典越丰富，语音辨识就越准确——你用得越多，它就越懂你。
 
-- 貼上後自動偵測修正，AI 篩選出值得學習的詞彙
-- 字典權重系統：常用詞優先送入辨識提示，越常被修正的詞權重越高
-- 字典頁面改版：AI 推薦與手動新增分區顯示，附權重標示
-- HUD 即時通知新學習的詞彙
-- 設定中可開關（macOS 預設開啟）
+- 贴上后自动侦测修正，AI 筛选出值得学习的词汇
+- 字典权重系统：常用词优先送入辨识提示，越常被修正的词权重越高
+- 字典页面改版：AI 推荐与手动新增分区显示，附权重标示
+- HUD 即时通知新学习的词汇
+- 设定中可开关（macOS 预设开启）
 
 ## [0.6.0](https://github.com/yee94/SayIt/releases/tag/v0.6.0) - 2026-03-09
 
 ### Added
 
-- 轉錄語言獨立設定：UI 語言與 Whisper 語言可分開選擇，支援「自動偵測」模式
-- Sentry 錯誤監控全覆蓋：29 個 captureError 呼叫點 + 全域錯誤處理器（雙視窗）
+- 转录语言独立设定：UI 语言与 Whisper 语言可分开选择，支援「自动侦测」模式
+- Sentry 错误监控全覆盖：29 个 captureError 呼叫点 + 全域错误处理器（双视窗）
 
 ### Changed
 
-- macOS 貼上機制改為 CGEvent Cmd+V 模擬，修復 LINE 等無標準 Edit 選單的 App 貼上失敗問題
+- macOS 贴上机制改为 CGEvent Cmd+V 模拟，修复 LINE 等无标准 Edit 选单的 App 贴上失败问题
 
 ### Fixed
 
-- 修復自動更新後 App 無法重新啟動的問題（_exit(0) 截殺 Tauri restart 邏輯）
+- 修复自动更新后 App 无法重新启动的问题（_exit(0) 截杀 Tauri restart 逻辑）
 
 ## [0.5.0](https://github.com/yee94/SayIt/releases/tag/v0.5.0) - 2026-03-08
 
 ### Added
 
-- 錄音開始／結束音效回饋，讓使用者明確感知錄音狀態
+- 录音开始／结束音效回馈，让使用者明确感知录音状态
 
 ## [0.4.0](https://github.com/yee94/SayIt/releases/tag/v0.4.0) - 2026-03-08
 
 ### Added
 
-- 多語言（i18n）支援：vue-i18n 基礎建設、所有 Vue 元件與 views 國際化、Stores/Lib/Rust 轉錄層整合
+- 多语言（i18n）支援：vue-i18n 基础建设、所有 Vue 元件与 views 国际化、Stores/Lib/Rust 转录层整合
 
 ### Fixed
 
-- 強化 Whisper 靜音幻覺偵測，減少無聲片段產生錯誤轉錄
+- 强化 Whisper 静音幻觉侦测，减少无声片段产生错误转录
 
 ## [0.3.0](https://github.com/yee94/SayIt/releases/tag/v0.3.0) - 2026-03-08
 
 ### Added
 
-- 跨平台自動貼上功能（macOS AX API + Windows SendInput）
-- 音訊錄製與轉錄遷移至 Rust 原生管線，提升效能與穩定性
-- 優雅關機與持久化鍵盤監控機制
+- 跨平台自动贴上功能（macOS AX API + Windows SendInput）
+- 音讯录制与转录迁移至 Rust 原生管线，提升效能与稳定性
+- 优雅关机与持久化键盘监控机制
 
 ### Fixed
 
-- 修正 Sentry sourcemap upload 指令與 release publish 設定
+- 修正 Sentry sourcemap upload 指令与 release publish 设定
 
 ## [0.2.5](https://github.com/yee94/SayIt/releases/tag/v0.2.5) - 2026-03-06
 
 ### Added
 
-- Sentry release 自動化整合
+- Sentry release 自动化整合
 
 ### Fixed
 
-- 修復語音 fallback 機制與設定同步更新問題
+- 修复语音 fallback 机制与设定同步更新问题
 
 ## [0.2.4](https://github.com/yee94/SayIt/releases/tag/v0.2.4) - 2026-03-06
 
 ### Changed
 
-- 優化預設 prompt 防護性，切換預設模型為 Qwen3 32B
+- 优化预设 prompt 防护性，切换预设模型为 Qwen3 32B
 
 ## [0.2.3](https://github.com/yee94/SayIt/releases/tag/v0.2.3) - 2026-03-06
 
 ### Fixed
 
-- Dashboard 額度文字修正與短文字門檻預設停用
-- 停用 Dashboard 右鍵選單並移除重複的更新檢查
+- Dashboard 额度文字修正与短文字门槛预设停用
+- 停用 Dashboard 右键选单并移除重复的更新检查
 
 ## [0.2.2](https://github.com/yee94/SayIt/releases/tag/v0.2.2) - 2026-03-06
 
 ### Fixed
 
-- 重構自動更新流程，修復檢查更新無回應問題
+- 重构自动更新流程，修复检查更新无回应问题
 
 ## [0.2.1](https://github.com/yee94/SayIt/releases/tag/v0.2.1) - 2026-03-06
 
 ### Added
 
-- 設定頁新增「關於 SayIt」區塊與社群連結
+- 设定页新增「关于 SayIt」区块与社群连结
 
 ### Fixed
 
-- 修正 stable-name asset 上傳路徑以支援 cross-compilation
-- 新增 workflow_dispatch 觸發器並分離 tag 推送
+- 修正 stable-name asset 上传路径以支援 cross-compilation
+- 新增 workflow_dispatch 触发器并分离 tag 推送
 
 ## [0.2.0](https://github.com/yee94/SayIt/releases/tag/v0.2.0) - 2026-03-06
 
 ### Added
 
-- 自動更新 UI 與定時檢查機制（啟動 5 秒後首次檢查，每 4 小時定期檢查）
-- CI/CD stable-name asset 上傳至 GitHub Release
+- 自动更新 UI 与定时检查机制（启动 5 秒后首次检查，每 4 小时定期检查）
+- CI/CD stable-name asset 上传至 GitHub Release
 
 ### Fixed
 
-- 授予輔助使用權限後自動偵測並啟用快捷鍵
+- 授予辅助使用权限后自动侦测并启用快捷键
 
 ## [0.1.0](https://github.com/yee94/SayIt/releases/tag/v0.1.0) - 2026-03-05
 
 ### Added
 
-- 語音轉文字核心功能（Groq Whisper API）
-- HUD + Dashboard 雙視窗架構
-- 全域快捷鍵系統（OS 原生 API，支援自訂錄製）
-- API Key 安全儲存（tauri-plugin-store）
-- 轉錄歷史記錄與搜尋（SQLite）
-- AI 文字強化（Groq LLM）
-- API 用量追蹤與每日免費額度
-- 多螢幕 HUD 追蹤定位
-- 可調整文字強化門檻
-- macOS Accessibility 權限導引
-- CI/CD pipeline 與 Apple Code Signing
-- 錄音自動靜音系統喇叭
+- 语音转文字核心功能（Groq Whisper API）
+- HUD + Dashboard 双视窗架构
+- 全域快捷键系统（OS 原生 API，支援自订录制）
+- API Key 安全储存（tauri-plugin-store）
+- 转录历史记录与搜寻（SQLite）
+- AI 文字强化（Groq LLM）
+- API 用量追踪与每日免费额度
+- 多萤幕 HUD 追踪定位
+- 可调整文字强化门槛
+- macOS Accessibility 权限导引
+- CI/CD pipeline 与 Apple Code Signing
+- 录音自动静音系统喇叭

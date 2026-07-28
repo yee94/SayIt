@@ -1,7 +1,7 @@
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, vi } from "vitest";
 import { createI18n } from "vue-i18n";
-import zhTW from "../../src/i18n/locales/zh-TW.json";
+import zhCN from "../../src/i18n/locales/zh-CN.json";
 
 const { mockInvoke } = vi.hoisted(() => ({
   mockInvoke: vi.fn().mockResolvedValue(undefined),
@@ -15,8 +15,8 @@ import AccessibilityGuide from "../../src/components/AccessibilityGuide.vue";
 
 const i18n = createI18n({
   legacy: false,
-  locale: "zh-TW",
-  messages: { "zh-TW": zhTW },
+  locale: "zh-CN",
+  messages: { "zh-CN": zhCN },
 });
 
 describe("AccessibilityGuide", () => {

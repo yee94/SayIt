@@ -1,6 +1,13 @@
-export type SupportedLocale = "zh-CN" | "en" | "ja" | "zh-TW" | "ko";
+export type SupportedLocale = "zh-CN" | "en" | "ja" | "ko";
 
 export const FALLBACK_LOCALE: SupportedLocale = "zh-CN";
+
+export const SUPPORTED_LOCALE_LIST: readonly SupportedLocale[] = [
+  "zh-CN",
+  "en",
+  "ja",
+  "ko",
+] as const;
 
 export interface LanguageOption {
   locale: SupportedLocale;
@@ -16,7 +23,14 @@ export const LANGUAGE_OPTIONS: LanguageOption[] = [
     displayName: "简体中文",
     whisperCode: "zh",
     htmlLang: "zh-Hans",
-    navigatorPatternList: ["zh-Hans", "zh-CN"],
+    // 系统繁体（zh-Hant / zh-TW）统一映射到简体中文
+    navigatorPatternList: [
+      "zh-Hans",
+      "zh-CN",
+      "zh-Hant-TW",
+      "zh-Hant",
+      "zh-TW",
+    ],
   },
   {
     locale: "en",
@@ -33,13 +47,6 @@ export const LANGUAGE_OPTIONS: LanguageOption[] = [
     navigatorPatternList: ["ja"],
   },
   {
-    locale: "zh-TW",
-    displayName: "繁体中文",
-    whisperCode: "zh",
-    htmlLang: "zh-Hant",
-    navigatorPatternList: ["zh-Hant-TW", "zh-Hant", "zh-TW"],
-  },
-  {
     locale: "ko",
     displayName: "한국어",
     whisperCode: "ko",
@@ -48,12 +55,43 @@ export const LANGUAGE_OPTIONS: LanguageOption[] = [
   },
 ];
 
+export function isSupportedLocale(value: unknown): value is SupportedLocale {
+  return (
+    typeof value === "string" &&
+    (SUPPORTED_LOCALE_LIST as readonly string[]).includes(value)
+  );
+}
+
+/**
+ * 规范化历史/外部 locale 字符串：
+ * - zh-TW → zh-CN
+ * - 合法 SupportedLocale 原样返回
+ * - 非法值返回 null
+ */
+export function normalizeSupportedLocale(
+  value: unknown,
+): SupportedLocale | null {
+  if (value === "zh-TW") return "zh-CN";
+  if (isSupportedLocale(value)) return value;
+  return null;
+}
+
+/**
+ * 规范化转录语言：auto 保留；其余走 normalizeSupportedLocale。
+ */
+export function normalizeTranscriptionLocale(
+  value: unknown,
+): TranscriptionLocale | null {
+  if (value === "auto") return "auto";
+  return normalizeSupportedLocale(value);
+}
+
 export function detectSystemLocale(): SupportedLocale {
   const browserLanguageList =
     typeof navigator !== "undefined" ? navigator.languages : [];
 
   for (const browserLang of browserLanguageList) {
-    // 1. Exact match (e.g. "zh-Hant-TW" -> zh-TW)
+    // 1. Exact match（含 zh-Hant / zh-TW → zh-CN）
     for (const option of LANGUAGE_OPTIONS) {
       if (
         option.navigatorPatternList.some(
@@ -64,7 +102,7 @@ export function detectSystemLocale(): SupportedLocale {
       }
     }
 
-    // 2. Script subtag match (e.g. "zh-Hant" -> zh-TW, "zh-Hans" -> zh-CN)
+    // 2. Script subtag match（如 zh-Hans-SG → zh-CN, zh-Hant-HK → zh-CN）
     for (const option of LANGUAGE_OPTIONS) {
       if (
         option.navigatorPatternList.some((pattern) =>
@@ -75,7 +113,7 @@ export function detectSystemLocale(): SupportedLocale {
       }
     }
 
-    // 3. Language prefix match (e.g. "ja-JP" -> ja, "ko-KR" -> ko, "en-US" -> en)
+    // 3. Language prefix match（如 ja-JP → ja, ko-KR → ko, en-US → en）
     const langPrefix = browserLang.split("-")[0].toLowerCase();
     for (const option of LANGUAGE_OPTIONS) {
       if (option.locale.toLowerCase() === langPrefix) {
@@ -83,7 +121,7 @@ export function detectSystemLocale(): SupportedLocale {
       }
     }
 
-    // 4. Bare "zh" -> zh-CN
+    // 4. Bare "zh" → zh-CN
     if (langPrefix === "zh") {
       return "zh-CN";
     }

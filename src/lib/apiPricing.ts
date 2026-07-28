@@ -1,6 +1,6 @@
 /**
- * 計算 ASR 費用上限。
- * Doubao 計費由火山控制台決定，本地無法準確估算，回傳 0。
+ * 计算 ASR 费用上限。
+ * Doubao 计费由火山控制台决定，本地无法准确估算，回传 0。
  */
 export function calculateWhisperCostCeiling(
   _audioDurationMs: number,
@@ -10,8 +10,8 @@ export function calculateWhisperCostCeiling(
 }
 
 /**
- * 計算 LLM chat 費用上限。
- * 自訂 endpoint 價格未知，回傳 0。
+ * 计算 LLM chat 费用上限。
+ * 自订 endpoint 价格未知，回传 0。
  */
 export function calculateChatCostCeiling(
   _promptTokens: number,

@@ -20,7 +20,7 @@ const BASE_REQUEST: LlmChatRequest = {
 
 describe("llmProvider.ts (OpenAI-compatible)", () => {
   describe("buildFetchParams", () => {
-    it("[P0] 預設 URL + Bearer auth + OpenAI body", () => {
+    it("[P0] 预设 URL + Bearer auth + OpenAI body", () => {
       const { url, init } = buildFetchParams(
         BASE_REQUEST,
         TEST_API_KEY,
@@ -41,7 +41,7 @@ describe("llmProvider.ts (OpenAI-compatible)", () => {
       expect(body.max_tokens).toBe(2048);
     });
 
-    it("[P0] Base URL 僅到 /v1 時自動補 chat/completions", () => {
+    it("[P0] Base URL 仅到 /v1 时自动补 chat/completions", () => {
       const { url } = buildFetchParams(
         BASE_REQUEST,
         TEST_API_KEY,
@@ -50,7 +50,7 @@ describe("llmProvider.ts (OpenAI-compatible)", () => {
       expect(url).toBe("https://example.com/v1/chat/completions");
     });
 
-    it("[P0] 已是 chat/completions 的 URL 不重複拼接", () => {
+    it("[P0] 已是 chat/completions 的 URL 不重复拼接", () => {
       const { url } = buildFetchParams(
         BASE_REQUEST,
         TEST_API_KEY,
@@ -78,7 +78,7 @@ describe("llmProvider.ts (OpenAI-compatible)", () => {
       });
     });
 
-    it("[P1] error body 應拋錯", () => {
+    it("[P1] error body 应抛错", () => {
       expect(() =>
         parseProviderResponse({ error: { message: "boom" } }),
       ).toThrow(/boom/);

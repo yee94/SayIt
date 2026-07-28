@@ -16,14 +16,14 @@ export default tseslint.config(
   },
   {
     rules: {
-      // shadcn-vue 元件為單字命名
+      // shadcn-vue 元件为单字命名
       'vue/multi-word-component-names': 'off',
-      // vue-tsc strict mode 已處理 unused vars 和 undef
+      // vue-tsc strict mode 已处理 unused vars 和 undef
       '@typescript-eslint/no-unused-vars': 'off',
       'no-undef': 'off',
-      // Tauri IPC 邊界有時需要 any
+      // Tauri IPC 边界有时需要 any
       '@typescript-eslint/no-explicit-any': 'warn',
-      // Vue template 格式化 — 專案不使用 Prettier，保留既有風格
+      // Vue template 格式化 — 专案不使用 Prettier，保留既有风格
       'vue/max-attributes-per-line': 'off',
       'vue/singleline-html-element-content-newline': 'off',
       'vue/html-self-closing': 'off',

@@ -24,7 +24,7 @@ vi.mock("@tauri-apps/api/event", () => ({
 vi.mock("../../src/i18n", () => ({
   default: {
     global: {
-      locale: { value: "zh-TW" },
+      locale: { value: "zh-CN" },
       t: (key: string) => key,
     },
   },
@@ -59,7 +59,7 @@ describe("useVocabularyStore", () => {
   // ==========================================================================
 
   describe("addAiSuggestedTerm", () => {
-    it("應以 source='ai' 插入詞彙", async () => {
+    it("应以 source='ai' 插入词汇", async () => {
       const { useVocabularyStore } = await import(
         "../../src/stores/useVocabularyStore"
       );
@@ -74,7 +74,7 @@ describe("useVocabularyStore", () => {
       expect(params[1]).toBe("Tauri");
     });
 
-    it("空字串不觸發 INSERT", async () => {
+    it("空字串不触发 INSERT", async () => {
       const { useVocabularyStore } = await import(
         "../../src/stores/useVocabularyStore"
       );
@@ -85,7 +85,7 @@ describe("useVocabularyStore", () => {
       expect(mockDbExecute).not.toHaveBeenCalled();
     });
 
-    it("UNIQUE 衝突時靜默處理不拋錯", async () => {
+    it("UNIQUE 冲突时静默处理不抛错", async () => {
       mockDbExecute.mockRejectedValueOnce(
         new Error("UNIQUE constraint failed"),
       );
@@ -104,7 +104,7 @@ describe("useVocabularyStore", () => {
   // ==========================================================================
 
   describe("batchIncrementWeights", () => {
-    it("應對每個 ID 執行 UPDATE weight + 1", async () => {
+    it("应对每个 ID 执行 UPDATE weight + 1", async () => {
       const { useVocabularyStore } = await import(
         "../../src/stores/useVocabularyStore"
       );
@@ -122,7 +122,7 @@ describe("useVocabularyStore", () => {
       expect(updateCalls[2][1]).toEqual(["id-3"]);
     });
 
-    it("空陣列不執行任何操作", async () => {
+    it("空阵列不执行任何操作", async () => {
       const { useVocabularyStore } = await import(
         "../../src/stores/useVocabularyStore"
       );
@@ -140,7 +140,7 @@ describe("useVocabularyStore", () => {
   // ==========================================================================
 
   describe("getTopTermListByWeight", () => {
-    it("應回傳按 weight DESC 排序的前 N 個詞", async () => {
+    it("应回传按 weight DESC 排序的前 N 个词", async () => {
       mockDbSelect.mockResolvedValueOnce([
         { term: "Tauri" },
         { term: "Vue.js" },
@@ -161,7 +161,7 @@ describe("useVocabularyStore", () => {
       expect(params).toEqual([3]);
     });
 
-    it("DB 失敗時回傳空陣列", async () => {
+    it("DB 失败时回传空阵列", async () => {
       mockDbSelect.mockRejectedValueOnce(new Error("DB error"));
 
       const { useVocabularyStore } = await import(
@@ -178,8 +178,8 @@ describe("useVocabularyStore", () => {
   // manualTermList / aiSuggestedTermList computed
   // ==========================================================================
 
-  describe("computed 過濾", () => {
-    it("manualTermList 只包含 source=manual 的項目", async () => {
+  describe("computed 过滤", () => {
+    it("manualTermList 只包含 source=manual 的项目", async () => {
       mockDbSelect.mockResolvedValueOnce([
         createRawVocabularyRow({ id: "1", term: "Vue.js", source: "manual" }),
         createRawVocabularyRow({ id: "2", term: "Tauri", source: "ai" }),
@@ -199,7 +199,7 @@ describe("useVocabularyStore", () => {
       ]);
     });
 
-    it("aiSuggestedTermList 只包含 source=ai 的項目", async () => {
+    it("aiSuggestedTermList 只包含 source=ai 的项目", async () => {
       mockDbSelect.mockResolvedValueOnce([
         createRawVocabularyRow({ id: "1", term: "Vue.js", source: "manual" }),
         createRawVocabularyRow({ id: "2", term: "Tauri", source: "ai" }),
@@ -221,11 +221,11 @@ describe("useVocabularyStore", () => {
   });
 
   // ==========================================================================
-  // addTerm (manual) — 驗證 source='manual'
+  // addTerm (manual) — 验证 source='manual'
   // ==========================================================================
 
   describe("addTerm", () => {
-    it("應以 source='manual' 插入", async () => {
+    it("应以 source='manual' 插入", async () => {
       const { useVocabularyStore } = await import(
         "../../src/stores/useVocabularyStore"
       );
@@ -244,7 +244,7 @@ describe("useVocabularyStore", () => {
   // ==========================================================================
 
   describe("importTerms", () => {
-    it("批量插入新詞並跳過已存在（大小寫不敏感）", async () => {
+    it("批量插入新词并跳过已存在（大小写不敏感）", async () => {
       mockDbSelect
         .mockResolvedValueOnce([
           createRawVocabularyRow({ id: "1", term: "Vue.js", source: "manual" }),
@@ -264,7 +264,7 @@ describe("useVocabularyStore", () => {
       const result = await store.importTerms(["vue.js", "Tauri", "Pinia", "  "]);
 
       expect(result).toEqual({ added: 2, skipped: 2 });
-      // 兩次 INSERT（Tauri、Pinia）
+      // 两次 INSERT（Tauri、Pinia）
       const insertCalls = mockDbExecute.mock.calls.filter(([sql]) =>
         String(sql).includes("INSERT INTO vocabulary"),
       );
@@ -274,7 +274,7 @@ describe("useVocabularyStore", () => {
       );
     });
 
-    it("全部已存在時不寫入 DB", async () => {
+    it("全部已存在时不写入 DB", async () => {
       mockDbSelect.mockResolvedValueOnce([
         createRawVocabularyRow({ id: "1", term: "Vue.js", source: "manual" }),
       ]);
@@ -293,7 +293,7 @@ describe("useVocabularyStore", () => {
   });
 
   describe("importFromTypeless", () => {
-    it("拉取 Typeless 詞典並匯入新詞", async () => {
+    it("拉取 Typeless 词典并汇入新词", async () => {
       mockInvoke.mockResolvedValueOnce(["Tauri", "Pinia"]);
       mockDbSelect.mockResolvedValueOnce([
         createRawVocabularyRow({ id: "1", term: "Tauri", source: "manual" }),

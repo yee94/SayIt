@@ -9,27 +9,27 @@ import {
   type LlmUsageData,
 } from "./llmProvider";
 
-const SYSTEM_PROMPT = `你是語音轉錄字典助手。
-比較 <original> 和 <corrected>，找出語音辨識寫錯、使用者改正的詞彙。
-注意：<corrected> 可能包含多餘文字（如重複行或額外內容），請只關注與 <original> 對應的部分。
+const SYSTEM_PROMPT = `你是语音转录字典助手。
+比较 <original> 和 <corrected>，找出语音辨识写错、使用者改正的词汇。
+注意：<corrected> 可能包含多余文字（如重复行或额外内容），请只关注与 <original> 对应的部分。
 
-【回傳條件 — 替換後的詞必須是】
-✅ 專有名詞（人名、地名、品牌、公司名、產品名）
-✅ 技術術語（框架、程式語言、工具、協定、API）
-✅ 特定領域用語（行業術語、學術用語）
+【回传条件 — 替换后的词必须是】
+✅ 专有名词（人名、地名、品牌、公司名、产品名）
+✅ 技术术语（框架、程式语言、工具、协定、API）
+✅ 特定领域用语（行业术语、学术用语）
 
 【排除】
-❌ 一般常用詞彙（今天、因為、the、good）
-❌ 標點、空格、語序、語氣詞的差異
-❌ 使用者新增的補充內容（原文沒有對應位置）
-❌ 單一中文字（至少 2 字）
+❌ 一般常用词汇（今天、因为、the、good）
+❌ 标点、空格、语序、语气词的差异
+❌ 使用者新增的补充内容（原文没有对应位置）
+❌ 单一中文字（至少 2 字）
 
-【範例】
-original: "我的名字是陳太誠" → corrected: "我的名字是陳泰呈" → ["陳泰呈"]
-original: "用view js寫的" → corrected: "用Vue.js寫的" → ["Vue.js"]
-original: "今天天氣很好" → corrected: "今天天氣不錯" → []
+【范例】
+original: "我的名字是陈太诚" → corrected: "我的名字是陈泰呈" → ["陈泰呈"]
+original: "用view js写的" → corrected: "用Vue.js写的" → ["Vue.js"]
+original: "今天天气很好" → corrected: "今天天气不错" → []
 
-回傳格式：JSON array，沒有符合的就回 []。只要 JSON，不要解釋。`;
+回传格式：JSON array，没有符合的就回 []。只要 JSON，不要解释。`;
 
 export interface ApiUsageInfo {
   promptTokens: number;
@@ -51,7 +51,7 @@ const MIN_ENGLISH_CHAR_COUNT = 2;
 
 function isTermTooShort(term: string): boolean {
   const trimmed = term.trim();
-  // 判斷是否為中文為主的詞
+  // 判断是否为中文为主的词
   const chineseCharCount = (trimmed.match(/[\u4e00-\u9fff]/g) ?? []).length;
   if (chineseCharCount > 0) {
     return chineseCharCount < MIN_CHINESE_CHAR_COUNT;
@@ -73,7 +73,7 @@ function parseSuggestedTermList(content: string): string[] {
       return parsed.filter(isValidSuggestedTerm);
     }
   } catch {
-    // AI 回傳非 JSON，嘗試從回傳中提取 JSON array
+    // AI 回传非 JSON，尝试从回传中提取 JSON array
     const match = content.match(/\[[\s\S]*?\]/);
     if (match) {
       try {
@@ -82,7 +82,7 @@ function parseSuggestedTermList(content: string): string[] {
           return parsed.filter(isValidSuggestedTerm);
         }
       } catch {
-        // 真的解析失敗，回傳空陣列
+        // 真的解析失败，回传空阵列
       }
     }
   }

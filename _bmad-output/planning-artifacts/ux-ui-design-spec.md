@@ -1,74 +1,74 @@
 ---
-title: SayIt UI 設計規範
-description: 給 AI Agent 的前端 UI/UX 設計規則集
+title: SayIt UI 设计规范
+description: 给 AI Agent 的前端 UI/UX 设计规则集
 author: Jackle
 date: 2026-03-02
 ---
 
-# SayIt UI 設計規範
+# SayIt UI 设计规范
 
-本文件定義 SayIt 桌面應用的 UI/UX 設計規則。所有 AI Agent 在生成或修改前端程式碼時**必須**遵守這些規則。
+本文件定义 SayIt 桌面应用的 UI/UX 设计规则。所有 AI Agent 在生成或修改前端程式码时**必须**遵守这些规则。
 
-## 遷移狀態
+## 迁移状态
 
-本規範描述的是**目標狀態**。以下列出當前與目標之間的差距：
+本规范描述的是**目标状态**。以下列出当前与目标之间的差距：
 
-**尚未完成的基礎設定：**
+**尚未完成的基础设定：**
 
-- Teal 品牌主題未套用 — 需執行 `pnpm dlx shadcn-vue@latest init --theme teal` 覆寫 CSS 變數
-- Dark mode 未啟用 — `main-window.html` 和 `index.html` 的 `<html>` 標籤需加上 `class="dark"`
-- `src/components/ui/` 目錄不存在 — 尚未安裝任何 shadcn-vue 元件
-- `--destructive-foreground` 和狀態色（success/warning/info）CSS 變數未定義
+- Teal 品牌主题未套用 — 需执行 `pnpm dlx shadcn-vue@latest init --theme teal` 覆写 CSS 变数
+- Dark mode 未启用 — `main-window.html` 和 `index.html` 的 `<html>` 标签需加上 `class="dark"`
+- `src/components/ui/` 目录不存在 — 尚未安装任何 shadcn-vue 元件
+- `--destructive-foreground` 和状态色（success/warning/info）CSS 变数未定义
 
-**現有程式碼的違規項目：**
+**现有程式码的违规项目：**
 
-- `MainApp.vue`：使用 Emoji 圖標、硬編碼 `bg-zinc-950`/`text-white`/`border-zinc-800`
-- `SettingsView.vue`：使用 `window.confirm()`、硬編碼色彩、`lg:` 響應式斷點、裸 HTML input/button
-- 其他 View 頁面：使用 `text-white`/`text-zinc-400` 等原生色彩
+- `MainApp.vue`：使用 Emoji 图标、硬编码 `bg-zinc-950`/`text-white`/`border-zinc-800`
+- `SettingsView.vue`：使用 `window.confirm()`、硬编码色彩、`lg:` 响应式断点、裸 HTML input/button
+- 其他 View 页面：使用 `text-white`/`text-zinc-400` 等原生色彩
 
-**規則適用範圍：**
+**规则适用范围：**
 
-- **所有新開發的元件和頁面**：必須完全遵守本規範
-- **修改現有元件時**：順手將接觸到的區域遷移至本規範
-- **不主動大規模重構**：除非 Story 明確要求
+- **所有新开发的元件和页面**：必须完全遵守本规范
+- **修改现有元件时**：顺手将接触到的区域迁移至本规范
+- **不主动大规模重构**：除非 Story 明确要求
 
-## 設計稿審核流程（強制）
+## 设计稿审核流程（强制）
 
-任何 UI 實作前，**必須**先在設計稿中完成視覺設計並取得使用者確認。
+任何 UI 实作前，**必须**先在设计稿中完成视觉设计并取得使用者确认。
 
-**設計稿檔案：** `/Users/jackle/workspace/say-it/design.pen`
+**设计稿档案：** `/Users/jackle/workspace/say-it/design.pen`
 
 **流程：**
 
-1. **設計先行**：收到 UI 相關 Story 或任務時，先在 `design.pen` 中建立對應頁面/元件的設計稿
-2. **遵循本規範**：設計稿必須使用本文件定義的色彩系統、元件、間距、排版規則
-3. **截圖呈現**：完成設計稿後，截取畫面呈現給使用者審查
-4. **等待確認**：使用者確認設計稿後，才可進入程式碼實作階段
-5. **設計變更同步**：若實作過程中需調整設計，先更新 `design.pen` 並再次確認
+1. **设计先行**：收到 UI 相关 Story 或任务时，先在 `design.pen` 中建立对应页面/元件的设计稿
+2. **遵循本规范**：设计稿必须使用本文件定义的色彩系统、元件、间距、排版规则
+3. **截图呈现**：完成设计稿后，截取画面呈现给使用者审查
+4. **等待确认**：使用者确认设计稿后，才可进入程式码实作阶段
+5. **设计变更同步**：若实作过程中需调整设计，先更新 `design.pen` 并再次确认
 
-**禁止行為：**
+**禁止行为：**
 
-- 未經設計稿確認就直接寫 UI 程式碼
-- 實作與已確認的設計稿不一致
-- 跳過設計稿流程（即使是「小調整」）
+- 未经设计稿确认就直接写 UI 程式码
+- 实作与已确认的设计稿不一致
+- 跳过设计稿流程（即使是「小调整」）
 
-## 設計系統基礎
+## 设计系统基础
 
-### 元件框架：shadcn-vue（強制）
+### 元件框架：shadcn-vue（强制）
 
-- **所有 UI 元件必須使用 shadcn-vue**，禁止手寫替代品
-- 安裝指令：`npx shadcn-vue@latest add <component>`
-- 元件使用前必須先用 CLI 安裝，安裝後才會出現在 `src/components/ui/`
-- 設定風格：`new-york`
+- **所有 UI 元件必须使用 shadcn-vue**，禁止手写替代品
+- 安装指令：`npx shadcn-vue@latest add <component>`
+- 元件使用前必须先用 CLI 安装，安装后才会出现在 `src/components/ui/`
+- 设定风格：`new-york`
 - 基底色：`neutral`
-- 圖標庫：`lucide`（`components.json` 中的值，實際 npm 套件為 `lucide-vue-next`）
-- 元件安裝目錄：`src/components/ui/`
-- 工具函式：`cn()` 來自 `@/lib/utils`（clsx + tailwind-merge）
-- 動畫庫：`tw-animate-css`（已安裝，shadcn-vue 元件的展開/收合動畫依賴此庫）
+- 图标库：`lucide`（`components.json` 中的值，实际 npm 套件为 `lucide-vue-next`）
+- 元件安装目录：`src/components/ui/`
+- 工具函式：`cn()` 来自 `@/lib/utils`（clsx + tailwind-merge）
+- 动画库：`tw-animate-css`（已安装，shadcn-vue 元件的展开/收合动画依赖此库）
 
 ### cn() 使用方式
 
-在使用端合併或覆蓋 shadcn-vue 元件的樣式：
+在使用端合并或覆盖 shadcn-vue 元件的样式：
 
 ```vue
 <script setup lang="ts">
@@ -85,22 +85,22 @@ const props = defineProps<{ fullWidth?: boolean }>()
 </template>
 ```
 
-### 例外區域（允許手寫 CSS）
+### 例外区域（允许手写 CSS）
 
-以下元件不適用 shadcn-vue 改造，允許保留手寫樣式：
+以下元件不适用 shadcn-vue 改造，允许保留手写样式：
 
-- `NotchHud.vue` — Notch clip-path 動畫引擎
-- `App.vue` — Notch 啟動序列動畫
+- `NotchHud.vue` — Notch clip-path 动画引擎
+- `App.vue` — Notch 启动序列动画
 
-## 色彩系統
+## 色彩系统
 
 ### 品牌色：Teal
 
-品牌主題透過 `pnpm dlx shadcn-vue@latest init --theme teal` 設定（**待執行**，當前 `style.css` 仍為 neutral 預設值）。執行後 Teal 主題會覆蓋 `--primary` 系列變數為以下值：
+品牌主题透过 `pnpm dlx shadcn-vue@latest init --theme teal` 设定（**待执行**，当前 `style.css` 仍为 neutral 预设值）。执行后 Teal 主题会覆盖 `--primary` 系列变数为以下值：
 
 **Light mode：**
 
-| 變數 | Tailwind 色階 | oklch 值 |
+| 变数 | Tailwind 色阶 | oklch 值 |
 |------|-------------|---------|
 | `--primary` | teal-600 | `oklch(0.6 0.118 184.704)` |
 | `--primary-foreground` | teal-50 | `oklch(0.984 0.014 180.72)` |
@@ -109,40 +109,40 @@ const props = defineProps<{ fullWidth?: boolean }>()
 
 **Dark mode：**
 
-| 變數 | Tailwind 色階 | oklch 值 |
+| 变数 | Tailwind 色阶 | oklch 值 |
 |------|-------------|---------|
 | `--primary` | teal-500 | `oklch(0.704 0.14 182.503)` |
 | `--primary-foreground` | teal-50 | `oklch(0.984 0.014 180.72)` |
 | `--sidebar-primary` | teal-500 | `oklch(0.704 0.14 182.503)` |
 | `--sidebar-ring` | teal-900 | `oklch(0.386 0.063 188.416)` |
 
-### 規則：只用語意色彩變數
+### 规则：只用语意色彩变数
 
 **禁止**直接使用 Tailwind 原生色彩（如 `zinc-800`、`teal-600`、`red-500`）。
-**必須**使用 shadcn-vue 定義的語意色彩變數。
+**必须**使用 shadcn-vue 定义的语意色彩变数。
 
-| 用途 | 正確 | 禁止 |
+| 用途 | 正确 | 禁止 |
 |------|------|------|
-| 頁面背景 | `bg-background` | `bg-zinc-950` |
+| 页面背景 | `bg-background` | `bg-zinc-950` |
 | 主要文字 | `text-foreground` | `text-white` |
 | 次要文字 | `text-muted-foreground` | `text-zinc-400` |
 | 卡片背景 | `bg-card` | `bg-zinc-900` |
 | 卡片文字 | `text-card-foreground` | `text-zinc-100` |
-| 邊框 | `border-border` | `border-zinc-700` |
+| 边框 | `border-border` | `border-zinc-700` |
 | 主要操作（teal） | `bg-primary` | `bg-teal-600` |
 | 主要操作文字 | `text-primary-foreground` | `text-white` |
 | 次要操作 | `bg-secondary` | `bg-zinc-700` |
 | 次要操作文字 | `text-secondary-foreground` | `text-zinc-200` |
-| 危險操作 | `bg-destructive` | `bg-red-500` |
-| 表單輸入邊框 | `border-input` | `border-zinc-600` |
-| 懸浮/選取 | `bg-accent` | `bg-zinc-800` |
+| 危险操作 | `bg-destructive` | `bg-red-500` |
+| 表单输入边框 | `border-input` | `border-zinc-600` |
+| 悬浮/选取 | `bg-accent` | `bg-zinc-800` |
 | 聚焦外框 | `ring-ring` | `ring-teal-500` |
-| 下拉選單背景 | `bg-popover` | `bg-zinc-900` |
-| 下拉選單文字 | `text-popover-foreground` | `text-white` |
+| 下拉选单背景 | `bg-popover` | `bg-zinc-900` |
+| 下拉选单文字 | `text-popover-foreground` | `text-white` |
 
-### 狀態色
+### 状态色
 
-在 `src/style.css` 中新增以下自訂語意色彩變數，用於業務狀態指示：
+在 `src/style.css` 中新增以下自订语意色彩变数，用于业务状态指示：
 
 ```css
 /* 在 :root 中加入 */
@@ -162,7 +162,7 @@ const props = defineProps<{ fullWidth?: boolean }>()
 --info-foreground: oklch(0.985 0 0);
 ```
 
-在 `@theme inline` 中加入對應映射：
+在 `@theme inline` 中加入对应映射：
 
 ```css
 --color-success: var(--success);
@@ -173,18 +173,18 @@ const props = defineProps<{ fullWidth?: boolean }>()
 --color-info-foreground: var(--info-foreground);
 ```
 
-**狀態色使用場景：**
+**状态色使用场景：**
 
-| 狀態 | class 範例 | 使用場景 |
+| 状态 | class 范例 | 使用场景 |
 |------|-----------|---------|
-| Success | `bg-success text-success-foreground` | API Key 驗證成功、轉錄完成 Badge |
-| Warning | `bg-warning text-warning-foreground` | API 逾時降級通知 |
-| Info | `bg-info text-info-foreground` | 提示訊息、使用指引 |
-| Destructive | `bg-destructive` | 刪除確認、錯誤狀態（已內建） |
+| Success | `bg-success text-success-foreground` | API Key 验证成功、转录完成 Badge |
+| Warning | `bg-warning text-warning-foreground` | API 逾时降级通知 |
+| Info | `bg-info text-info-foreground` | 提示讯息、使用指引 |
+| Destructive | `bg-destructive` | 删除确认、错误状态（已内建） |
 
-### 注意：缺失的 CSS 變數
+### 注意：缺失的 CSS 变数
 
-`src/style.css` 目前**未定義** `--destructive-foreground`。安裝 shadcn-vue 的 `button` 元件（destructive variant）前，先補上此變數：
+`src/style.css` 目前**未定义** `--destructive-foreground`。安装 shadcn-vue 的 `button` 元件（destructive variant）前，先补上此变数：
 
 ```css
 /* 在 :root 中加入 */
@@ -194,36 +194,36 @@ const props = defineProps<{ fullWidth?: boolean }>()
 --destructive-foreground: oklch(0.985 0 0);
 ```
 
-並在 `@theme inline` 中加入：
+并在 `@theme inline` 中加入：
 
 ```css
 --color-destructive-foreground: var(--destructive-foreground);
 ```
 
-### 主題模式
+### 主题模式
 
-- 本應用預設 **dark mode**（桌面常駐 App）
-- Dark mode 透過在根元素加上 `class="dark"` 啟用，目前在 `main-window.html` 和 `index.html` 的 `<html>` 標籤設定
-- 所有色彩變數在 `src/style.css` 的 `:root`（light）和 `.dark`（dark）中定義
-- 色彩空間：oklch（已設定，AI Agent 不變更此設定）
+- 本应用预设 **dark mode**（桌面常驻 App）
+- Dark mode 透过在根元素加上 `class="dark"` 启用，目前在 `main-window.html` 和 `index.html` 的 `<html>` 标签设定
+- 所有色彩变数在 `src/style.css` 的 `:root`（light）和 `.dark`（dark）中定义
+- 色彩空间：oklch（已设定，AI Agent 不变更此设定）
 
-### 圖表配色
+### 图表配色
 
-Dashboard 圖表使用 teal 品牌色階（由 `--theme teal` 自動設定，**待執行**後生效）：
+Dashboard 图表使用 teal 品牌色阶（由 `--theme teal` 自动设定，**待执行**后生效）：
 
-| 變數 | Tailwind 色階 | 用途 |
+| 变数 | Tailwind 色阶 | 用途 |
 |------|-------------|------|
-| `chart-1` | teal-300 | 主要資料線/面積 |
-| `chart-2` | teal-500 | 次要資料線 |
-| `chart-3` | teal-600 | 第三資料系列 |
-| `chart-4` | teal-700 | 第四資料系列 |
-| `chart-5` | teal-800 | 第五資料系列 |
+| `chart-1` | teal-300 | 主要资料线/面积 |
+| `chart-2` | teal-500 | 次要资料线 |
+| `chart-3` | teal-600 | 第三资料系列 |
+| `chart-4` | teal-700 | 第四资料系列 |
+| `chart-5` | teal-800 | 第五资料系列 |
 
-## 元件使用規則
+## 元件使用规则
 
-### 安裝即用原則
+### 安装即用原则
 
-需要新元件時，先用 CLI 安裝。常用元件參考清單：
+需要新元件时，先用 CLI 安装。常用元件参考清单：
 
 ```bash
 npx shadcn-vue@latest add button
@@ -240,7 +240,7 @@ npx shadcn-vue@latest add scroll-area
 npx shadcn-vue@latest add dropdown-menu
 ```
 
-### 元件導入格式
+### 元件导入格式
 
 ```vue
 <script setup lang="ts">
@@ -250,20 +250,20 @@ import { Input } from '@/components/ui/input'
 </script>
 ```
 
-### Button 變體使用場景
+### Button 变体使用场景
 
-| 場景 | variant | 範例 |
+| 场景 | variant | 范例 |
 |------|---------|------|
-| 主要操作 | `default` | 儲存設定、確認 |
-| 危險操作 | `destructive` | 刪除詞彙、清除歷史 |
+| 主要操作 | `default` | 储存设定、确认 |
+| 危险操作 | `destructive` | 删除词汇、清除历史 |
 | 次要操作 | `outline` | 取消、返回 |
-| 不顯眼操作 | `ghost` | 工具列按鈕、導航項 |
-| 連結式 | `link` | 外部連結 |
-| 純圖標 | size `icon` | Sidebar 收合、複製 |
+| 不显眼操作 | `ghost` | 工具列按钮、导航项 |
+| 连结式 | `link` | 外部连结 |
+| 纯图标 | size `icon` | Sidebar 收合、复制 |
 
-### 表單模式
+### 表单模式
 
-使用 shadcn-vue 的 label + input 組合搭配手動結構化佈局：
+使用 shadcn-vue 的 label + input 组合搭配手动结构化布局：
 
 ```vue
 <script setup lang="ts">
@@ -275,36 +275,36 @@ import { Input } from '@/components/ui/input'
   <div class="space-y-2">
     <Label for="api-key">Groq API Key</Label>
     <Input id="api-key" type="password" placeholder="gsk_..." />
-    <p class="text-xs text-muted-foreground">從 Groq Console 取得你的 API Key</p>
+    <p class="text-xs text-muted-foreground">从 Groq Console 取得你的 API Key</p>
   </div>
 </template>
 ```
 
-安裝所需元件：
+安装所需元件：
 
 ```bash
 npx shadcn-vue@latest add label
 npx shadcn-vue@latest add input
 ```
 
-### 卡片模式（Dashboard 統計卡片）
+### 卡片模式（Dashboard 统计卡片）
 
 ```vue
 <Card>
   <CardHeader class="pb-2">
     <CardTitle class="text-sm font-medium text-muted-foreground">
-      總口述時間
+      总口述时间
     </CardTitle>
   </CardHeader>
   <CardContent>
-    <div class="text-2xl font-bold">42 分鐘</div>
+    <div class="text-2xl font-bold">42 分钟</div>
   </CardContent>
 </Card>
 ```
 
-### 操作回饋：Toast
+### 操作回馈：Toast
 
-所有使用者操作的成功/失敗回饋統一使用 `Sonner`（shadcn-vue 推薦的 Toast 方案）：
+所有使用者操作的成功/失败回馈统一使用 `Sonner`（shadcn-vue 推荐的 Toast 方案）：
 
 ```bash
 npx shadcn-vue@latest add sonner
@@ -316,26 +316,26 @@ import { toast } from 'vue-sonner'
 
 function handleSave() {
   // ...
-  toast.success('API Key 已儲存')
+  toast.success('API Key 已储存')
 }
 </script>
 ```
 
-使用場景：儲存設定、複製文字、刪除詞彙、API Key 操作。不再使用內嵌 `feedbackMessage` 模式。
+使用场景：储存设定、复制文字、删除词汇、API Key 操作。不再使用内嵌 `feedbackMessage` 模式。
 
-### 載入狀態：Skeleton
+### 载入状态：Skeleton
 
-資料載入中使用 `Skeleton` 元件佔位：
+资料载入中使用 `Skeleton` 元件占位：
 
 ```bash
 npx shadcn-vue@latest add skeleton
 ```
 
-適用位置：Dashboard 統計卡片、History 記錄列表、Dictionary 詞彙表格。
+适用位置：Dashboard 统计卡片、History 记录列表、Dictionary 词汇表格。
 
-## 圖標系統
+## 图标系统
 
-### 規則：只用 lucide-vue-next
+### 规则：只用 lucide-vue-next
 
 ```vue
 <script setup lang="ts">
@@ -343,25 +343,25 @@ import { Mic, Settings, History, BookOpen, LayoutDashboard } from 'lucide-vue-ne
 </script>
 
 <template>
-  <Mic class="size-4" />           <!-- 標準大小 -->
+  <Mic class="size-4" />           <!-- 标准大小 -->
   <Settings class="size-5" />      <!-- Sidebar 大小 -->
 </template>
 ```
 
-**圖標大小標準：**
+**图标大小标准：**
 
 | 位置 | class | 像素 |
 |------|-------|------|
-| 內文/按鈕 | `size-4` | 16px |
-| Sidebar 導航 | `size-5` | 20px |
-| 空狀態插圖 | `size-12` | 48px |
-| 頁面標題 | `size-6` | 24px |
+| 内文/按钮 | `size-4` | 16px |
+| Sidebar 导航 | `size-5` | 20px |
+| 空状态插图 | `size-12` | 48px |
+| 页面标题 | `size-6` | 24px |
 
-**禁止**使用 Emoji 作為 UI 圖標（Notch HUD 啟動動畫中的 `🎙` 是唯一例外）。
+**禁止**使用 Emoji 作为 UI 图标（Notch HUD 启动动画中的 `🎙` 是唯一例外）。
 
-**Sidebar 導航圖標對應：**
+**Sidebar 导航图标对应：**
 
-| 路由 | 圖標元件 |
+| 路由 | 图标元件 |
 |------|---------|
 | `/dashboard` | `LayoutDashboard` |
 | `/history` | `History` |
@@ -372,47 +372,47 @@ import { Mic, Settings, History, BookOpen, LayoutDashboard } from 'lucide-vue-ne
 
 ### 字型
 
-系統預設字型堆疊，不自訂 font-family（Tauri WebView 跟隨 OS）。
+系统预设字型堆叠，不自订 font-family（Tauri WebView 跟随 OS）。
 
-### 字級標準
+### 字级标准
 
 | 用途 | class |
 |------|-------|
-| 頁面標題 | `text-2xl font-bold` |
-| 區塊標題 | `text-lg font-semibold` |
-| 卡片標題 | `text-sm font-medium text-muted-foreground` |
-| 卡片數值 | `text-2xl font-bold` |
+| 页面标题 | `text-2xl font-bold` |
+| 区块标题 | `text-lg font-semibold` |
+| 卡片标题 | `text-sm font-medium text-muted-foreground` |
+| 卡片数值 | `text-2xl font-bold` |
 | 正文 | `text-sm` |
-| 輔助說明 | `text-xs text-muted-foreground` |
-| 標籤 | `text-sm font-medium` |
+| 辅助说明 | `text-xs text-muted-foreground` |
+| 标签 | `text-sm font-medium` |
 
-## 間距與佈局
+## 间距与布局
 
-### 間距標準
+### 间距标准
 
-| 場景 | class |
+| 场景 | class |
 |------|-------|
-| 頁面內距 | `p-6` |
-| 區塊間距 | `space-y-6` |
-| 卡片內距 | 由 shadcn Card 預設處理 |
-| 表單欄位間距 | `space-y-4` |
-| 按鈕組間距 | `gap-2` |
-| Sidebar 項目間距 | `gap-1` |
+| 页面内距 | `p-6` |
+| 区块间距 | `space-y-6` |
+| 卡片内距 | 由 shadcn Card 预设处理 |
+| 表单栏位间距 | `space-y-4` |
+| 按钮组间距 | `gap-2` |
+| Sidebar 项目间距 | `gap-1` |
 
-### 頁面佈局結構
+### 页面布局结构
 
-所有 View 頁面遵循統一結構：
+所有 View 页面遵循统一结构：
 
 ```vue
 <template>
   <div class="flex-1 space-y-6 p-6">
-    <!-- 頁面標題 -->
+    <!-- 页面标题 -->
     <div>
-      <h1 class="text-2xl font-bold">頁面標題</h1>
-      <p class="text-sm text-muted-foreground">頁面描述</p>
+      <h1 class="text-2xl font-bold">页面标题</h1>
+      <p class="text-sm text-muted-foreground">页面描述</p>
     </div>
 
-    <!-- 內容區塊 -->
+    <!-- 内容区块 -->
     <section class="space-y-4">
       ...
     </section>
@@ -420,9 +420,9 @@ import { Mic, Settings, History, BookOpen, LayoutDashboard } from 'lucide-vue-ne
 </template>
 ```
 
-### Sidebar 佈局
+### Sidebar 布局
 
-MainApp.vue 使用固定 Sidebar + 動態內容區：
+MainApp.vue 使用固定 Sidebar + 动态内容区：
 
 ```
 +----------+---------------------------+
@@ -433,47 +433,47 @@ MainApp.vue 使用固定 Sidebar + 動態內容區：
 +----------+---------------------------+
 ```
 
-- Sidebar 寬度：`w-56`（224px）
+- Sidebar 宽度：`w-56`（224px）
 - 背景：`bg-sidebar`
-- 邊框：`border-r border-sidebar-border`
-- 導航項文字：`text-sidebar-foreground`
-- 活動項：`bg-sidebar-accent text-sidebar-accent-foreground`
+- 边框：`border-r border-sidebar-border`
+- 导航项文字：`text-sidebar-foreground`
+- 活动项：`bg-sidebar-accent text-sidebar-accent-foreground`
 
-## 動畫與過渡
+## 动画与过渡
 
-### 標準過渡
+### 标准过渡
 
 ```css
-/* 互動元素（按鈕、連結、輸入框） */
-transition-colors          /* 色彩變化 */
+/* 互动元素（按钮、连结、输入框） */
+transition-colors          /* 色彩变化 */
 
-/* 內容出現/消失 */
+/* 内容出现/消失 */
 transition: opacity 180ms ease;
 
-/* 佈局變化 */
+/* 布局变化 */
 transition: all 200ms ease-out;
 ```
 
-shadcn-vue 元件（Accordion、Collapsible 等）的展開/收合動畫由 `tw-animate-css` 庫提供，已在 `src/style.css` 中引入，不需額外設定。
+shadcn-vue 元件（Accordion、Collapsible 等）的展开/收合动画由 `tw-animate-css` 库提供，已在 `src/style.css` 中引入，不需额外设定。
 
-### Notch 動畫（僅限 HUD）
+### Notch 动画（仅限 HUD）
 
-Notch 系統使用自訂 cubic-bezier 曲線，這些數值已調校完成，AI Agent 不修改：
+Notch 系统使用自订 cubic-bezier 曲线，这些数值已调校完成，AI Agent 不修改：
 
 ```
-cubic-bezier(0.32, 0.72, 0, 1)     /* Notch 形狀過渡 */
-cubic-bezier(0.34, 1.56, 0.64, 1)  /* Notch 進入彈跳 */
+cubic-bezier(0.32, 0.72, 0, 1)     /* Notch 形状过渡 */
+cubic-bezier(0.34, 1.56, 0.64, 1)  /* Notch 进入弹跳 */
 ```
 
-**HUD 視覺狀態摘要（Visual Redesign 後）：**
+**HUD 视觉状态摘要（Visual Redesign 后）：**
 
-| 狀態 | 視覺 | 說明 |
+| 状态 | 视觉 | 说明 |
 |------|------|------|
-| recording | 6 根 bar 山丘形排列 + 計時器 | bin `[9,4,1,2,6,12]`，中間高兩側低 |
-| transcribing | 5 個空心圓點依序亮起變實心 | dotSlide 週期 1.5s，掃描波浪效果 |
-| success | 圓點匯聚 + SVG ✓ + 邊緣綠光 | 無底色 flash，背景保持純黑 |
-| error | 圓點散開 + 抖動 + ↻ retry | 無底色 flash，背景保持純黑 |
-| collapsing | 尺寸縮小 200×32 + 內容淡出 | 過渡回 hidden |
+| recording | 6 根 bar 山丘形排列 + 计时器 | bin `[9,4,1,2,6,12]`，中间高两侧低 |
+| transcribing | 5 个空心圆点依序亮起变实心 | dotSlide 周期 1.5s，扫描波浪效果 |
+| success | 圆点汇聚 + SVG ✓ + 边缘绿光 | 无底色 flash，背景保持纯黑 |
+| error | 圆点散开 + 抖动 + ↻ retry | 无底色 flash，背景保持纯黑 |
+| collapsing | 尺寸缩小 200×32 + 内容淡出 | 过渡回 hidden |
 
 ### Vue Transition 命名
 
@@ -489,74 +489,74 @@ cubic-bezier(0.34, 1.56, 0.64, 1)  /* Notch 進入彈跳 */
 .fade-leave-to { opacity: 0; }
 ```
 
-## 無障礙（Accessibility）
+## 无障碍（Accessibility）
 
-### 強制規則
+### 强制规则
 
-- shadcn-vue 元件已內建 ARIA 屬性，不要移除或覆蓋
-- 所有互動元素必須可用鍵盤操作
-- Dialog 必須有焦點陷阱（shadcn Dialog 已內建）
-- 表單欄位必須關聯 `<label>`（使用 shadcn Label 元件）
-- 圖標按鈕必須加 `aria-label` 或搭配 `sr-only` 文字
+- shadcn-vue 元件已内建 ARIA 属性，不要移除或覆盖
+- 所有互动元素必须可用键盘操作
+- Dialog 必须有焦点陷阱（shadcn Dialog 已内建）
+- 表单栏位必须关联 `<label>`（使用 shadcn Label 元件）
+- 图标按钮必须加 `aria-label` 或搭配 `sr-only` 文字
 
 ```vue
-<!-- 正確：圖標按鈕帶無障礙標籤 -->
-<Button variant="ghost" size="icon" aria-label="複製文字">
+<!-- 正确：图标按钮带无障碍标签 -->
+<Button variant="ghost" size="icon" aria-label="复制文字">
   <Copy class="size-4" />
 </Button>
 ```
 
-## 響應式設計
+## 响应式设计
 
-本應用為**固定尺寸桌面視窗**，不需要行動端響應式設計。
+本应用为**固定尺寸桌面视窗**，不需要行动端响应式设计。
 
-- Main Window：最小寬度 `800px`、最小高度 `600px`
+- Main Window：最小宽度 `800px`、最小高度 `600px`
 - HUD Window：固定尺寸，由 Notch 引擎控制
-- 不使用 `sm:`、`md:`、`lg:` 等響應式斷點
+- 不使用 `sm:`、`md:`、`lg:` 等响应式断点
 
-## 元件檔案組織
+## 元件档案组织
 
 ```
 src/components/
-├── ui/                     # shadcn-vue 元件（CLI 安裝生成，不手動修改）
+├── ui/                     # shadcn-vue 元件（CLI 安装生成，不手动修改）
 │   ├── button/
 │   ├── card/
 │   ├── input/
 │   └── ...
-├── NotchHud.vue            # Notch HUD 狀態顯示（手寫例外）
-├── AccessibilityGuide.vue  # macOS 權限引導（遷移時改用 shadcn Dialog）
-└── [功能元件].vue           # 業務元件，使用 shadcn-vue 原子元件組合
+├── NotchHud.vue            # Notch HUD 状态显示（手写例外）
+├── AccessibilityGuide.vue  # macOS 权限引导（迁移时改用 shadcn Dialog）
+└── [功能元件].vue           # 业务元件，使用 shadcn-vue 原子元件组合
 ```
 
-### 規則
+### 规则
 
-- `src/components/ui/` 內的檔案由 shadcn CLI 生成，**不手動修改**
-- 業務元件放在 `src/components/` 根目錄或按功能建子目錄
-- 每個 `.vue` 檔案使用 `<script setup lang="ts">` + Composition API
-- Props 使用 TypeScript interface 定義
+- `src/components/ui/` 内的档案由 shadcn CLI 生成，**不手动修改**
+- 业务元件放在 `src/components/` 根目录或按功能建子目录
+- 每个 `.vue` 档案使用 `<script setup lang="ts">` + Composition API
+- Props 使用 TypeScript interface 定义
 
-## 禁止事項清單
+## 禁止事项清单
 
 | 禁止 | 替代方案 |
 |------|---------|
-| 直接用 `zinc-*`、`blue-*` 等原生色彩 | 使用語意變數 `bg-primary`、`text-foreground` |
-| 手寫 Button/Input/Card/Dialog | 安裝 shadcn-vue 元件 |
-| 使用 Emoji 作為 UI 圖標 | 使用 lucide-vue-next |
-| 在 `ui/` 目錄手動修改元件 | 透過 `cn()` 在使用端覆蓋樣式 |
-| 使用 `px` 硬編碼尺寸 | 使用 Tailwind spacing（`p-4`、`gap-2`） |
-| 使用響應式斷點 `sm:`/`md:`/`lg:` | 固定桌面佈局 |
+| 直接用 `zinc-*`、`blue-*` 等原生色彩 | 使用语意变数 `bg-primary`、`text-foreground` |
+| 手写 Button/Input/Card/Dialog | 安装 shadcn-vue 元件 |
+| 使用 Emoji 作为 UI 图标 | 使用 lucide-vue-next |
+| 在 `ui/` 目录手动修改元件 | 透过 `cn()` 在使用端覆盖样式 |
+| 使用 `px` 硬编码尺寸 | 使用 Tailwind spacing（`p-4`、`gap-2`） |
+| 使用响应式断点 `sm:`/`md:`/`lg:` | 固定桌面布局 |
 | Options API | Composition API + `<script setup>` |
 | 裸 `<input>`/`<button>` HTML 元素 | shadcn `<Input />`、`<Button />` |
-| `<style scoped>` 定義色彩或背景 | Tailwind utility class + 語意變數 |
-| 直接在元件中 hardcode Tailwind 色彩變數值 | 引用 CSS 變數名稱 |
+| `<style scoped>` 定义色彩或背景 | Tailwind utility class + 语意变数 |
+| 直接在元件中 hardcode Tailwind 色彩变数值 | 引用 CSS 变数名称 |
 
-## 頁面佈局規範
+## 页面布局规范
 
-本節定義各頁面的具體佈局結構。所有頁面共用 `MainApp.vue` 的 Sidebar + 內容區框架。
+本节定义各页面的具体布局结构。所有页面共用 `MainApp.vue` 的 Sidebar + 内容区框架。
 
 ### 全域框架：MainApp.vue
 
-使用 shadcn-vue 的 `SidebarProvider` + `SidebarInset` 模式取代目前的手寫 Sidebar：
+使用 shadcn-vue 的 `SidebarProvider` + `SidebarInset` 模式取代目前的手写 Sidebar：
 
 ```
 +--[SidebarProvider]-----------------------------------+
@@ -566,109 +566,109 @@ src/components/
 | |  "SayIt"    | | | SidebarTrigger  Breadcrumb    | | |
 | |             | | +-------------------------------+ | |
 | |  Dashboard  | | |                               | | |
-| |  歷史記錄   | | |    <RouterView />             | | |
-| |  自訂字典   | | |    (flex-1 space-y-6 p-6)     | | |
-| |  設定       | | |                               | | |
+| |  历史记录   | | |    <RouterView />             | | |
+| |  自订字典   | | |    (flex-1 space-y-6 p-6)     | | |
+| |  设定       | | |                               | | |
 | |             | | |                               | | |
 | |  v0.1.0    | | |                               | | |
 | +-------------+ +----------------------------------+ |
 +-------------------------------------------------------+
 ```
 
-**安裝指令：**
+**安装指令：**
 
 ```bash
 npx shadcn-vue@latest add sidebar
 ```
 
-**關鍵元件：**
+**关键元件：**
 
 | 元件 | 用途 |
 |------|------|
-| `SidebarProvider` | 包裹整個應用，管理收合狀態 |
-| `Sidebar` | 側邊欄容器，含 `SidebarHeader` / `SidebarContent` / `SidebarFooter` |
-| `SidebarFooter` | 側邊欄底部，顯示版本號（透過 Vite `__APP_VERSION__` 從 `package.json` 動態注入） |
-| `SidebarMenu` + `SidebarMenuItem` + `SidebarMenuButton` | 導航項目 |
-| `SidebarInset` | 主要內容區域 |
-| `SidebarTrigger` | 收合/展開按鈕 |
+| `SidebarProvider` | 包裹整个应用，管理收合状态 |
+| `Sidebar` | 侧边栏容器，含 `SidebarHeader` / `SidebarContent` / `SidebarFooter` |
+| `SidebarFooter` | 侧边栏底部，显示版本号（透过 Vite `__APP_VERSION__` 从 `package.json` 动态注入） |
+| `SidebarMenu` + `SidebarMenuItem` + `SidebarMenuButton` | 导航项目 |
+| `SidebarInset` | 主要内容区域 |
+| `SidebarTrigger` | 收合/展开按钮 |
 
-**收合狀態：** Sidebar 收合後顯示 icon-only 模式（寬度約 48px），僅顯示導航圖標。SidebarProvider 的 `collapsible="icon"` 屬性控制。
+**收合状态：** Sidebar 收合后显示 icon-only 模式（宽度约 48px），仅显示导航图标。SidebarProvider 的 `collapsible="icon"` 属性控制。
 
-**Sidebar 導航項定義：**
+**Sidebar 导航项定义：**
 
 ```ts
 const navItems = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/history', label: '歷史記錄', icon: History },
-  { path: '/dictionary', label: '自訂字典', icon: BookOpen },
-  { path: '/settings', label: '設定', icon: Settings },
+  { path: '/history', label: '历史记录', icon: History },
+  { path: '/dictionary', label: '自订字典', icon: BookOpen },
+  { path: '/settings', label: '设定', icon: Settings },
 ]
 ```
 
-### Dashboard 頁面（`/dashboard`）
+### Dashboard 页面（`/dashboard`）
 
-參考 shadcn-vue `dashboard-01` block 佈局。
+参考 shadcn-vue `dashboard-01` block 布局。
 
-**安裝 block（可取得完整範例程式碼）：**
+**安装 block（可取得完整范例程式码）：**
 
 ```bash
 npx shadcn-vue@latest add dashboard-01
 ```
 
-**佈局結構：**
+**布局结构：**
 
 ```
-+--[頁面容器 flex-1 space-y-6 p-6]---------------------+
++--[页面容器 flex-1 space-y-6 p-6]---------------------+
 |                                                        |
-| +--[標題區]----------------------------------------+  |
+| +--[标题区]----------------------------------------+  |
 | | "Dashboard"                text-2xl font-bold     |  |
-| | "語音轉文字統計總覽"       text-muted-foreground  |  |
+| | "语音转文字统计总览"       text-muted-foreground  |  |
 | +---------------------------------------------------+  |
 |                                                        |
-| +--[統計卡片 grid grid-cols-2 gap-4]-----------------+  |
+| +--[统计卡片 grid grid-cols-2 gap-4]-----------------+  |
 | | +--Card------+ +--Card------+                      |  |
-| | |總口述時間  | |口述字數    |                      |  |
-| | |42 分鐘     | |12,350字    |                      |  |
+| | |总口述时间  | |口述字数    |                      |  |
+| | |42 分钟     | |12,350字    |                      |  |
 | | +------------+ +------------+                      |  |
 | | +--Card------+ +--Card------+                      |  |
-| | |平均口述速度| |節省時間    |                      |  |
-| | |185字/分    | |28 分鐘     |                      |  |
+| | |平均口述速度| |节省时间    |                      |  |
+| | |185字/分    | |28 分钟     |                      |  |
 | | +------------+ +------------+                      |  |
 | | +--Card------+ +--Card------+                      |  |
-| | |使用次數    | |AI整理使用率|                      |  |
+| | |使用次数    | |AI整理使用率|                      |  |
 | | |156 次      | |87%         |                      |  |
 | | +------------+ +------------+                      |  |
 | +---------------------------------------------------+  |
 |                                                        |
-| +--[趨勢圖表 Card]----------------------------------+  |
-| | CardHeader: "使用趨勢"  [時間篩選 Select]         |  |
+| +--[趋势图表 Card]----------------------------------+  |
+| | CardHeader: "使用趋势"  [时间筛选 Select]         |  |
 | | CardContent:                                       |  |
-| |   Area Chart（每日口述次數 / 字數趨勢）            |  |
-| |   X 軸：日期   Y 軸：次數或字數                    |  |
-| |   使用 chart-1 (teal-300) 作為主要面積色           |  |
+| |   Area Chart（每日口述次数 / 字数趋势）            |  |
+| |   X 轴：日期   Y 轴：次数或字数                    |  |
+| |   使用 chart-1 (teal-300) 作为主要面积色           |  |
 | +---------------------------------------------------+  |
 |                                                        |
-| +--[最近轉錄 Card]----------------------------------+  |
-| | CardHeader: "最近轉錄"                             |  |
+| +--[最近转录 Card]----------------------------------+  |
+| | CardHeader: "最近转录"                             |  |
 | | CardContent:                                       |  |
 | |   Table:                                           |  |
-| |   | 時間 | 原始文字(截斷) | 字數 | AI整理 | 耗時 ||  |
+| |   | 时间 | 原始文字(截断) | 字数 | AI整理 | 耗时 ||  |
 | |   |------|----------------|------|--------|------||  |
 | |   | ...  | ...            | ...  | Badge  | ...  ||  |
-| |   分頁元件（若記錄 > 10 筆）                       |  |
+| |   分页元件（若记录 > 10 笔）                       |  |
 | +---------------------------------------------------+  |
 +--------------------------------------------------------+
 ```
 
-**統計卡片元件模式：**
+**统计卡片元件模式：**
 
-每張 Card 遵循統一結構：
+每张 Card 遵循统一结构：
 
 ```vue
 <Card>
   <CardHeader class="flex flex-row items-center justify-between pb-2">
     <CardTitle class="text-sm font-medium text-muted-foreground">
-      總口述時間
+      总口述时间
     </CardTitle>
     <Badge variant="outline" class="text-xs">
       <TrendingUp class="mr-1 size-3" />
@@ -676,205 +676,205 @@ npx shadcn-vue@latest add dashboard-01
     </Badge>
   </CardHeader>
   <CardContent>
-    <div class="text-2xl font-bold">42 分鐘</div>
-    <p class="text-xs text-muted-foreground">較上週增加 5 分鐘</p>
+    <div class="text-2xl font-bold">42 分钟</div>
+    <p class="text-xs text-muted-foreground">较上周增加 5 分钟</p>
   </CardContent>
 </Card>
 ```
 
-**六項統計指標（對應 PRD FR24）：**
+**六项统计指标（对应 PRD FR24）：**
 
-| 指標 | 卡片標題 | 數值格式 | 圖標 |
+| 指标 | 卡片标题 | 数值格式 | 图标 |
 |------|---------|---------|------|
-| 總口述時間 | 總口述時間 | `X 分鐘` 或 `X 小時 Y 分` | `Timer` |
-| 口述字數 | 口述字數 | `12,350 字`（千位分隔） | `Type` |
+| 总口述时间 | 总口述时间 | `X 分钟` 或 `X 小时 Y 分` | `Timer` |
+| 口述字数 | 口述字数 | `12,350 字`（千位分隔） | `Type` |
 | 平均口述速度 | 平均口述速度 | `185 字/分` | `Gauge` |
-| 節省時間 | 節省時間 | `X 分鐘`（預估打字所需時間 - 口述時間） | `Clock` |
-| 使用次數 | 使用次數 | `156 次` | `Mic` |
+| 节省时间 | 节省时间 | `X 分钟`（预估打字所需时间 - 口述时间） | `Clock` |
+| 使用次数 | 使用次数 | `156 次` | `Mic` |
 | AI 整理使用率 | AI 整理使用率 | `87%` | `Sparkles` |
 
-**趨勢圖表技術選型：**
+**趋势图表技术选型：**
 
-使用 shadcn-vue 的 Chart 元件（底層為 [Unovis](https://unovis.dev/)）。安裝：
+使用 shadcn-vue 的 Chart 元件（底层为 [Unovis](https://unovis.dev/)）。安装：
 
 ```bash
 npx shadcn-vue@latest add chart-area
 ```
 
-**Dashboard 空狀態：** 當歷史記錄為零時，統計卡片顯示 `0`/`0%`/`0 分鐘`，趨勢圖表區域顯示空狀態插圖（`BarChart3` icon `size-12` + 「開始使用語音輸入以累積統計資料」）。
+**Dashboard 空状态：** 当历史记录为零时，统计卡片显示 `0`/`0%`/`0 分钟`，趋势图表区域显示空状态插图（`BarChart3` icon `size-12` + 「开始使用语音输入以累积统计资料」）。
 
-### History 頁面（`/history`）
+### History 页面（`/history`）
 
 ```
-+--[頁面容器 flex-1 space-y-6 p-6]---------------------+
++--[页面容器 flex-1 space-y-6 p-6]---------------------+
 |                                                        |
-| +--[標題區 + 搜尋]----------------------------------+  |
-| | "歷史記錄"             text-2xl font-bold          |  |
-| | "瀏覽與搜尋轉錄歷史"   text-muted-foreground       |  |
+| +--[标题区 + 搜寻]----------------------------------+  |
+| | "历史记录"             text-2xl font-bold          |  |
+| | "浏览与搜寻转录历史"   text-muted-foreground       |  |
 | +---------------------------------------------------+  |
 |                                                        |
 | +--[工具列 flex items-center gap-2]-----------------+  |
 | | [Search Input w/ icon]              [排序 Select]  |  |
 | +---------------------------------------------------+  |
 |                                                        |
-| +--[記錄列表 space-y-3]---------scroll-area----------+  |
+| +--[记录列表 space-y-3]---------scroll-area----------+  |
 | | +--Card (hover:bg-accent)---------------------+    |  |
 | | | 2026-03-02 14:32     Badge:"AI整理"          |    |  |
-| | | "會議記錄：今天下午討論了新功能的..."         |    |  |
-| | | text-xs: 原始 52字 → 整理後 48字  耗時 1.2s  |    |  |
-| | | [複製原始] [複製整理後] 按鈕靠右 ghost        |    |  |
+| | | "会议记录：今天下午讨论了新功能的..."         |    |  |
+| | | text-xs: 原始 52字 → 整理后 48字  耗时 1.2s  |    |  |
+| | | [复制原始] [复制整理后] 按钮靠右 ghost        |    |  |
 | | +----------------------------------------------+    |  |
 | |                                                     |  |
 | | +--Card------------------------------------------+  |  |
-| | | ...下一筆記錄...                                |  |  |
+| | | ...下一笔记录...                                |  |  |
 | | +------------------------------------------------+  |  |
 | |                                                     |  |
 | +-----------------------------------------------------+  |
 |                                                        |
-| +--[分頁 flex justify-center]------------------------+  |
+| +--[分页 flex justify-center]------------------------+  |
 | | Pagination 元件                                    |  |
 | +---------------------------------------------------+  |
 +--------------------------------------------------------+
 ```
 
-**關鍵元件：**
+**关键元件：**
 
-- 搜尋：`Input` + `Search` icon（lucide）
-- 排序：`Select`（時間正序/倒序）
-- 記錄卡片：`Card` 包含轉錄內容截斷顯示（`line-clamp-2`）
-- 複製按鈕：`Button variant="ghost" size="icon"`，使用 `Copy` icon
-- AI 整理標記：`Badge`（經 AI 整理的記錄顯示）
-- 滾動區域：`ScrollArea`（固定高度，內部捲動）
-- 分頁：安裝 `npx shadcn-vue@latest add pagination`
+- 搜寻：`Input` + `Search` icon（lucide）
+- 排序：`Select`（时间正序/倒序）
+- 记录卡片：`Card` 包含转录内容截断显示（`line-clamp-2`）
+- 复制按钮：`Button variant="ghost" size="icon"`，使用 `Copy` icon
+- AI 整理标记：`Badge`（经 AI 整理的记录显示）
+- 滚动区域：`ScrollArea`（固定高度，内部卷动）
+- 分页：安装 `npx shadcn-vue@latest add pagination`
 
-**記錄卡片展開互動：** 點擊卡片展開顯示完整原始文字與整理後文字的對照。使用 `Collapsible` 元件。
+**记录卡片展开互动：** 点击卡片展开显示完整原始文字与整理后文字的对照。使用 `Collapsible` 元件。
 
-**History 空狀態：** 無記錄時顯示 `History` icon（`size-12 text-muted-foreground`）+ 「尚無轉錄記錄」+ 「按住快捷鍵開始語音輸入」。
+**History 空状态：** 无记录时显示 `History` icon（`size-12 text-muted-foreground`）+ 「尚无转录记录」+ 「按住快捷键开始语音输入」。
 
-### Dictionary 頁面（`/dictionary`）
+### Dictionary 页面（`/dictionary`）
 
 ```
-+--[頁面容器 flex-1 space-y-6 p-6]---------------------+
++--[页面容器 flex-1 space-y-6 p-6]---------------------+
 |                                                        |
-| +--[標題區]----------------------------------------+  |
-| | "自訂字典"             text-2xl font-bold          |  |
-| | "管理自訂詞彙以提升轉錄精準度" text-muted-fg       |  |
+| +--[标题区]----------------------------------------+  |
+| | "自订字典"             text-2xl font-bold          |  |
+| | "管理自订词汇以提升转录精准度" text-muted-fg       |  |
 | +---------------------------------------------------+  |
 |                                                        |
-| +--[新增區 Card]-------------------------------------+  |
-| | CardHeader: "新增詞彙"                             |  |
+| +--[新增区 Card]-------------------------------------+  |
+| | CardHeader: "新增词汇"                             |  |
 | | CardContent:                                       |  |
 | |   +--[flex gap-2]-------------------------------+  |  |
-| |   | [Input placeholder="輸入詞彙..."]  [Button] |  |  |
+| |   | [Input placeholder="输入词汇..."]  [Button] |  |  |
 | |   |                                    "新增"   |  |  |
 | |   +---------------------------------------------+  |  |
 | |   text-xs text-muted-foreground:                   |  |
-| |   "詞彙會同時注入 Whisper 辨識與 AI 整理上下文"    |  |
+| |   "词汇会同时注入 Whisper 辨识与 AI 整理上下文"    |  |
 | +---------------------------------------------------+  |
 |                                                        |
-| +--[詞彙列表 Card]-----------------------------------+  |
-| | CardHeader: "已建立詞彙" Badge:"12 個"             |  |
+| +--[词汇列表 Card]-----------------------------------+  |
+| | CardHeader: "已建立词汇" Badge:"12 个"             |  |
 | | CardContent:                                       |  |
 | |   +--[Table]------------------------------------+  |  |
-| |   | 詞彙         | 建立時間        | 操作       |  |  |
+| |   | 词汇         | 建立时间        | 操作       |  |  |
 | |   |--------------|-----------------|------------|  |  |
-| |   | Fortuna      | 2026-03-01      | [刪除]     |  |  |
-| |   | NoWayLM      | 2026-03-01      | [刪除]     |  |  |
-| |   | OAuth        | 2026-02-28      | [刪除]     |  |  |
+| |   | Fortuna      | 2026-03-01      | [删除]     |  |  |
+| |   | NoWayLM      | 2026-03-01      | [删除]     |  |  |
+| |   | OAuth        | 2026-02-28      | [删除]     |  |  |
 | |   +----------------------------------------------+  |  |
 | +---------------------------------------------------+  |
 |                                                        |
-| +--[空狀態（無詞彙時顯示）]---------------------------+  |
+| +--[空状态（无词汇时显示）]---------------------------+  |
 | |   BookOpen icon (size-12 text-muted-foreground)    |  |
-| |   "尚未建立任何詞彙"                                |  |
-| |   "新增常用專有名詞，提升辨識準確率"                |  |
+| |   "尚未建立任何词汇"                                |  |
+| |   "新增常用专有名词，提升辨识准确率"                |  |
 | +---------------------------------------------------+  |
 +--------------------------------------------------------+
 ```
 
-**關鍵元件：**
+**关键元件：**
 
-- 新增表單：`Input` + `Button`（inline flex 佈局）
-- 詞彙表格：`Table` + `TableHeader` + `TableBody` + `TableRow` + `TableCell`
-- 刪除按鈕：`Button variant="ghost" size="icon"` + `Trash2` icon
-- 刪除確認：`AlertDialog`（取代 `window.confirm()`）
-- 詞彙計數：`Badge variant="secondary"`
-- 空狀態：居中圖標 + 說明文字（參照 圖標系統 > 空狀態插圖 `size-12`）
+- 新增表单：`Input` + `Button`（inline flex 布局）
+- 词汇表格：`Table` + `TableHeader` + `TableBody` + `TableRow` + `TableCell`
+- 删除按钮：`Button variant="ghost" size="icon"` + `Trash2` icon
+- 删除确认：`AlertDialog`（取代 `window.confirm()`）
+- 词汇计数：`Badge variant="secondary"`
+- 空状态：居中图标 + 说明文字（参照 图标系统 > 空状态插图 `size-12`）
 
-**安裝所需元件：**
+**安装所需元件：**
 
 ```bash
 npx shadcn-vue@latest add table
 npx shadcn-vue@latest add alert-dialog
 ```
 
-### Settings 頁面（`/settings`）
+### Settings 页面（`/settings`）
 
 ```
-+--[頁面容器 flex-1 space-y-6 p-6]---------------------+
++--[页面容器 flex-1 space-y-6 p-6]---------------------+
 |                                                        |
-| +--[標題區]----------------------------------------+  |
-| | "設定"                 text-2xl font-bold          |  |
-| | "快捷鍵、API Key 與應用程式偏好" text-muted-fg     |  |
+| +--[标题区]----------------------------------------+  |
+| | "设定"                 text-2xl font-bold          |  |
+| | "快捷键、API Key 与应用程式偏好" text-muted-fg     |  |
 | +---------------------------------------------------+  |
 |                                                        |
-| +--[快捷鍵設定 Card]--------------------------------+  |
-| | CardHeader: "快捷鍵"  Keyboard icon               |  |
+| +--[快捷键设定 Card]--------------------------------+  |
+| | CardHeader: "快捷键"  Keyboard icon               |  |
 | | CardContent (space-y-4):                           |  |
-| |   Label: "觸發鍵"                                  |  |
+| |   Label: "触发键"                                  |  |
 | |   Select: macOS=[Fn/Option/Ctrl/Cmd/Shift]         |  |
 | |           Windows=[右Alt/左Alt/Ctrl/Shift]         |  |
 | |   Separator                                        |  |
-| |   Label: "觸發模式"                                |  |
+| |   Label: "触发模式"                                |  |
 | |   RadioGroup:                                      |  |
-| |     ○ Hold（按住錄音，放開停止）                   |  |
-| |     ○ Toggle（按一下開始，再按一下停止）           |  |
+| |     ○ Hold（按住录音，放开停止）                   |  |
+| |     ○ Toggle（按一下开始，再按一下停止）           |  |
 | +---------------------------------------------------+  |
 |                                                        |
-| +--[API Key 設定 Card]-------------------------------+  |
+| +--[API Key 设定 Card]-------------------------------+  |
 | | CardHeader:                                        |  |
-| |   "Groq API Key"  Badge:"已設定"(success) or      |  |
-| |                    Badge:"未設定"(destructive)      |  |
+| |   "Groq API Key"  Badge:"已设定"(success) or      |  |
+| |                    Badge:"未设定"(destructive)      |  |
 | | CardContent (space-y-4):                           |  |
-| |   text-sm text-muted-foreground: Groq Console 連結 |  |
-| |   Label + Input (type=password) + 顯示/隱藏 Button |  |
+| |   text-sm text-muted-foreground: Groq Console 连结 |  |
+| |   Label + Input (type=password) + 显示/隐藏 Button |  |
 | |   flex justify-between:                            |  |
-| |     [儲存 Button default] [刪除 Button destructive]|  |
+| |     [储存 Button default] [删除 Button destructive]|  |
 | +---------------------------------------------------+  |
 |                                                        |
-| +--[AI Prompt 設定 Card]-----------------------------+  |
+| +--[AI Prompt 设定 Card]-----------------------------+  |
 | | CardHeader: "AI 整理 Prompt"  Sparkles icon        |  |
 | | CardContent (space-y-4):                           |  |
-| |   text-sm text-muted-foreground: 說明文字          |  |
+| |   text-sm text-muted-foreground: 说明文字          |  |
 | |   Textarea (rows=6, class="font-mono")             |  |
 | |   flex justify-between:                            |  |
-| |     [重置為預設 Button outline]  [儲存 Button]     |  |
+| |     [重置为预设 Button outline]  [储存 Button]     |  |
 | +---------------------------------------------------+  |
 |                                                        |
-| +--[一般設定 Card]-----------------------------------+  |
+| +--[一般设定 Card]-----------------------------------+  |
 | | CardHeader: "一般"                                 |  |
 | | CardContent (space-y-4):                           |  |
 | |   flex items-center justify-between:               |  |
-| |     Label:"開機自動啟動"  Switch                   |  |
+| |     Label:"开机自动启动"  Switch                   |  |
 | |   Separator                                        |  |
 | |   flex items-center justify-between:               |  |
-| |     Label:"自動更新"      Switch                   |  |
+| |     Label:"自动更新"      Switch                   |  |
 | +---------------------------------------------------+  |
 +--------------------------------------------------------+
 ```
 
-**關鍵元件：**
+**关键元件：**
 
-- 區塊容器：每個設定區塊使用 `Card` + `CardHeader` + `CardContent`
-- 觸發鍵選擇：`Select` + `SelectTrigger` + `SelectContent` + `SelectItem`（依平台動態載入選項：macOS 為 Fn/Option/Ctrl/Cmd/Shift；Windows 為 右Alt/左Alt/Ctrl/Shift）
-- 觸發模式：`RadioGroup` + `RadioGroupItem`
-- API Key 輸入：`Input type="password"` + 顯示/隱藏 `Button variant="outline" size="icon"`（`Eye` / `EyeOff` icon）
-- API Key 狀態：`Badge variant="outline"` 搭配 `bg-success/20 text-success`（已設定）或 `bg-destructive/20 text-destructive`（未設定）
-- Prompt 編輯：`Textarea`（需安裝 `npx shadcn-vue@latest add textarea`）
-- 開關：`Switch`
-- 區塊分隔：`Separator`
+- 区块容器：每个设定区块使用 `Card` + `CardHeader` + `CardContent`
+- 触发键选择：`Select` + `SelectTrigger` + `SelectContent` + `SelectItem`（依平台动态载入选项：macOS 为 Fn/Option/Ctrl/Cmd/Shift；Windows 为 右Alt/左Alt/Ctrl/Shift）
+- 触发模式：`RadioGroup` + `RadioGroupItem`
+- API Key 输入：`Input type="password"` + 显示/隐藏 `Button variant="outline" size="icon"`（`Eye` / `EyeOff` icon）
+- API Key 状态：`Badge variant="outline"` 搭配 `bg-success/20 text-success`（已设定）或 `bg-destructive/20 text-destructive`（未设定）
+- Prompt 编辑：`Textarea`（需安装 `npx shadcn-vue@latest add textarea`）
+- 开关：`Switch`
+- 区块分隔：`Separator`
 
-**安裝所需元件：**
+**安装所需元件：**
 
 ```bash
 npx shadcn-vue@latest add select
@@ -884,38 +884,38 @@ npx shadcn-vue@latest add switch
 npx shadcn-vue@latest add separator
 ```
 
-## Dark Mode 配色調整
+## Dark Mode 配色调整
 
-本應用預設 dark mode。以下是 `src/style.css` 中 `.dark` 區塊的調整指引。
+本应用预设 dark mode。以下是 `src/style.css` 中 `.dark` 区块的调整指引。
 
-### 現有配色保留
+### 现有配色保留
 
-shadcn-vue 的 `neutral` base color 的 dark mode 預設值已經過設計，大部分情況下直接使用。以下變數**不修改**：
+shadcn-vue 的 `neutral` base color 的 dark mode 预设值已经过设计，大部分情况下直接使用。以下变数**不修改**：
 
-- `--background`、`--foreground`（頁面基底）
+- `--background`、`--foreground`（页面基底）
 - `--card`、`--card-foreground`（卡片）
-- `--popover`、`--popover-foreground`（下拉選單）
+- `--popover`、`--popover-foreground`（下拉选单）
 - `--muted`、`--muted-foreground`（次要色）
 - `--secondary`、`--secondary-foreground`（次要操作）
-- `--accent`、`--accent-foreground`（懸浮/選取）
-- `--border`、`--input`（邊框/輸入框）
+- `--accent`、`--accent-foreground`（悬浮/选取）
+- `--border`、`--input`（边框/输入框）
 
-### Teal 品牌色 Dark Mode 調整
+### Teal 品牌色 Dark Mode 调整
 
-由 `--theme teal` 自動處理。Dark mode 下 `--primary` 使用 teal-500（較亮）取代 light mode 的 teal-600（較暗），確保在深色背景上的可讀性。
+由 `--theme teal` 自动处理。Dark mode 下 `--primary` 使用 teal-500（较亮）取代 light mode 的 teal-600（较暗），确保在深色背景上的可读性。
 
-### 狀態色 Dark Mode 對照表
+### 状态色 Dark Mode 对照表
 
-| 變數 | Light Mode | Dark Mode | 調整理由 |
+| 变数 | Light Mode | Dark Mode | 调整理由 |
 |------|-----------|-----------|---------|
 | `--success` | green-600 `oklch(0.59 0.145 163.225)` | green-500 `oklch(0.696 0.17 162.48)` | 深色背景需更亮 |
-| `--warning` | orange-400 `oklch(0.75 0.183 55.934)` | amber-400 `oklch(0.828 0.189 84.429)` | 提高辨識度 |
-| `--info` | blue-500 `oklch(0.623 0.214 259.815)` | blue-500 `oklch(0.623 0.214 259.815)` | 明度已足夠 |
-| `--destructive` | 已在 style.css 定義 | 已在 style.css 定義 | 不修改 |
+| `--warning` | orange-400 `oklch(0.75 0.183 55.934)` | amber-400 `oklch(0.828 0.189 84.429)` | 提高辨识度 |
+| `--info` | blue-500 `oklch(0.623 0.214 259.815)` | blue-500 `oklch(0.623 0.214 259.815)` | 明度已足够 |
+| `--destructive` | 已在 style.css 定义 | 已在 style.css 定义 | 不修改 |
 
-### Dark Mode 對比度規則
+### Dark Mode 对比度规则
 
-- 文字對比度 >= 4.5:1（WCAG AA），`text-foreground` 在 `bg-background` 上已滿足
-- `text-muted-foreground` 對比度 >= 3:1（輔助文字可接受較低對比）
-- 狀態色背景（`bg-success`、`bg-warning`）上的文字使用對應 `*-foreground` 變數
-- 邊框使用 `oklch(1 0 0 / 10%)`（白色 10% 透明度），在深色背景上微妙可見
+- 文字对比度 >= 4.5:1（WCAG AA），`text-foreground` 在 `bg-background` 上已满足
+- `text-muted-foreground` 对比度 >= 3:1（辅助文字可接受较低对比）
+- 状态色背景（`bg-success`、`bg-warning`）上的文字使用对应 `*-foreground` 变数
+- 边框使用 `oklch(1 0 0 / 10%)`（白色 10% 透明度），在深色背景上微妙可见

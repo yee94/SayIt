@@ -2,11 +2,11 @@ use std::sync::Mutex;
 
 use tauri::{command, State};
 
-/// 系統音量控制狀態
+/// 系统音量控制状态
 ///
-/// `was_muted_before`: None = 沒有 pending restore（初始/已恢復狀態）
-///                     Some(true) = 錄音前系統已靜音
-///                     Some(false) = 錄音前系統未靜音
+/// `was_muted_before`: None = 没有 pending restore（初始/已恢复状态）
+///                     Some(true) = 录音前系统已静音
+///                     Some(false) = 录音前系统未静音
 pub struct AudioControlState {
     was_muted_before: Mutex<Option<bool>>,
 }
@@ -63,7 +63,7 @@ mod macos {
         ) -> i32;
     }
 
-    // FourCC 常數（big-endian byte order）
+    // FourCC 常数（big-endian byte order）
     const K_AUDIO_HARDWARE_PROPERTY_DEFAULT_OUTPUT_DEVICE: u32 = 0x644F7574; // 'dOut'
     const K_AUDIO_DEVICE_PROPERTY_MUTE: u32 = 0x6D757465; // 'mute'
     const K_AUDIO_OBJECT_PROPERTY_SCOPE_OUTPUT: u32 = 0x6F757470; // 'outp'
@@ -93,9 +93,7 @@ mod macos {
         };
 
         if status != 0 {
-            eprintln!(
-                "[audio-control] Failed to get default output device: OSStatus {status}"
-            );
+            eprintln!("[audio-control] Failed to get default output device: OSStatus {status}");
             return None;
         }
 
@@ -181,7 +179,7 @@ mod windows_audio {
         CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_ALL, COINIT_APARTMENTTHREADED,
     };
 
-    /// COM scope guard：離開 scope 時自動 CoUninitialize（若此次呼叫有成功 init）
+    /// COM scope guard：离开 scope 时自动 CoUninitialize（若此次呼叫有成功 init）
     struct ComGuard {
         should_uninit: bool,
     }
@@ -194,11 +192,11 @@ mod windows_audio {
         }
     }
 
-    /// 初始化 COM 並回傳 scope guard。guard 必須存活到 COM 操作全部完成。
+    /// 初始化 COM 并回传 scope guard。guard 必须存活到 COM 操作全部完成。
     fn init_com() -> Result<ComGuard, String> {
         unsafe {
-            // windows crate 0.61: CoInitializeEx 回傳 HRESULT
-            // S_OK (0) / S_FALSE (1) → 需要配對 CoUninitialize
+            // windows crate 0.61: CoInitializeEx 回传 HRESULT
+            // S_OK (0) / S_FALSE (1) → 需要配对 CoUninitialize
             // RPC_E_CHANGED_MODE (0x80010106) → 已在其他模式 init，不需 CoUninitialize
             let hr = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
             if hr.is_ok() {
@@ -301,7 +299,7 @@ pub fn mute_system_audio(state: State<AudioControlState>) -> Result<(), String> 
         .lock()
         .map_err(|e| format!("Lock poisoned: {e}"))?;
 
-    // 冪等：若已有 pending restore，跳過
+    // 幂等：若已有 pending restore，跳过
     if guard.is_some() {
         println!("[audio-control] mute_system_audio: already muted (pending restore), skipping");
         return Ok(());
@@ -311,9 +309,7 @@ pub fn mute_system_audio(state: State<AudioControlState>) -> Result<(), String> 
     platform_set_system_mute(true)?;
     *guard = Some(current_mute);
 
-    println!(
-        "[audio-control] mute_system_audio: muted (was_muted_before={current_mute})"
-    );
+    println!("[audio-control] mute_system_audio: muted (was_muted_before={current_mute})");
     Ok(())
 }
 
@@ -324,7 +320,7 @@ pub fn restore_system_audio(state: State<AudioControlState>) -> Result<(), Strin
         .lock()
         .map_err(|e| format!("Lock poisoned: {e}"))?;
 
-    // 冪等：若沒有 pending restore，跳過
+    // 幂等：若没有 pending restore，跳过
     let was_muted = match *guard {
         Some(v) => v,
         None => {
@@ -333,7 +329,7 @@ pub fn restore_system_audio(state: State<AudioControlState>) -> Result<(), Strin
         }
     };
 
-    // 先清除狀態，避免 restore 失敗導致永久卡在 muted 狀態
+    // 先清除状态，避免 restore 失败导致永久卡在 muted 状态
     *guard = None;
 
     if let Err(e) = platform_set_system_mute(was_muted) {
@@ -343,9 +339,7 @@ pub fn restore_system_audio(state: State<AudioControlState>) -> Result<(), Strin
         return Err(e);
     }
 
-    println!(
-        "[audio-control] restore_system_audio: restored (was_muted={was_muted})"
-    );
+    println!("[audio-control] restore_system_audio: restored (was_muted={was_muted})");
     Ok(())
 }
 
@@ -366,21 +360,21 @@ mod tests {
     fn test_state_transitions() {
         let state = AudioControlState::new();
 
-        // 模擬 mute: None → Some(false)
+        // 模拟 mute: None → Some(false)
         {
             let mut guard = state.was_muted_before.lock().unwrap();
             assert!(guard.is_none());
             *guard = Some(false);
         }
 
-        // 模擬 restore: Some(false) → None
+        // 模拟 restore: Some(false) → None
         {
             let mut guard = state.was_muted_before.lock().unwrap();
             assert_eq!(*guard, Some(false));
             *guard = None;
         }
 
-        // 確認回到初始狀態
+        // 确认回到初始状态
         {
             let guard = state.was_muted_before.lock().unwrap();
             assert_eq!(*guard, None);
@@ -398,10 +392,10 @@ mod tests {
             *guard = Some(false);
         }
 
-        // 第二次 mute（應該跳過，因為已有值）
+        // 第二次 mute（应该跳过，因为已有值）
         {
             let guard = state.was_muted_before.lock().unwrap();
-            assert!(guard.is_some()); // 不為 None 表示跳過
+            assert!(guard.is_some()); // 不为 None 表示跳过
         }
     }
 
@@ -409,10 +403,10 @@ mod tests {
     fn test_restore_without_mute_state() {
         let state = AudioControlState::new();
 
-        // 直接 restore（沒有先 mute）
+        // 直接 restore（没有先 mute）
         {
             let guard = state.was_muted_before.lock().unwrap();
-            assert!(guard.is_none()); // None 表示跳過 restore
+            assert!(guard.is_none()); // None 表示跳过 restore
         }
     }
 
@@ -433,7 +427,7 @@ mod tests {
             *guard = None;
         }
 
-        // 確認 reset
+        // 确认 reset
         {
             let guard = state.was_muted_before.lock().unwrap();
             assert_eq!(*guard, None);

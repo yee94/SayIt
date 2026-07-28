@@ -414,8 +414,8 @@ export const useHistoryStore = defineStore("history", () => {
     days = USAGE_TREND_DAYS,
   ): Promise<DailyUsageTrend[]> {
     const db = getDatabase();
-    // SQL 查詢窗口必須與 buildDailyUsageSeries 的補零窗口對齊（同一個本地日曆區間），
-    // 否則落在「滾動 24h cutoff 但日曆區間外」的記錄會被 SQL 撈到卻被補零丟棄。
+    // SQL 查询窗口必须与 buildDailyUsageSeries 的补零窗口对齐（同一个本地日历区间），
+    // 否则落在「滚动 24h cutoff 但日历区间外」的记录会被 SQL 捞到却被补零丢弃。
     const endDate = new Date();
     const startDate = new Date(
       endDate.getFullYear(),

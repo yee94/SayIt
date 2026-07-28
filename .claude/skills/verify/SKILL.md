@@ -1,40 +1,40 @@
 ---
 name: verify
-description: 完整驗證 — ESLint + 型別檢查 + 單元測試 + Rust clippy + 編譯檢查。在提交前或完成功能開發後使用。
+description: 完整验证 — ESLint + 型别检查 + 单元测试 + Rust clippy + 编译检查。在提交前或完成功能开发后使用。
 ---
 
-# 完整驗證流程
+# 完整验证流程
 
-依序執行以下五個檢查，任何一步失敗就停下來修正：
+依序执行以下五个检查，任何一步失败就停下来修正：
 
-## 1. ESLint 檢查
+## 1. ESLint 检查
 ```bash
 npx eslint .
 ```
 
-## 2. TypeScript 型別檢查
+## 2. TypeScript 型别检查
 ```bash
 npx vue-tsc --noEmit
 ```
 
-## 3. Vitest 單元測試
+## 3. Vitest 单元测试
 ```bash
 pnpm test
 ```
 
-## 4. Rust clippy 靜態分析
+## 4. Rust clippy 静态分析
 ```bash
 cd src-tauri && cargo clippy -- -D warnings
 ```
 
-## 5. Rust 編譯檢查
+## 5. Rust 编译检查
 ```bash
 cd src-tauri && cargo check
 ```
 
-## 行為規則
+## 行为规则
 
-- 五步全過才算驗證通過
-- 任何一步失敗時，報告完整錯誤訊息並嘗試修正
-- 修正後重新跑失敗的步驟（不需要從頭跑）
-- 全部通過後回報簡潔摘要
+- 五步全过才算验证通过
+- 任何一步失败时，报告完整错误讯息并尝试修正
+- 修正后重新跑失败的步骤（不需要从头跑）
+- 全部通过后回报简洁摘要

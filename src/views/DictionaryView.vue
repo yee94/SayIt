@@ -118,7 +118,7 @@ async function handleImportFromTypeless() {
 
 function formatDate(dateString: string): string {
   try {
-    // SQLite created_at 儲存為 UTC 且不帶時區後綴，附加 "Z" 確保以 UTC 解析
+    // SQLite created_at 储存为 UTC 且不带时区后缀，附加 "Z" 确保以 UTC 解析
     const date = new Date(dateString + "Z");
     return date.toLocaleDateString(locale.value, {
       year: "numeric",

@@ -88,7 +88,7 @@ async function handleDeleteRecord(record: TranscriptionRecord) {
       expandedRecordId.value = null;
     }
   } catch {
-    // DB 刪除失敗，靜默處理（Sentry 已在 store 層捕獲）
+    // DB 删除失败，静默处理（Sentry 已在 store 层捕获）
   }
 }
 
@@ -107,7 +107,7 @@ async function handlePlayRecording(record: TranscriptionRecord) {
   // 停止正在播放的
   cleanupAudio();
 
-  // 如果點擊同一個（暫停）
+  // 如果点击同一个（暂停）
   if (playingRecordId.value === record.id) {
     playingRecordId.value = null;
     return;
@@ -118,12 +118,12 @@ async function handlePlayRecording(record: TranscriptionRecord) {
   playingRecordId.value = record.id;
 
   try {
-    // macOS WKWebView IPC 回傳 number[]，非 macOS 回傳 ArrayBuffer
+    // macOS WKWebView IPC 回传 number[]，非 macOS 回传 ArrayBuffer
     const raw = await invoke<number[]>("read_recording_file", {
       id: record.id,
     });
 
-    // 防止 race condition：invoke 回來時已經切換到別的紀錄
+    // 防止 race condition：invoke 回来时已经切换到别的纪录
     if (playingRecordId.value !== record.id) return;
 
     const blob = new Blob([new Uint8Array(raw)], { type: "audio/wav" });
@@ -152,7 +152,7 @@ onMounted(async () => {
   try {
     await historyStore.resetAndFetch();
   } catch (err) {
-    // DB 初始化失敗時 graceful degradation，MainApp Banner 已通知使用者
+    // DB 初始化失败时 graceful degradation，MainApp Banner 已通知使用者
     captureError(err, { source: "history-view-mount" });
   }
 
@@ -181,7 +181,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
-  // 停止播放、釋放 Audio + Blob URL 資源
+  // 停止播放、释放 Audio + Blob URL 资源
   cleanupAudio();
   playingRecordId.value = null;
 
@@ -194,7 +194,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="app-page">
-    <!-- 搜尋列 -->
+    <!-- 搜寻列 -->
     <div class="relative mb-6">
       <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
       <Input
@@ -206,10 +206,10 @@ onBeforeUnmount(() => {
       />
     </div>
 
-    <!-- 歷史記錄卡片 -->
+    <!-- 历史记录卡片 -->
     <Card>
       <CardContent class="p-0">
-        <!-- 載入狀態（初次載入） -->
+        <!-- 载入状态（初次载入） -->
         <div
           v-if="historyStore.isLoading && historyStore.transcriptionList.length === 0"
           class="text-center text-muted-foreground py-12"
@@ -217,7 +217,7 @@ onBeforeUnmount(() => {
           {{ $t("history.loading") }}
         </div>
 
-        <!-- 空狀態 -->
+        <!-- 空状态 -->
         <div
           v-else-if="historyStore.transcriptionList.length === 0"
           class="py-12 text-center text-muted-foreground"
@@ -230,13 +230,13 @@ onBeforeUnmount(() => {
           </template>
         </div>
 
-        <!-- 記錄列表 -->
+        <!-- 记录列表 -->
         <template v-else>
           <div
             v-for="(record, index) in historyStore.transcriptionList"
             :key="record.id"
           >
-            <!-- 摘要行（可點擊展開） -->
+            <!-- 摘要行（可点击展开） -->
             <div
               class="px-5 py-4 cursor-pointer hover:bg-accent/50 transition"
               :class="{ 'border-b border-border': index < historyStore.transcriptionList.length - 1 || expandedRecordId === record.id }"
@@ -296,13 +296,13 @@ onBeforeUnmount(() => {
               </p>
             </div>
 
-            <!-- 展開詳細 -->
+            <!-- 展开详细 -->
             <div
               v-if="expandedRecordId === record.id"
               class="bg-card px-5 py-4 space-y-3"
               :class="{ 'border-b border-border': index < historyStore.transcriptionList.length - 1 }"
             >
-              <!-- 整理後文字 -->
+              <!-- 整理后文字 -->
               <div v-if="record.wasEnhanced && record.processedText">
                 <p class="text-xs font-medium text-emerald-400 mb-1">{{ $t("history.enhancedText") }}</p>
                 <p class="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
@@ -328,7 +328,7 @@ onBeforeUnmount(() => {
                 </p>
               </div>
 
-              <!-- 詳細資訊 -->
+              <!-- 详细资讯 -->
               <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground border-t border-border pt-3">
                 <span>{{ $t("history.recordingLabel") }}{{ formatDurationMs(record.recordingDurationMs) }}</span>
                 <span>{{ $t("history.transcriptionLabel") }}{{ formatDurationMs(record.transcriptionDurationMs) }}</span>
@@ -339,7 +339,7 @@ onBeforeUnmount(() => {
                 <span>{{ $t("history.modeLabel") }}{{ record.triggerMode === "hold" ? $t("history.holdMode") : $t("history.toggleMode") }}</span>
               </div>
 
-              <!-- 操作按鈕 -->
+              <!-- 操作按钮 -->
               <div class="mt-3 flex justify-start gap-2">
                 <Button
                   variant="destructive"
@@ -363,7 +363,7 @@ onBeforeUnmount(() => {
           </div>
         </template>
 
-        <!-- 載入更多指示 -->
+        <!-- 载入更多指示 -->
         <div
           v-if="historyStore.isLoading && historyStore.transcriptionList.length > 0"
           class="py-4 text-center text-sm text-muted-foreground"
@@ -371,7 +371,7 @@ onBeforeUnmount(() => {
           {{ $t("history.loadingMore") }}
         </div>
 
-        <!-- 無限捲動 sentinel -->
+        <!-- 无限卷动 sentinel -->
         <div ref="sentinelRef" class="h-4" />
       </CardContent>
     </Card>

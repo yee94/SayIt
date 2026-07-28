@@ -22,16 +22,16 @@ vi.mock("@tauri-apps/api/core", () => ({
 vi.mock("../../src/i18n", () => ({
   default: {
     global: {
-      locale: { value: "zh-TW" },
+      locale: { value: "zh-CN" },
       t: (key: string) => key,
     },
   },
 }));
 
 vi.mock("../../src/i18n/prompts", async () => {
-  const LEGACY_PROMPT = "你是文字校對工具，不是對話助理。";
-  const MINIMAL_PROMPT = "你是語音逐字稿的文字校對工具。";
-  const ACTIVE_PROMPT = "你是語音逐字稿整理工具。";
+  const LEGACY_PROMPT = "你是文字校对工具，不是对话助理。";
+  const MINIMAL_PROMPT = "你是语音逐字稿的文字校对工具。";
+  const ACTIVE_PROMPT = "你是语音逐字稿整理工具。";
 
   return {
     getMinimalPromptForLocale: () => MINIMAL_PROMPT,
@@ -41,20 +41,34 @@ vi.mock("../../src/i18n/prompts", async () => {
       const trimmed = prompt.trim();
       return trimmed === LEGACY_PROMPT || trimmed === MINIMAL_PROMPT;
     },
-    MINIMAL_PROMPTS: { "zh-TW": MINIMAL_PROMPT },
-    ACTIVE_PROMPTS: { "zh-TW": ACTIVE_PROMPT },
+    MINIMAL_PROMPTS: { "zh-CN": MINIMAL_PROMPT },
+    ACTIVE_PROMPTS: { "zh-CN": ACTIVE_PROMPT },
   };
 });
 
 vi.mock("../../src/i18n/languageConfig", () => ({
-  FALLBACK_LOCALE: "zh-TW",
-  detectSystemLocale: () => "zh-TW",
-  getHtmlLangForLocale: () => "zh-TW",
+  FALLBACK_LOCALE: "zh-CN",
+  detectSystemLocale: () => "zh-CN",
+  getHtmlLangForLocale: () => "zh-Hans",
   getWhisperCodeForTranscriptionLocale: () => null,
+  normalizeSupportedLocale: (value: unknown) =>
+    value === "zh-CN" || value === "en" || value === "ja" || value === "ko"
+      ? value
+      : value === "zh-TW"
+        ? "zh-CN"
+        : null,
+  normalizeTranscriptionLocale: (value: unknown) =>
+    value === "auto"
+      ? "auto"
+      : value === "zh-CN" || value === "en" || value === "ja" || value === "ko"
+        ? value
+        : value === "zh-TW"
+          ? "zh-CN"
+          : null,
 }));
 
 vi.mock("../../src/lib/enhancer", () => ({
-  getDefaultSystemPrompt: () => "你是語音逐字稿的文字校對工具。",
+  getDefaultSystemPrompt: () => "你是语音逐字稿的文字校对工具。",
 }));
 
 vi.mock("../../src/composables/useTauriEvents", () => ({
@@ -98,7 +112,7 @@ vi.mock("../../src/lib/llmProvider", () => ({
   DEFAULT_LLM_BASE_URL: "https://api.openai.com/v1/chat/completions",
 }));
 
-describe("useSettingsStore — prompt mode 遷移", () => {
+describe("useSettingsStore — prompt mode 迁移", () => {
   beforeEach(() => {
     vi.resetModules();
     mockStoreGet.mockReset();
@@ -130,7 +144,7 @@ describe("useSettingsStore — prompt mode 遷移", () => {
     return useSettingsStore();
   }
 
-  it("[P0] 新安裝（store 無 promptMode 且無 aiPrompt）→ 設為 minimal", async () => {
+  it("[P0] 新安装（store 无 promptMode 且无 aiPrompt）→ 设为 minimal", async () => {
     setupStoreGetMock({});
     const store = await createStore();
     await store.loadSettings();
@@ -138,9 +152,9 @@ describe("useSettingsStore — prompt mode 遷移", () => {
     expect(store.promptMode).toBe("minimal");
   });
 
-  it("[P0] 舊版預設 prompt（匹配 LEGACY）→ 遷移為 minimal", async () => {
+  it("[P0] 旧版默认 prompt（匹配 LEGACY）→ 迁移为 minimal", async () => {
     setupStoreGetMock({
-      aiPrompt: "你是文字校對工具，不是對話助理。",
+      aiPrompt: "你是文字校对工具，不是对话助理。",
     });
     const store = await createStore();
     await store.loadSettings();
@@ -148,8 +162,8 @@ describe("useSettingsStore — prompt mode 遷移", () => {
     expect(store.promptMode).toBe("minimal");
   });
 
-  it("[P0] 舊版自訂 prompt（不匹配任何預設）→ 遷移為 custom，保留原文", async () => {
-    const customPrompt = "我的自訂 prompt 完全不一樣";
+  it("[P0] 旧版自定义 prompt（不匹配任何默认）→ 迁移为 custom，保留原文", async () => {
+    const customPrompt = "我的自定义 prompt 完全不一样";
     setupStoreGetMock({
       aiPrompt: customPrompt,
     });
@@ -160,7 +174,7 @@ describe("useSettingsStore — prompt mode 遷移", () => {
     expect(store.getAiPrompt()).toBe(customPrompt);
   });
 
-  it("[P0] 已有 promptMode（非遷移）→ 直接使用存的值", async () => {
+  it("[P0] 已有 promptMode（非迁移）→ 直接使用存的值", async () => {
     setupStoreGetMock({
       promptMode: "active",
       aiPrompt: "some prompt",
@@ -171,7 +185,7 @@ describe("useSettingsStore — prompt mode 遷移", () => {
     expect(store.promptMode).toBe("active");
   });
 
-  it("[P0] getAiPrompt() minimal 模式 → 回傳 minimal preset", async () => {
+  it("[P0] getAiPrompt() minimal 模式 → 返回 minimal preset", async () => {
     setupStoreGetMock({
       promptMode: "minimal",
     });
@@ -179,10 +193,10 @@ describe("useSettingsStore — prompt mode 遷移", () => {
     await store.loadSettings();
 
     const prompt = store.getAiPrompt();
-    expect(prompt).toBe("你是語音逐字稿的文字校對工具。");
+    expect(prompt).toBe("你是语音逐字稿的文字校对工具。");
   });
 
-  it("[P0] getAiPrompt() active 模式 → 回傳 active preset", async () => {
+  it("[P0] getAiPrompt() active 模式 → 返回 active preset", async () => {
     setupStoreGetMock({
       promptMode: "active",
     });
@@ -190,11 +204,11 @@ describe("useSettingsStore — prompt mode 遷移", () => {
     await store.loadSettings();
 
     const prompt = store.getAiPrompt();
-    expect(prompt).toBe("你是語音逐字稿整理工具。");
+    expect(prompt).toBe("你是语音逐字稿整理工具。");
   });
 
-  it("[P0] getAiPrompt() custom 模式 → 回傳 aiPrompt ref 值", async () => {
-    const customPrompt = "完全自訂的 prompt";
+  it("[P0] getAiPrompt() custom 模式 → 返回 aiPrompt ref 值", async () => {
+    const customPrompt = "完全自定义的 prompt";
     setupStoreGetMock({
       promptMode: "custom",
       aiPrompt: customPrompt,

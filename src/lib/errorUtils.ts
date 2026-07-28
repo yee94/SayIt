@@ -10,7 +10,7 @@ export function extractErrorMessage(err: unknown): string {
 }
 
 export function getMicrophoneErrorMessage(error: unknown): string {
-  // Rust AudioRecorderError 字串匹配（透過 Tauri invoke 傳來的字串錯誤）
+  // Rust AudioRecorderError 字符串匹配（通过 Tauri invoke 传来的字符串错误）
   const message = extractErrorMessage(error);
   if (message.includes("No input device")) {
     return t("errors.mic.notFound");
@@ -22,7 +22,7 @@ export function getMicrophoneErrorMessage(error: unknown): string {
     return t("errors.mic.configFailed");
   }
 
-  // 瀏覽器 DOMException（備用）
+  // 浏览器 DOMException（备用）
   if (error instanceof DOMException) {
     switch (error.name) {
       case "NotAllowedError":
@@ -47,19 +47,19 @@ export function getTranscriptionErrorMessage(error: unknown): string {
     return t("errors.network");
   }
 
-  // Rust TranscriptionError 透過 Tauri invoke 以「字串」reject（serialize_str），
-  // 不能依賴 error instanceof Error；一律用 extractErrorMessage 取訊息字串比對。
+  // Rust TranscriptionError 通过 Tauri invoke 以「字符串」reject（serialize_str），
+  // 不能依赖 error instanceof Error；一律用 extractErrorMessage 取消息字符串比对。
   const message = extractErrorMessage(error);
 
-  // ApiError 的 Display 為 "Groq API returned error ({status}): {body}"
-  //（同時相容舊字串 "Groq API error"）
+  // ApiError 的 Display 为 "Groq API returned error ({status}): {body}"
+  //（同时兼容旧字符串 "Groq API error"）
   const isApiStatusError = /Groq API (?:returned )?error/i.test(message);
 
   if (message.includes("Audio file too large")) {
     return t("errors.transcription.fileTooLarge");
   }
 
-  // 先判 API 狀態碼（避免 body 含 network 字眼被誤判為網路錯誤）
+  // 先判 API 状态码（避免 body 含 network 字样被误判为网络错误）
   if (isApiStatusError) {
     const statusMatch = message.match(/\((\d+)\)/);
     if (statusMatch) {
@@ -72,8 +72,8 @@ export function getTranscriptionErrorMessage(error: unknown): string {
     return t("errors.transcription.failed");
   }
 
-  // 網路/傳輸層失敗：RequestFailed 的 Display 為 "Groq API request failed: ..."，
-  // 或含一般網路關鍵字（connect/dns/timeout/os error…）
+  // 网络/传输层失败：RequestFailed 的 Display 为 "Groq API request failed: ..."，
+  // 或含一般网络关键字（connect/dns/timeout/os error…）
   if (
     message.includes("Groq API request failed") ||
     NETWORK_ERROR_PATTERN.test(message)

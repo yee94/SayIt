@@ -1,4 +1,4 @@
-# Story 2.3: 貼上後品質監控
+# Story 2.3: 贴上后品质监控
 
 Status: done
 
@@ -7,148 +7,148 @@ Status: done
 ## Story
 
 As a 使用者,
-I want 系統追蹤我是否修改了貼上的文字,
-So that 我能透過統計數據了解 AI 整理的輸出品質趨勢。
+I want 系统追踪我是否修改了贴上的文字,
+So that 我能透过统计数据了解 AI 整理的输出品质趋势。
 
 ## Acceptance Criteria
 
-1. **keyboard_monitor.rs 模組建立** — 新增 `src-tauri/src/plugins/keyboard_monitor.rs` 模組，使用 OS-native API（macOS: CGEventTap / Windows: SetWindowsHookExW）監聽鍵盤事件。模組在收到啟動指令後開始監聽全域鍵盤事件，監聽時間窗口為 5 秒。
+1. **keyboard_monitor.rs 模组建立** — 新增 `src-tauri/src/plugins/keyboard_monitor.rs` 模组，使用 OS-native API（macOS: CGEventTap / Windows: SetWindowsHookExW）监听键盘事件。模组在收到启动指令后开始监听全域键盘事件，监听时间窗口为 5 秒。
 
-2. **Backspace/Delete 偵測** — 貼上後監聽期間（5 秒），若使用者按下 Backspace 或 Delete 鍵至少一次，判定此次輸出「被修改」（`wasModified = true`）。結果透過 Tauri Event `quality-monitor:result` 回傳前端，payload 為 `{ wasModified: boolean }`。
+2. **Backspace/Delete 侦测** — 贴上后监听期间（5 秒），若使用者按下 Backspace 或 Delete 键至少一次，判定此次输出「被修改」（`wasModified = true`）。结果透过 Tauri Event `quality-monitor:result` 回传前端，payload 为 `{ wasModified: boolean }`。
 
-3. **5 秒無偵測自動結束** — 貼上後 5 秒內未偵測到 Backspace 或 Delete 鍵，判定此次輸出「未修改」（`wasModified = false`）。自動結束監聽並透過 Tauri Event 回傳結果。
+3. **5 秒无侦测自动结束** — 贴上后 5 秒内未侦测到 Backspace 或 Delete 键，判定此次输出「未修改」（`wasModified = false`）。自动结束监听并透过 Tauri Event 回传结果。
 
-4. **前端觸發與接收** — `useVoiceFlowStore` 在成功貼上文字後（`transitionTo("success")` 之後），透過 `invoke("start_quality_monitor")` 啟動 Rust 端的鍵盤監控。`useVoiceFlowStore` 監聽 `quality-monitor:result` 事件，收到 `wasModified` 結果後暫存於 store state，供後續歷史記錄儲存使用（Epic 4）。
+4. **前端触发与接收** — `useVoiceFlowStore` 在成功贴上文字后（`transitionTo("success")` 之后），透过 `invoke("start_quality_monitor")` 启动 Rust 端的键盘监控。`useVoiceFlowStore` 监听 `quality-monitor:result` 事件，收到 `wasModified` 结果后暂存于 store state，供后续历史记录储存使用（Epic 4）。
 
-5. **簡單版不做焦點判斷** — 監聽期間偵測到的 Backspace/Delete 不區分來源焦點窗口。使用者在其他應用程式按下的 Backspace/Delete 也會被記錄為 `wasModified = true`。此為簡單版設計，接受誤判，以避免增加焦點追蹤的複雜度。
+5. **简单版不做焦点判断** — 监听期间侦测到的 Backspace/Delete 不区分来源焦点窗口。使用者在其他应用程式按下的 Backspace/Delete 也会被记录为 `wasModified = true`。此为简单版设计，接受误判，以避免增加焦点追踪的复杂度。
 
-6. **監聽不阻塞主流程** — 鍵盤監控在獨立執行緒/背景執行，不阻塞 App 主流程。使用者觸發下一次錄音時，若上一次的品質監控尚在進行，自動取消上一次監控並回傳當前已收集的結果。
+6. **监听不阻塞主流程** — 键盘监控在独立执行绪/背景执行，不阻塞 App 主流程。使用者触发下一次录音时，若上一次的品质监控尚在进行，自动取消上一次监控并回传当前已收集的结果。
 
-7. **跨平台支援** — macOS 使用 CGEventTap（與 hotkey_listener.rs 相同的 OS-native API）。Windows 使用 SetWindowsHookExW（WH_KEYBOARD_LL hook，與 hotkey_listener.rs 相同模式）。兩個平台使用相同的 Tauri Command 介面和相同的 Tauri Event payload 格式。
+7. **跨平台支援** — macOS 使用 CGEventTap（与 hotkey_listener.rs 相同的 OS-native API）。Windows 使用 SetWindowsHookExW（WH_KEYBOARD_LL hook，与 hotkey_listener.rs 相同模式）。两个平台使用相同的 Tauri Command 介面和相同的 Tauri Event payload 格式。
 
 ## Tasks / Subtasks
 
-- [x]Task 1: 建立 keyboard_monitor.rs 模組（macOS 實作）(AC: #1, #2, #3, #7)
-  - [x]1.1 建立 `src-tauri/src/plugins/keyboard_monitor.rs`，定義模組結構：
-    - `MONITOR_DURATION_MS: u64 = 5000` — 監聽時間窗口常數
+- [x]Task 1: 建立 keyboard_monitor.rs 模组（macOS 实作）(AC: #1, #2, #3, #7)
+  - [x]1.1 建立 `src-tauri/src/plugins/keyboard_monitor.rs`，定义模组结构：
+    - `MONITOR_DURATION_MS: u64 = 5000` — 监听时间窗口常数
     - `const BACKSPACE_KEYCODE: u16 = 51` — macOS Backspace keycode
     - `const DELETE_KEYCODE: u16 = 117` — macOS Delete (Forward Delete) keycode
-  - [x]1.2 定義共享狀態結構 `KeyboardMonitorState`：
-    - `is_monitoring: Arc<AtomicBool>` — 是否正在監聽
-    - `was_modified: Arc<AtomicBool>` — 是否偵測到修改按鍵
-    - `cancel_token: Arc<AtomicBool>` — 用於取消當前監控
-  - [x]1.3 實作 macOS CGEventTap 監聽：
-    - 建立新的 CGEventTap（ListenOnly mode）專門監聽 KeyDown 事件
-    - 在 callback 中檢查 keycode 是否為 Backspace(51) 或 Delete(117)
-    - 偵測到時設定 `was_modified = true`
-    - 使用獨立執行緒的 CFRunLoop 運行 event tap
-  - [x]1.4 實作 5 秒計時器邏輯：
-    - 啟動監聽時同步啟動 5 秒倒數計時器（`std::thread::sleep` 或 timer）
-    - 5 秒到期後停止 CGEventTap（`CFRunLoop::stop`）
-    - 透過 `app_handle.emit("quality-monitor:result", payload)` 發送結果
-  - [x]1.5 實作提前中斷邏輯：
-    - 若 `cancel_token` 被設為 true，立即停止監聽
-    - 回傳當前已收集的 `was_modified` 結果
+  - [x]1.2 定义共享状态结构 `KeyboardMonitorState`：
+    - `is_monitoring: Arc<AtomicBool>` — 是否正在监听
+    - `was_modified: Arc<AtomicBool>` — 是否侦测到修改按键
+    - `cancel_token: Arc<AtomicBool>` — 用于取消当前监控
+  - [x]1.3 实作 macOS CGEventTap 监听：
+    - 建立新的 CGEventTap（ListenOnly mode）专门监听 KeyDown 事件
+    - 在 callback 中检查 keycode 是否为 Backspace(51) 或 Delete(117)
+    - 侦测到时设定 `was_modified = true`
+    - 使用独立执行绪的 CFRunLoop 运行 event tap
+  - [x]1.4 实作 5 秒计时器逻辑：
+    - 启动监听时同步启动 5 秒倒数计时器（`std::thread::sleep` 或 timer）
+    - 5 秒到期后停止 CGEventTap（`CFRunLoop::stop`）
+    - 透过 `app_handle.emit("quality-monitor:result", payload)` 发送结果
+  - [x]1.5 实作提前中断逻辑：
+    - 若 `cancel_token` 被设为 true，立即停止监听
+    - 回传当前已收集的 `was_modified` 结果
 
-- [x]Task 2: 建立 keyboard_monitor.rs 模組（Windows 實作）(AC: #1, #2, #3, #7)
-  - [x]2.1 定義 Windows 鍵碼常數：
+- [x]Task 2: 建立 keyboard_monitor.rs 模组（Windows 实作）(AC: #1, #2, #3, #7)
+  - [x]2.1 定义 Windows 键码常数：
     - `const VK_BACK: u32 = 0x08` — Windows Backspace VK code
     - `const VK_DELETE: u32 = 0x2E` — Windows Delete VK code
-  - [x]2.2 實作 Windows WH_KEYBOARD_LL hook 監聽：
-    - 使用 `SetWindowsHookExW(WH_KEYBOARD_LL, ...)` 安裝全域鍵盤 hook
-    - 在 hook callback 中檢查 `vkCode` 是否為 VK_BACK 或 VK_DELETE
-    - 偵測到時設定 `was_modified = true`
-    - 使用 `GetMessageW` loop 驅動 hook 回呼
-  - [x]2.3 實作 5 秒計時器 + 提前中斷（與 macOS 同邏輯）：
-    - 5 秒到期後 `UnhookWindowsHookEx` + `PostThreadMessageW(WM_QUIT)` 結束 message loop
-    - 發送 Tauri Event 回傳結果
+  - [x]2.2 实作 Windows WH_KEYBOARD_LL hook 监听：
+    - 使用 `SetWindowsHookExW(WH_KEYBOARD_LL, ...)` 安装全域键盘 hook
+    - 在 hook callback 中检查 `vkCode` 是否为 VK_BACK 或 VK_DELETE
+    - 侦测到时设定 `was_modified = true`
+    - 使用 `GetMessageW` loop 驱动 hook 回呼
+  - [x]2.3 实作 5 秒计时器 + 提前中断（与 macOS 同逻辑）：
+    - 5 秒到期后 `UnhookWindowsHookEx` + `PostThreadMessageW(WM_QUIT)` 结束 message loop
+    - 发送 Tauri Event 回传结果
 
 - [x]Task 3: 建立 Tauri Command 介面 (AC: #4, #6)
-  - [x]3.1 實作 `#[tauri::command] fn start_quality_monitor(app: AppHandle)` command：
-    - 若已有監控進行中（`is_monitoring == true`），先取消：設定 `cancel_token = true`，等待短暫時間確保上一輪結束
-    - 重置狀態：`was_modified = false`, `is_monitoring = true`, `cancel_token = false`
-    - 啟動新的監控執行緒（平台分支：macOS/Windows）
-    - 立即回傳 `Ok(())`（非同步，不等待結果）
+  - [x]3.1 实作 `#[tauri::command] fn start_quality_monitor(app: AppHandle)` command：
+    - 若已有监控进行中（`is_monitoring == true`），先取消：设定 `cancel_token = true`，等待短暂时间确保上一轮结束
+    - 重置状态：`was_modified = false`, `is_monitoring = true`, `cancel_token = false`
+    - 启动新的监控执行绪（平台分支：macOS/Windows）
+    - 立即回传 `Ok(())`（非同步，不等待结果）
   - [x]3.2 在 `mod.rs` 中加入 `pub mod keyboard_monitor;`
-  - [x]3.3 在 `lib.rs` 的 `invoke_handler` 中註冊 `start_quality_monitor` command
-  - [x]3.4 在 `lib.rs` 的 `setup` 中初始化 `KeyboardMonitorState` 並 `app.manage(state)` 管理
+  - [x]3.3 在 `lib.rs` 的 `invoke_handler` 中注册 `start_quality_monitor` command
+  - [x]3.4 在 `lib.rs` 的 `setup` 中初始化 `KeyboardMonitorState` 并 `app.manage(state)` 管理
 
-- [x]Task 4: 前端整合 — useVoiceFlowStore 觸發與接收 (AC: #4, #6)
-  - [x]4.1 在 `useTauriEvents.ts` 新增事件常數：
+- [x]Task 4: 前端整合 — useVoiceFlowStore 触发与接收 (AC: #4, #6)
+  - [x]4.1 在 `useTauriEvents.ts` 新增事件常数：
     - `export const QUALITY_MONITOR_RESULT = "quality-monitor:result" as const;`
-  - [x]4.2 在 `types/events.ts` 新增 payload 型別：
+  - [x]4.2 在 `types/events.ts` 新增 payload 型别：
     - `export interface QualityMonitorResultPayload { wasModified: boolean; }`
-  - [x]4.3 在 `useVoiceFlowStore.ts` 新增狀態：
-    - `const lastWasModified = ref<boolean | null>(null)` — 最近一次品質監控結果
-  - [x]4.4 修改 `handleStopRecording()` 成功貼上後的邏輯：
-    - 在 `transitionTo("success", ...)` 之後，呼叫 `void invoke("start_quality_monitor")`
-    - 注意：使用 `void` 前綴（fire-and-forget），不 await，不阻塞成功狀態顯示
-  - [x]4.5 在 `initialize()` 中新增監聽 `quality-monitor:result` 事件：
+  - [x]4.3 在 `useVoiceFlowStore.ts` 新增状态：
+    - `const lastWasModified = ref<boolean | null>(null)` — 最近一次品质监控结果
+  - [x]4.4 修改 `handleStopRecording()` 成功贴上后的逻辑：
+    - 在 `transitionTo("success", ...)` 之后，呼叫 `void invoke("start_quality_monitor")`
+    - 注意：使用 `void` 前缀（fire-and-forget），不 await，不阻塞成功状态显示
+  - [x]4.5 在 `initialize()` 中新增监听 `quality-monitor:result` 事件：
     - `listen<QualityMonitorResultPayload>(QUALITY_MONITOR_RESULT, (event) => { lastWasModified.value = event.payload.wasModified; })`
-    - 將 unlisten 加入 `unlistenFunctions`
-  - [x]4.6 匯出 `lastWasModified` 供後續 Story 4.1 使用
-  - [x]4.7 在下一次錄音開始（`handleStartRecording`）時，重置 `lastWasModified.value = null`
+    - 将 unlisten 加入 `unlistenFunctions`
+  - [x]4.6 汇出 `lastWasModified` 供后续 Story 4.1 使用
+  - [x]4.7 在下一次录音开始（`handleStartRecording`）时，重置 `lastWasModified.value = null`
 
-- [x]Task 5: 測試驗證 (AC: #1-7)
-  - [x]5.1 Rust 單元測試（`keyboard_monitor.rs` 內 `#[cfg(test)] mod tests`）：
-    - 測試 `KeyboardMonitorState` 初始值（`is_monitoring = false`, `was_modified = false`）
-    - 測試狀態重置邏輯
-    - 測試 `cancel_token` 設定後 `is_monitoring` 轉為 false
-    - 注意：CGEventTap / Windows Hook 的實際鍵盤監聽不易在 CI 中測試，改以手動驗證
-  - [x]5.2 前端測試擴展（`tests/unit/use-voice-flow-store.test.ts`）：
-    - Mock `invoke("start_quality_monitor")` 確認貼上成功後被呼叫
-    - Mock `listen("quality-monitor:result")` 確認 `lastWasModified` 正確更新
-    - 測試下一次錄音開始時 `lastWasModified` 被重置為 null
-  - [x]5.3 `pnpm exec vue-tsc --noEmit` 通過
-  - [x]5.4 `cargo test` 通過（Rust 端）
-  - [x]5.5 手動測試：語音輸入 → 成功貼上 → 5 秒內按 Backspace → console log 顯示 `wasModified: true`
-  - [x]5.6 手動測試：語音輸入 → 成功貼上 → 5 秒內不按任何鍵 → console log 顯示 `wasModified: false`
-  - [x]5.7 手動測試：連續兩次語音輸入，第二次啟動時第一次監控被正確取消
-  - [x]5.8 手動測試：語音輸入貼上失敗（error 狀態）時不啟動品質監控
+- [x]Task 5: 测试验证 (AC: #1-7)
+  - [x]5.1 Rust 单元测试（`keyboard_monitor.rs` 内 `#[cfg(test)] mod tests`）：
+    - 测试 `KeyboardMonitorState` 初始值（`is_monitoring = false`, `was_modified = false`）
+    - 测试状态重置逻辑
+    - 测试 `cancel_token` 设定后 `is_monitoring` 转为 false
+    - 注意：CGEventTap / Windows Hook 的实际键盘监听不易在 CI 中测试，改以手动验证
+  - [x]5.2 前端测试扩展（`tests/unit/use-voice-flow-store.test.ts`）：
+    - Mock `invoke("start_quality_monitor")` 确认贴上成功后被呼叫
+    - Mock `listen("quality-monitor:result")` 确认 `lastWasModified` 正确更新
+    - 测试下一次录音开始时 `lastWasModified` 被重置为 null
+  - [x]5.3 `pnpm exec vue-tsc --noEmit` 通过
+  - [x]5.4 `cargo test` 通过（Rust 端）
+  - [x]5.5 手动测试：语音输入 → 成功贴上 → 5 秒内按 Backspace → console log 显示 `wasModified: true`
+  - [x]5.6 手动测试：语音输入 → 成功贴上 → 5 秒内不按任何键 → console log 显示 `wasModified: false`
+  - [x]5.7 手动测试：连续两次语音输入，第二次启动时第一次监控被正确取消
+  - [x]5.8 手动测试：语音输入贴上失败（error 状态）时不启动品质监控
 
 ## Dev Notes
 
-### 架構模式與約束
+### 架构模式与约束
 
-**Brownfield 專案** — 基於 Story 2.1-2.2（AI 文字整理 + prompt 自訂）繼續擴展。本 Story 是 Epic 2 的最後一個 Story，新增純 Rust 端模組 + 前端事件接收整合。
+**Brownfield 专案** — 基于 Story 2.1-2.2（AI 文字整理 + prompt 自订）继续扩展。本 Story 是 Epic 2 的最后一个 Story，新增纯 Rust 端模组 + 前端事件接收整合。
 
-**本 Story 的核心架構變更：**
-1. 新增 `keyboard_monitor.rs` Rust plugin 模組（OS-native 鍵盤監聽）
+**本 Story 的核心架构变更：**
+1. 新增 `keyboard_monitor.rs` Rust plugin 模组（OS-native 键盘监听）
 2. 新增 Tauri Command `start_quality_monitor`
 3. 新增 Tauri Event `quality-monitor:result`
-4. `useVoiceFlowStore` 擴展觸發/接收品質監控
+4. `useVoiceFlowStore` 扩展触发/接收品质监控
 
-**依賴方向規則（嚴格遵守）：**
+**依赖方向规则（严格遵守）：**
 ```
 Rust keyboard_monitor.rs → Tauri Event → 前端 store 接收
 前端 store → invoke("start_quality_monitor") → Rust command
 ```
 
 **禁止：**
-- 前端不做鍵盤監聽（Web API 無法監聽全域鍵盤）
-- 不做焦點判斷（簡單版設計決策，接受誤判）
-- 不阻塞語音輸入主流程
+- 前端不做键盘监听（Web API 无法监听全域键盘）
+- 不做焦点判断（简单版设计决策，接受误判）
+- 不阻塞语音输入主流程
 
-### keyboard_monitor.rs 設計
+### keyboard_monitor.rs 设计
 
-**與 hotkey_listener.rs 的關係：**
+**与 hotkey_listener.rs 的关系：**
 
-keyboard_monitor.rs 和 hotkey_listener.rs 都使用 OS-native 鍵盤 API，但職責完全不同：
+keyboard_monitor.rs 和 hotkey_listener.rs 都使用 OS-native 键盘 API，但职责完全不同：
 
-| 項目 | hotkey_listener.rs | keyboard_monitor.rs |
+| 项目 | hotkey_listener.rs | keyboard_monitor.rs |
 |------|-------------------|-------------------|
-| 用途 | 監聽觸發鍵（modifier keys） | 監聽 Backspace/Delete |
-| 生命週期 | App 生命週期常駐 | 按需啟動，5 秒後結束 |
-| 事件類型 | FlagsChanged（modifier） | KeyDown（一般鍵） |
-| 執行模式 | Plugin setup 時啟動 | Tauri Command 觸發 |
-| 結果通知 | 即時 emit 事件 | 5 秒後 emit 彙總結果 |
+| 用途 | 监听触发键（modifier keys） | 监听 Backspace/Delete |
+| 生命周期 | App 生命周期常驻 | 按需启动，5 秒后结束 |
+| 事件类型 | FlagsChanged（modifier） | KeyDown（一般键） |
+| 执行模式 | Plugin setup 时启动 | Tauri Command 触发 |
+| 结果通知 | 即时 emit 事件 | 5 秒后 emit 汇总结果 |
 
-**不共用 event tap/hook 的原因：** hotkey_listener 的 event tap 在 App 啟動時建立且永遠執行。keyboard_monitor 需要按需啟動/停止的短期監聽。兩者混用會增加狀態管理複雜度。獨立模組更清晰。
+**不共用 event tap/hook 的原因：** hotkey_listener 的 event tap 在 App 启动时建立且永远执行。keyboard_monitor 需要按需启动/停止的短期监听。两者混用会增加状态管理复杂度。独立模组更清晰。
 
-**macOS CGEventTap 實作策略：**
+**macOS CGEventTap 实作策略：**
 
 ```rust
-// keyboard_monitor.rs — macOS 實作概要
+// keyboard_monitor.rs — macOS 实作概要
 
 use core_foundation::runloop::{kCFRunLoopCommonModes, CFRunLoop};
 use core_graphics::event::{
@@ -169,7 +169,7 @@ fn start_monitoring_macos(
         let cancel_token = state.cancel_token.clone();
         let is_monitoring = state.is_monitoring.clone();
 
-        // 建立專用 CGEventTap（僅監聽 KeyDown）
+        // 建立专用 CGEventTap（仅监听 KeyDown）
         let tap = CGEventTap::new(
             CGEventTapLocation::Session,
             CGEventTapPlacement::HeadInsertEventTap,
@@ -187,11 +187,11 @@ fn start_monitoring_macos(
             },
         );
 
-        // 啟動 RunLoop + 5 秒計時器
-        // 使用另一個執行緒做計時，到期後停止 RunLoop
+        // 启动 RunLoop + 5 秒计时器
+        // 使用另一个执行绪做计时，到期后停止 RunLoop
         // ...
 
-        // 發送結果
+        // 发送结果
         let result = state.was_modified.load(Ordering::SeqCst);
         is_monitoring.store(false, Ordering::SeqCst);
         let _ = app_handle.emit("quality-monitor:result", serde_json::json!({
@@ -201,12 +201,12 @@ fn start_monitoring_macos(
 }
 ```
 
-**macOS 權限注意：** CGEventTap 需要 Accessibility 權限。hotkey_listener.rs 已在 App 啟動時檢查並引導授權。keyboard_monitor.rs 可以重用相同的權限（一旦 App 獲得 Accessibility 權限，所有 CGEventTap 都可用）。若權限未授予，CGEventTap 建立會失敗，應靜默處理（不阻塞主流程，直接回傳 wasModified = null/false）。
+**macOS 权限注意：** CGEventTap 需要 Accessibility 权限。hotkey_listener.rs 已在 App 启动时检查并引导授权。keyboard_monitor.rs 可以重用相同的权限（一旦 App 获得 Accessibility 权限，所有 CGEventTap 都可用）。若权限未授予，CGEventTap 建立会失败，应静默处理（不阻塞主流程，直接回传 wasModified = null/false）。
 
-**Windows WH_KEYBOARD_LL 實作策略：**
+**Windows WH_KEYBOARD_LL 实作策略：**
 
 ```rust
-// keyboard_monitor.rs — Windows 實作概要
+// keyboard_monitor.rs — Windows 实作概要
 
 const VK_BACK: u32 = 0x08;
 const VK_DELETE: u32 = 0x2E;
@@ -216,48 +216,48 @@ fn start_monitoring_windows(
     state: KeyboardMonitorState,
 ) {
     std::thread::spawn(move || {
-        // 安裝 WH_KEYBOARD_LL hook
-        // hook callback 中檢查 vkCode == VK_BACK || VK_DELETE
-        // 偵測到時設定 was_modified = true
+        // 安装 WH_KEYBOARD_LL hook
+        // hook callback 中检查 vkCode == VK_BACK || VK_DELETE
+        // 侦测到时设定 was_modified = true
 
-        // 5 秒計時器（另一個執行緒 sleep 5 秒後 PostThreadMessageW(WM_QUIT)）
-        // message loop 結束後 UnhookWindowsHookEx
+        // 5 秒计时器（另一个执行绪 sleep 5 秒后 PostThreadMessageW(WM_QUIT)）
+        // message loop 结束后 UnhookWindowsHookEx
 
-        // 發送結果
+        // 发送结果
     });
 }
 ```
 
-**Windows hook 注意：** `SetWindowsHookExW` 的 hook 會在一個新執行緒的 message loop 中運行。與 hotkey_listener 的 hook 是獨立的（不同執行緒、不同 hook handle）。hook callback 使用 `OnceLock` 或 thread-local 共享狀態。
+**Windows hook 注意：** `SetWindowsHookExW` 的 hook 会在一个新执行绪的 message loop 中运行。与 hotkey_listener 的 hook 是独立的（不同执行绪、不同 hook handle）。hook callback 使用 `OnceLock` 或 thread-local 共享状态。
 
-### 5 秒計時器 + 提前中斷設計
+### 5 秒计时器 + 提前中断设计
 
 ```
 start_quality_monitor() 被呼叫
     │
-    ├── 若已有監控進行中：
-    │   ├── 設定 cancel_token = true
-    │   ├── 短暫等待（50ms）確保上一輪清理
-    │   └── 繼續新一輪
+    ├── 若已有监控进行中：
+    │   ├── 设定 cancel_token = true
+    │   ├── 短暂等待（50ms）确保上一轮清理
+    │   └── 继续新一轮
     │
-    ├── 重置狀態
+    ├── 重置状态
     │   ├── was_modified = false
     │   ├── is_monitoring = true
     │   └── cancel_token = false
     │
-    ├── 啟動監聽執行緒（macOS/Windows 分支）
-    │   ├── CGEventTap / WH_KEYBOARD_LL hook 安裝
-    │   └── RunLoop / Message Loop 開始
+    ├── 启动监听执行绪（macOS/Windows 分支）
+    │   ├── CGEventTap / WH_KEYBOARD_LL hook 安装
+    │   └── RunLoop / Message Loop 开始
     │
-    └── 啟動計時器執行緒
-        ├── sleep(5 秒) 或 定期檢查 cancel_token
-        ├── 到期 → 停止監聽
+    └── 启动计时器执行绪
+        ├── sleep(5 秒) 或 定期检查 cancel_token
+        ├── 到期 → 停止监听
         │   ├── macOS: CFRunLoop::stop()
         │   └── Windows: PostThreadMessageW(WM_QUIT)
-        └── 發送 Tauri Event 回傳結果
+        └── 发送 Tauri Event 回传结果
 ```
 
-**cancel_token 檢查頻率：** 計時器不使用 `thread::sleep(5000ms)` 一次性等待（無法中斷）。改用 loop + `sleep(100ms)` 分段等待，每 100ms 檢查一次 `cancel_token`。50 次迭代 = 5 秒。
+**cancel_token 检查频率：** 计时器不使用 `thread::sleep(5000ms)` 一次性等待（无法中断）。改用 loop + `sleep(100ms)` 分段等待，每 100ms 检查一次 `cancel_token`。50 次迭代 = 5 秒。
 
 ```rust
 fn wait_with_cancellation(
@@ -278,7 +278,7 @@ fn wait_with_cancellation(
 
 ### Tauri Event Payload 格式
 
-**Event name:** `quality-monitor:result`（遵循 `{domain}:{action}` kebab-case 規範）
+**Event name:** `quality-monitor:result`（遵循 `{domain}:{action}` kebab-case 规范）
 
 **Payload：**
 ```json
@@ -306,7 +306,7 @@ listen<QualityMonitorResultPayload>(
 
 ### useVoiceFlowStore 修改策略
 
-**現有 handleStopRecording() 成功路徑（AI 整理分支）：**
+**现有 handleStopRecording() 成功路径（AI 整理分支）：**
 ```
 enhanceText() → enhancedText
   → hideHud()
@@ -315,7 +315,7 @@ enhanceText() → enhancedText
   → transitionTo("success", PASTE_SUCCESS_MESSAGE)
 ```
 
-**修改後：**
+**修改后：**
 ```
 enhanceText() → enhancedText
   → hideHud()
@@ -325,17 +325,17 @@ enhanceText() → enhancedText
   → void invoke("start_quality_monitor")  ← 新增（fire-and-forget）
 ```
 
-**同樣適用於所有成功貼上路徑：**
-1. AI 整理成功 → 貼上 enhancedText → start_quality_monitor
-2. AI fallback → 貼上 rawText → start_quality_monitor
-3. 跳過 AI（< 10 字）→ 貼上 rawText → start_quality_monitor
+**同样适用于所有成功贴上路径：**
+1. AI 整理成功 → 贴上 enhancedText → start_quality_monitor
+2. AI fallback → 贴上 rawText → start_quality_monitor
+3. 跳过 AI（< 10 字）→ 贴上 rawText → start_quality_monitor
 
-**不啟動品質監控的情況：**
-- 轉錄失敗（error 狀態）
-- 空轉錄結果
+**不启动品质监控的情况：**
+- 转录失败（error 状态）
+- 空转录结果
 - API Key 缺失
 
-**建議抽取輔助函式：**
+**建议抽取辅助函式：**
 ```typescript
 function startQualityMonitorAfterPaste() {
   void invoke("start_quality_monitor").catch((err) =>
@@ -346,125 +346,125 @@ function startQualityMonitorAfterPaste() {
 }
 ```
 
-在每個成功貼上路徑末尾呼叫此函式。
+在每个成功贴上路径末尾呼叫此函式。
 
-### macOS Keycode 參考
+### macOS Keycode 参考
 
-| 按鍵 | Keycode (decimal) | 用途 |
+| 按键 | Keycode (decimal) | 用途 |
 |------|-------------------|------|
-| Backspace (⌫) | 51 | 偵測修改 |
-| Delete (⌦, Forward Delete) | 117 | 偵測修改 |
+| Backspace (⌫) | 51 | 侦测修改 |
+| Delete (⌦, Forward Delete) | 117 | 侦测修改 |
 | Fn | 63 | hotkey_listener 使用 |
 | Option (L) | 58 | hotkey_listener 使用 |
 
-### Windows VK Code 參考
+### Windows VK Code 参考
 
-| 按鍵 | VK Code | 用途 |
+| 按键 | VK Code | 用途 |
 |------|---------|------|
-| Backspace | 0x08 (VK_BACK) | 偵測修改 |
-| Delete | 0x2E (VK_DELETE) | 偵測修改 |
+| Backspace | 0x08 (VK_BACK) | 侦测修改 |
+| Delete | 0x2E (VK_DELETE) | 侦测修改 |
 | Right Alt | 0xA5 (VK_RMENU) | hotkey_listener 使用 |
 
-### Cargo.toml 依賴分析
+### Cargo.toml 依赖分析
 
-**不需要新增 Rust 依賴。** keyboard_monitor.rs 使用的所有 crate 已在 Cargo.toml 中：
+**不需要新增 Rust 依赖。** keyboard_monitor.rs 使用的所有 crate 已在 Cargo.toml 中：
 - macOS: `core-graphics 0.24`, `core-foundation 0.10` — 已存在
 - Windows: `windows 0.61` with `Win32_UI_WindowsAndMessaging`, `Win32_UI_Input_KeyboardAndMouse` features — 已存在
 - `serde`, `serde_json` — 已存在
 - `tauri` — 已存在
 
-**不需要新增 JS 依賴。** 前端僅使用 Tauri 核心 API（`invoke`, `listen`）。
+**不需要新增 JS 依赖。** 前端仅使用 Tauri 核心 API（`invoke`, `listen`）。
 
-### 檔案層級 Capabilities 注意
+### 档案层级 Capabilities 注意
 
-`capabilities/default.json` 目前已包含 `core:event:default` 和 `core:event:allow-emit`，Rust 端 `emit` 事件到前端不需額外權限。`invoke` command 需要確認 invoke handler 已註冊（Task 3.3）。
+`capabilities/default.json` 目前已包含 `core:event:default` 和 `core:event:allow-emit`，Rust 端 `emit` 事件到前端不需额外权限。`invoke` command 需要确认 invoke handler 已注册（Task 3.3）。
 
-### 跨 Story 注意事項
+### 跨 Story 注意事项
 
-- **Story 4.1** 會在 success 後寫入歷史記錄，包含 `wasModified` 欄位。本 Story 的 `lastWasModified` 供 4.1 讀取：`useVoiceFlowStore().lastWasModified`。
-- **Story 2.1/2.2** 的 `handleStopRecording()` 有多個成功貼上路徑（AI 成功、AI fallback、跳過 AI），每個都需要觸發品質監控。
-- **TranscriptionRecord** type（`types/transcription.ts`）已預定義 `wasModified: boolean | null` 欄位（line 14）。
-- **SQLite schema**（architecture.md）的 `transcriptions` table 已預定義 `was_modified INTEGER` 欄位。
-- `hotkey_listener.rs` 的 CGEventTap 使用 `CGEventTapOptions::ListenOnly`，keyboard_monitor 也必須使用 `ListenOnly`（不攔截、不修改事件）。
+- **Story 4.1** 会在 success 后写入历史记录，包含 `wasModified` 栏位。本 Story 的 `lastWasModified` 供 4.1 读取：`useVoiceFlowStore().lastWasModified`。
+- **Story 2.1/2.2** 的 `handleStopRecording()` 有多个成功贴上路径（AI 成功、AI fallback、跳过 AI），每个都需要触发品质监控。
+- **TranscriptionRecord** type（`types/transcription.ts`）已预定义 `wasModified: boolean | null` 栏位（line 14）。
+- **SQLite schema**（architecture.md）的 `transcriptions` table 已预定义 `was_modified INTEGER` 栏位。
+- `hotkey_listener.rs` 的 CGEventTap 使用 `CGEventTapOptions::ListenOnly`，keyboard_monitor 也必须使用 `ListenOnly`（不拦截、不修改事件）。
 
-### 前一個 Story (2.2) 關鍵學習
+### 前一个 Story (2.2) 关键学习
 
-- `enhanceText()` 的 options 參數使用 optional interface，向後相容
+- `enhanceText()` 的 options 参数使用 optional interface，向后相容
 - `useSettingsStore` 的 tauri-plugin-store 操作模式：`store.get()` / `store.set()` / `store.save()`
-- `handleStopRecording()` 的 AI 整理流程有 3 個成功 exit path（AI 成功 / AI fallback / 跳過 AI），每個都需要新增品質監控觸發
-- `writeInfoLog` / `writeErrorLog` 用於所有關鍵節點
-- Tauri Event 命名遵循 `{domain}:{action}` kebab-case 規範
+- `handleStopRecording()` 的 AI 整理流程有 3 个成功 exit path（AI 成功 / AI fallback / 跳过 AI），每个都需要新增品质监控触发
+- `writeInfoLog` / `writeErrorLog` 用于所有关键节点
+- Tauri Event 命名遵循 `{domain}:{action}` kebab-case 规范
 
-### 現有檔案改動點
+### 现有档案改动点
 
-**新增檔案：**
+**新增档案：**
 ```
-src-tauri/src/plugins/keyboard_monitor.rs — OS-native 鍵盤監控模組
+src-tauri/src/plugins/keyboard_monitor.rs — OS-native 键盘监控模组
 ```
 
-**修改檔案：**
+**修改档案：**
 ```
 src-tauri/src/plugins/mod.rs              — 新增 pub mod keyboard_monitor
-src-tauri/src/lib.rs                       — 註冊 start_quality_monitor command + 初始化 state
-src/composables/useTauriEvents.ts          — 新增 QUALITY_MONITOR_RESULT 事件常數
-src/types/events.ts                        — 新增 QualityMonitorResultPayload 型別
-src/stores/useVoiceFlowStore.ts            — 觸發品質監控 + 接收結果 + lastWasModified state
-tests/unit/use-voice-flow-store.test.ts    — 新增品質監控相關測試案例
+src-tauri/src/lib.rs                       — 注册 start_quality_monitor command + 初始化 state
+src/composables/useTauriEvents.ts          — 新增 QUALITY_MONITOR_RESULT 事件常数
+src/types/events.ts                        — 新增 QualityMonitorResultPayload 型别
+src/stores/useVoiceFlowStore.ts            — 触发品质监控 + 接收结果 + lastWasModified state
+tests/unit/use-voice-flow-store.test.ts    — 新增品质监控相关测试案例
 ```
 
-**不修改的檔案（明確排除）：**
-- `src/lib/enhancer.ts` — AI 整理邏輯不變
-- `src/lib/transcriber.ts` — 轉錄邏輯不變
-- `src/lib/recorder.ts` — 錄音邏輯不變
-- `src/components/NotchHud.vue` — HUD 不顯示品質監控狀態
-- `src/views/SettingsView.vue` — 設定頁面不涉及品質監控
-- `src/stores/useSettingsStore.ts` — 設定 store 不涉及
-- `src/types/index.ts` — HudStatus 不新增狀態
-- `src/types/transcription.ts` — wasModified 欄位已預定義
-- `Cargo.toml` / `package.json` — 不需新增依賴
-- `src-tauri/capabilities/default.json` — 現有權限已足夠
-- `src-tauri/src/plugins/hotkey_listener.rs` — 不修改，獨立模組
+**不修改的档案（明确排除）：**
+- `src/lib/enhancer.ts` — AI 整理逻辑不变
+- `src/lib/transcriber.ts` — 转录逻辑不变
+- `src/lib/recorder.ts` — 录音逻辑不变
+- `src/components/NotchHud.vue` — HUD 不显示品质监控状态
+- `src/views/SettingsView.vue` — 设定页面不涉及品质监控
+- `src/stores/useSettingsStore.ts` — 设定 store 不涉及
+- `src/types/index.ts` — HudStatus 不新增状态
+- `src/types/transcription.ts` — wasModified 栏位已预定义
+- `Cargo.toml` / `package.json` — 不需新增依赖
+- `src-tauri/capabilities/default.json` — 现有权限已足够
+- `src-tauri/src/plugins/hotkey_listener.rs` — 不修改，独立模组
 - `src-tauri/src/plugins/clipboard_paste.rs` — 不修改
 
-### 安全規則提醒
+### 安全规则提醒
 
-- 鍵盤監控使用 `ListenOnly` mode，不攔截或修改系統鍵盤事件
-- 不記錄按鍵內容到日誌（僅記錄是否偵測到 Backspace/Delete 的布林結果）
-- 監控結果不包含任何個人資訊（僅 `wasModified: boolean`）
-- macOS Accessibility 權限是 hotkey_listener 已處理的前提條件
+- 键盘监控使用 `ListenOnly` mode，不拦截或修改系统键盘事件
+- 不记录按键内容到日志（仅记录是否侦测到 Backspace/Delete 的布林结果）
+- 监控结果不包含任何个人资讯（仅 `wasModified: boolean`）
+- macOS Accessibility 权限是 hotkey_listener 已处理的前提条件
 
-### 效能注意事項
+### 效能注意事项
 
-- CGEventTap / Windows Hook 是 OS-native API，overhead 極低（< 1ms per event）
-- 5 秒監聽期間的 CPU 使用幾乎為零（event-driven，非 polling）
-- 監聽執行緒在 5 秒後自動清理，不造成資源洩漏
-- cancel_token 檢查間隔 100ms，取消響應延遲最多 100ms
-- 品質監控不影響 E2E 延遲（fire-and-forget，在成功貼上後才啟動）
+- CGEventTap / Windows Hook 是 OS-native API，overhead 极低（< 1ms per event）
+- 5 秒监听期间的 CPU 使用几乎为零（event-driven，非 polling）
+- 监听执行绪在 5 秒后自动清理，不造成资源泄漏
+- cancel_token 检查间隔 100ms，取消响应延迟最多 100ms
+- 品质监控不影响 E2E 延迟（fire-and-forget，在成功贴上后才启动）
 
-### Git 歷史分析
+### Git 历史分析
 
 **最近 commit 模式：**
-- `feat:` 前綴用於功能實作
-- `fix:` 前綴用於 code review 後修復
-- `docs:` 前綴用於 BMAD artifacts 更新
+- `feat:` 前缀用于功能实作
+- `fix:` 前缀用于 code review 后修复
+- `docs:` 前缀用于 BMAD artifacts 更新
 
 ### References
 
 - [Source: _bmad-output/planning-artifacts/epics.md#Epic 2 — Story 2.3]
 - [Source: _bmad-output/planning-artifacts/architecture.md#Project Structure — plugins/keyboard_monitor.rs]
-- [Source: _bmad-output/planning-artifacts/architecture.md#Integration Points — clipboard_paste.rs 擴展貼上後監控]
-- [Source: _bmad-output/planning-artifacts/prd.md#文字輸出 FR15 — 貼上後鍵盤監控品質衡量]
-- [Source: _bmad-output/planning-artifacts/prd.md#Risk Mitigation — 貼上後鍵盤監控的準確度]
+- [Source: _bmad-output/planning-artifacts/architecture.md#Integration Points — clipboard_paste.rs 扩展贴上后监控]
+- [Source: _bmad-output/planning-artifacts/prd.md#文字输出 FR15 — 贴上后键盘监控品质衡量]
+- [Source: _bmad-output/planning-artifacts/prd.md#Risk Mitigation — 贴上后键盘监控的准确度]
 - [Source: _bmad-output/implementation-artifacts/2-1-groq-llm-text-enhancement.md — useVoiceFlowStore handleStopRecording 流程]
-- [Source: _bmad-output/implementation-artifacts/2-2-ai-prompt-customization-context.md — handleStopRecording 多個成功路徑]
-- [Source: Codebase — src-tauri/src/plugins/hotkey_listener.rs（CGEventTap + Windows Hook 模式參考）]
-- [Source: Codebase — src-tauri/src/plugins/clipboard_paste.rs（Rust command 模式參考）]
-- [Source: Codebase — src-tauri/src/lib.rs（command 註冊 + state 管理模式）]
-- [Source: Codebase — src/stores/useVoiceFlowStore.ts（擴展目標 — 3 個成功貼上路徑）]
-- [Source: Codebase — src/types/transcription.ts — TranscriptionRecord.wasModified 已預定義]
-- [Source: Codebase — src/types/events.ts（事件 payload 型別模式參考）]
-- [Source: Codebase — src/composables/useTauriEvents.ts（事件常數命名模式參考）]
-- [Source: Codebase — src-tauri/Cargo.toml — 確認現有依賴已足夠]
+- [Source: _bmad-output/implementation-artifacts/2-2-ai-prompt-customization-context.md — handleStopRecording 多个成功路径]
+- [Source: Codebase — src-tauri/src/plugins/hotkey_listener.rs（CGEventTap + Windows Hook 模式参考）]
+- [Source: Codebase — src-tauri/src/plugins/clipboard_paste.rs（Rust command 模式参考）]
+- [Source: Codebase — src-tauri/src/lib.rs（command 注册 + state 管理模式）]
+- [Source: Codebase — src/stores/useVoiceFlowStore.ts（扩展目标 — 3 个成功贴上路径）]
+- [Source: Codebase — src/types/transcription.ts — TranscriptionRecord.wasModified 已预定义]
+- [Source: Codebase — src/types/events.ts（事件 payload 型别模式参考）]
+- [Source: Codebase — src/composables/useTauriEvents.ts（事件常数命名模式参考）]
+- [Source: Codebase — src-tauri/Cargo.toml — 确认现有依赖已足够]
 
 ## Dev Agent Record
 
@@ -474,19 +474,19 @@ Claude Opus 4.6
 
 ### Debug Log References
 
-- vue-tsc: 無新增錯誤
+- vue-tsc: 无新增错误
 - pnpm test: 116 JS + 19 Rust tests passed
 
 ### Completion Notes List
 
 - keyboard_monitor.rs 建立（macOS CGEventTap + Windows WH_KEYBOARD_LL）
-- 5 秒監控視窗 + cancel_token 提前中斷機制
+- 5 秒监控视窗 + cancel_token 提前中断机制
 - useVoiceFlowStore 整合 startQualityMonitorAfterPaste + lastWasModified
-- useTauriEvents 新增 QUALITY_MONITOR_RESULT 事件常數
+- useTauriEvents 新增 QUALITY_MONITOR_RESULT 事件常数
 
 ### Change Log
 
-- Story 2.3 完整實作 — 貼上後品質監控
+- Story 2.3 完整实作 — 贴上后品质监控
 
 ### File List
 

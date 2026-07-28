@@ -22,6 +22,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Check simplified Chinese
+        run: node scripts/check-simplified-chinese.mjs
+
       - name: Type check
         run: npx vue-tsc --noEmit
 

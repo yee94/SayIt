@@ -51,9 +51,9 @@ impl KeyboardMonitorState {
         let correction_enter_pressed = Arc::new(AtomicBool::new(false));
         let correction_last_key_time = Arc::new(Mutex::new(Instant::now()));
 
-        // 啟動持久的平台鍵盤監聽器（建立一次，永不銷毀）
-        // 靠 is_monitoring / correction_monitoring flag 控制是否處理事件
-        // 避免每次轉錄重新建立/銷毀 CGEventTap — 這是幽靈 Enter 的根因
+        // 启动持久的平台键盘监听器（建立一次，永不销毁）
+        // 靠 is_monitoring / correction_monitoring flag 控制是否处理事件
+        // 避免每次转录重新建立/销毁 CGEventTap — 这是幽灵 Enter 的根因
         #[cfg(target_os = "macos")]
         {
             let m = is_monitoring.clone();
@@ -107,7 +107,7 @@ impl KeyboardMonitorState {
     }
 }
 
-/// 分段等待，定期檢查 cancel_token。回傳 true 表示被取消。
+/// 分段等待，定期检查 cancel_token。回传 true 表示被取消。
 fn wait_with_cancellation(
     cancel_token: &Arc<AtomicBool>,
     duration_ms: u64,
@@ -127,9 +127,7 @@ fn emit_quality_result<R: Runtime>(app_handle: &AppHandle<R>, was_modified: bool
     let payload = QualityMonitorResultPayload { was_modified };
     let _ = app_handle.emit("quality-monitor:result", payload);
     #[cfg(debug_assertions)]
-    println!(
-        "[keyboard-monitor] Emitted quality result: wasModified={was_modified}"
-    );
+    println!("[keyboard-monitor] Emitted quality result: wasModified={was_modified}");
 }
 
 fn emit_correction_result<R: Runtime>(
@@ -180,19 +178,18 @@ fn run_persistent_event_tap(
         CGEventTapOptions::ListenOnly,
         vec![CGEventType::KeyDown],
         move |_proxy, _event_type, event| {
-            let keycode = event.get_integer_value_field(
-                core_graphics::event::EventField::KEYBOARD_EVENT_KEYCODE,
-            ) as u16;
+            let keycode = event
+                .get_integer_value_field(core_graphics::event::EventField::KEYBOARD_EVENT_KEYCODE)
+                as u16;
 
             // Quality monitor logic (unchanged)
             if is_monitoring.load(Ordering::SeqCst)
-                && (keycode == macos_keycodes::BACKSPACE || keycode == macos_keycodes::DELETE) {
-                    was_modified.store(true, Ordering::SeqCst);
-                    #[cfg(debug_assertions)]
-                    println!(
-                        "[keyboard-monitor] Quality: detected modify key: keycode={keycode}"
-                    );
-                }
+                && (keycode == macos_keycodes::BACKSPACE || keycode == macos_keycodes::DELETE)
+            {
+                was_modified.store(true, Ordering::SeqCst);
+                #[cfg(debug_assertions)]
+                println!("[keyboard-monitor] Quality: detected modify key: keycode={keycode}");
+            }
 
             // Correction monitor logic (independent)
             if correction_monitoring.load(Ordering::SeqCst) {
@@ -297,7 +294,9 @@ fn run_persistent_hook(
 
                     // Correction monitor logic (independent)
                     if state.correction_monitoring.load(Ordering::SeqCst) {
-                        state.correction_any_key_pressed.store(true, Ordering::SeqCst);
+                        state
+                            .correction_any_key_pressed
+                            .store(true, Ordering::SeqCst);
                         if let Ok(mut t) = state.correction_last_key_time.lock() {
                             *t = Instant::now();
                         }
@@ -329,7 +328,10 @@ fn run_persistent_hook(
                 println!("[keyboard-monitor] Persistent Windows hook removed");
             }
             Err(e) => {
-                eprintln!("[keyboard-monitor] Failed to install persistent hook: {}", e);
+                eprintln!(
+                    "[keyboard-monitor] Failed to install persistent hook: {}",
+                    e
+                );
             }
         }
     }
@@ -341,7 +343,7 @@ fn run_persistent_hook(
 pub fn start_quality_monitor<R: Runtime>(app: AppHandle<R>) {
     let state = app.state::<KeyboardMonitorState>();
 
-    // 若已有監控進行中，先取消
+    // 若已有监控进行中，先取消
     if state.is_monitoring.load(Ordering::SeqCst) {
         #[cfg(debug_assertions)]
         println!("[keyboard-monitor] Cancelling previous quality monitor session");
@@ -349,7 +351,7 @@ pub fn start_quality_monitor<R: Runtime>(app: AppHandle<R>) {
         std::thread::sleep(Duration::from_millis(150));
     }
 
-    // 重置狀態
+    // 重置状态
     state.was_modified.store(false, Ordering::SeqCst);
     state.is_monitoring.store(true, Ordering::SeqCst);
     state.cancel_token.store(false, Ordering::SeqCst);
@@ -357,18 +359,15 @@ pub fn start_quality_monitor<R: Runtime>(app: AppHandle<R>) {
     #[cfg(debug_assertions)]
     println!("[keyboard-monitor] Starting quality monitor");
 
-    // 計時器：5 秒後結束監控並回傳結果
-    // 持久 CGEventTap/Hook 已在背景運行，這裡只控制 flag 和計時
+    // 计时器：5 秒后结束监控并回传结果
+    // 持久 CGEventTap/Hook 已在背景运行，这里只控制 flag 和计时
     let is_monitoring = state.is_monitoring.clone();
     let was_modified = state.was_modified.clone();
     let cancel_token = state.cancel_token.clone();
 
     std::thread::spawn(move || {
-        let cancelled = wait_with_cancellation(
-            &cancel_token,
-            MONITOR_DURATION_MS,
-            CANCEL_CHECK_INTERVAL_MS,
-        );
+        let cancelled =
+            wait_with_cancellation(&cancel_token, MONITOR_DURATION_MS, CANCEL_CHECK_INTERVAL_MS);
         if cancelled {
             #[cfg(debug_assertions)]
             println!("[keyboard-monitor] Quality monitoring cancelled");
@@ -382,7 +381,7 @@ pub fn start_quality_monitor<R: Runtime>(app: AppHandle<R>) {
 pub fn start_correction_monitor<R: Runtime>(app: AppHandle<R>) {
     let state = app.state::<KeyboardMonitorState>();
 
-    // 若已有 correction 監控進行中，先取消
+    // 若已有 correction 监控进行中，先取消
     if state.correction_monitoring.load(Ordering::SeqCst) {
         #[cfg(debug_assertions)]
         println!("[keyboard-monitor] Cancelling previous correction monitor session");
@@ -401,9 +400,7 @@ pub fn start_correction_monitor<R: Runtime>(app: AppHandle<R>) {
         *t = Instant::now();
     }
     state.correction_monitoring.store(true, Ordering::SeqCst);
-    state
-        .correction_cancel_token
-        .store(false, Ordering::SeqCst);
+    state.correction_cancel_token.store(false, Ordering::SeqCst);
 
     #[cfg(debug_assertions)]
     println!("[keyboard-monitor] Starting correction monitor");
@@ -417,7 +414,7 @@ pub fn start_correction_monitor<R: Runtime>(app: AppHandle<R>) {
     std::thread::spawn(move || {
         let phase1_start = Instant::now();
 
-        // Phase 1: 等待首次按鍵，最長 CORRECTION_PHASE1_TIMEOUT_MS
+        // Phase 1: 等待首次按键，最长 CORRECTION_PHASE1_TIMEOUT_MS
         loop {
             if cancel_token.load(Ordering::SeqCst) {
                 correction_monitoring.store(false, Ordering::SeqCst);
@@ -425,14 +422,14 @@ pub fn start_correction_monitor<R: Runtime>(app: AppHandle<R>) {
             }
 
             if any_key_pressed.load(Ordering::SeqCst) {
-                // 偵測到首次按鍵，立即進入 Phase 2
+                // 侦测到首次按键，立即进入 Phase 2
                 #[cfg(debug_assertions)]
                 println!("[keyboard-monitor] Correction: Phase 1 → Phase 2 (key detected)");
                 break;
             }
 
             if phase1_start.elapsed() >= Duration::from_millis(CORRECTION_PHASE1_TIMEOUT_MS) {
-                // Phase 1 timeout：使用者沒按任何鍵
+                // Phase 1 timeout：使用者没按任何键
                 correction_monitoring.store(false, Ordering::SeqCst);
                 emit_correction_result(&app, false, false, false);
                 return;
@@ -441,7 +438,7 @@ pub fn start_correction_monitor<R: Runtime>(app: AppHandle<R>) {
             std::thread::sleep(Duration::from_millis(CANCEL_CHECK_INTERVAL_MS));
         }
 
-        // Phase 2: 追蹤修正，等 Enter 或 idle timeout
+        // Phase 2: 追踪修正，等 Enter 或 idle timeout
         let phase2_start = Instant::now();
 
         loop {
@@ -450,11 +447,11 @@ pub fn start_correction_monitor<R: Runtime>(app: AppHandle<R>) {
                 return;
             }
 
-            // Enter 偵測（debounce 500ms — IME 選字也按 Enter）
+            // Enter 侦测（debounce 500ms — IME 选字也按 Enter）
             if enter_pressed.load(Ordering::SeqCst) {
-                // 記錄 Enter 時間，等 debounce 期間是否有新按鍵
+                // 记录 Enter 时间，等 debounce 期间是否有新按键
                 let enter_time = Instant::now();
-                // 重設 flag + last_key_time snapshot
+                // 重设 flag + last_key_time snapshot
                 enter_pressed.store(false, Ordering::SeqCst);
                 let key_time_at_enter = last_key_time.lock().map(|t| *t).unwrap_or(enter_time);
 
@@ -467,7 +464,7 @@ pub fn start_correction_monitor<R: Runtime>(app: AppHandle<R>) {
                         correction_monitoring.store(false, Ordering::SeqCst);
                         return;
                     }
-                    // 檢查 debounce 期間是否有新按鍵（last_key_time 比 Enter 時更新）
+                    // 检查 debounce 期间是否有新按键（last_key_time 比 Enter 时更新）
                     if let Ok(t) = last_key_time.lock() {
                         if *t > key_time_at_enter {
                             ime_followup = true;
@@ -478,13 +475,13 @@ pub fn start_correction_monitor<R: Runtime>(app: AppHandle<R>) {
                 }
 
                 if ime_followup {
-                    // IME 選字後繼續打字，不是真正的 Enter 送出
+                    // IME 选字后继续打字，不是真正的 Enter 送出
                     #[cfg(debug_assertions)]
                     println!("[keyboard-monitor] Correction: Enter was IME confirm, continuing");
                     continue;
                 }
 
-                // debounce 期間無新按鍵 → 真正的 Enter 送出
+                // debounce 期间无新按键 → 真正的 Enter 送出
                 #[cfg(debug_assertions)]
                 println!("[keyboard-monitor] Correction: Enter confirmed (real send)");
                 correction_monitoring.store(false, Ordering::SeqCst);
@@ -492,7 +489,7 @@ pub fn start_correction_monitor<R: Runtime>(app: AppHandle<R>) {
                 return;
             }
 
-            // Idle timeout：最後按鍵後 3 秒無新按鍵
+            // Idle timeout：最后按键后 3 秒无新按键
             let idle_duration = if let Ok(t) = last_key_time.lock() {
                 t.elapsed()
             } else {
@@ -541,7 +538,7 @@ mod tests {
         state.was_modified.store(true, Ordering::SeqCst);
         state.cancel_token.store(true, Ordering::SeqCst);
 
-        // 模擬重置
+        // 模拟重置
         state.was_modified.store(false, Ordering::SeqCst);
         state.is_monitoring.store(true, Ordering::SeqCst);
         state.cancel_token.store(false, Ordering::SeqCst);
@@ -556,7 +553,7 @@ mod tests {
         let state = KeyboardMonitorState::new();
         state.is_monitoring.store(true, Ordering::SeqCst);
 
-        // 設定取消
+        // 设定取消
         state.cancel_token.store(true, Ordering::SeqCst);
 
         assert!(state.cancel_token.load(Ordering::SeqCst));
@@ -574,7 +571,7 @@ mod tests {
         let cancel_token = Arc::new(AtomicBool::new(false));
         let cancel_clone = cancel_token.clone();
 
-        // 另一個執行緒在 50ms 後取消
+        // 另一个执行绪在 50ms 后取消
         std::thread::spawn(move || {
             std::thread::sleep(Duration::from_millis(50));
             cancel_clone.store(true, Ordering::SeqCst);

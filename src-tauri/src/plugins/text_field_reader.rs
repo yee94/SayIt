@@ -1,8 +1,8 @@
-/// 讀取當前 focused text field 游標附近的文字。
-/// macOS: 透過 AXUIElement Accessibility API。
-/// Windows: 透過 UI Automation（IUIAutomation + TextPattern/ValuePattern，跑在專用 MTA 執行緒）。
+/// 读取当前 focused text field 游标附近的文字。
+/// macOS: 透过 AXUIElement Accessibility API。
+/// Windows: 透过 UI Automation（IUIAutomation + TextPattern/ValuePattern，跑在专用 MTA 执行绪）。
 ///
-/// 契約：回傳「游標附近、有上限」的文字（非整份文件）；讀不到一律回 `Ok(None)`。
+/// 契约：回传「游标附近、有上限」的文字（非整份文件）；读不到一律回 `Ok(None)`。
 #[tauri::command]
 pub fn read_focused_text_field() -> Result<Option<String>, String> {
     #[cfg(target_os = "macos")]
@@ -21,16 +21,16 @@ pub fn read_focused_text_field() -> Result<Option<String>, String> {
     }
 }
 
-/// 讀取當前聚焦文字欄位中被選取（highlight）的文字。
-/// 編輯模式的「剪貼簿後備」路徑：僅在 `read_selection_state` 回報
-/// unavailable（AX 不可見的 App）時、於錄音停止且按鍵放開後由前端呼叫。
-/// 透過模擬 Cmd+C / Ctrl+C 擷取剪貼簿內容。
+/// 读取当前聚焦文字栏位中被选取（highlight）的文字。
+/// 编辑模式的「剪贴簿后备」路径：仅在 `read_selection_state` 回报
+/// unavailable（AX 不可见的 App）时、于录音停止且按键放开后由前端呼叫。
+/// 透过模拟 Cmd+C / Ctrl+C 撷取剪贴簿内容。
 #[tauri::command]
 pub fn read_selected_text() -> Result<Option<String>, String> {
     super::clipboard_paste::capture_selected_text_via_clipboard()
 }
 
-/// 選取狀態偵測結果（#24/#25 編輯模式判定）。
+/// 选取状态侦测结果（#24/#25 编辑模式判定）。
 #[derive(serde::Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SelectionState {
@@ -40,8 +40,8 @@ pub struct SelectionState {
 }
 
 impl SelectionState {
-    // selection / no_selection 僅 macOS 的 AX 分類器使用；
-    // Windows 端一律 unavailable，cfg 閘避免 dead_code 撞上 clippy -D warnings
+    // selection / no_selection 仅 macOS 的 AX 分类器使用；
+    // Windows 端一律 unavailable，cfg 闸避免 dead_code 撞上 clippy -D warnings
     #[cfg(target_os = "macos")]
     fn selection(text: String) -> Self {
         Self {
@@ -64,14 +64,14 @@ impl SelectionState {
     }
 }
 
-/// 讀取聚焦文字欄位的選取狀態——編輯模式判定的主路徑。
-/// macOS：AX 被動查詢（零按鍵模擬，#25 的字元污染在此路徑不可能發生）。三態：
-///   selection    — 確定有選取，text 為選取內容 → 前端直接進編輯模式
-///   noSelection  — 確定無選取（AX 可讀且長度 0）→ 一般聽寫，
-///                  CodeMirror 類編輯器的「無選取複製整行」誤判（#24）在此被排除
-///   unavailable  — AX 不可見或讀值失真（Heptabase/LINE 類）→ 前端在錄音停止、
-///                  按鍵放開後改走剪貼簿後備（read_selected_text）
-/// Windows / 其他平台：一律 unavailable（沿用剪貼簿後備；選取讀取待 UIA 版補上）。
+/// 读取聚焦文字栏位的选取状态——编辑模式判定的主路径。
+/// macOS：AX 被动查询（零按键模拟，#25 的字元污染在此路径不可能发生）。三态：
+///   selection    — 确定有选取，text 为选取内容 → 前端直接进编辑模式
+///   noSelection  — 确定无选取（AX 可读且长度 0）→ 一般听写，
+///                  CodeMirror 类编辑器的「无选取复制整行」误判（#24）在此被排除
+///   unavailable  — AX 不可见或读值失真（Heptabase/LINE 类）→ 前端在录音停止、
+///                  按键放开后改走剪贴簿后备（read_selected_text）
+/// Windows / 其他平台：一律 unavailable（沿用剪贴簿后备；选取读取待 UIA 版补上）。
 #[tauri::command]
 pub fn read_selection_state() -> SelectionState {
     #[cfg(target_os = "macos")]
@@ -110,11 +110,11 @@ mod macos {
     const CONTEXT_CHARS: usize = 50;
     const FALLBACK_CHARS: usize = 100;
 
-    /// 選取狀態讀取的總 timeout：AX 是同步跨進程呼叫，目標 App 卡死會阻塞
-    /// （對齊 windows_impl 的守衛設計）。上限涵蓋「解析失敗 → 戳醒 Electron →
-    /// 等樹重建 → 重試」的最長路徑。
+    /// 选取状态读取的总 timeout：AX 是同步跨进程呼叫，目标 App 卡死会阻塞
+    /// （对齐 windows_impl 的守卫设计）。上限涵盖「解析失败 → 戳醒 Electron →
+    /// 等树重建 → 重试」的最长路径。
     const SELECTION_READ_TIMEOUT_MS: u64 = 600;
-    /// 對 Electron 施加 AXManualAccessibility 後等樹重建的時間。
+    /// 对 Electron 施加 AXManualAccessibility 后等树重建的时间。
     const POKE_SETTLE_MS: u64 = 150;
 
     extern "C" {
@@ -166,7 +166,7 @@ mod macos {
         Some(cf_string.to_string())
     }
 
-    /// 讀取 AXSelectedTextRange 並解出 CFRange（游標位置 + 選取長度的共用來源）。
+    /// 读取 AXSelectedTextRange 并解出 CFRange（游标位置 + 选取长度的共用来源）。
     fn read_selected_text_range(element: AXUIElementRef) -> Option<CFRange> {
         let value = get_ax_attribute(element, K_AX_SELECTED_TEXT_RANGE_ATTRIBUTE)?;
 
@@ -231,7 +231,7 @@ mod macos {
         )
     }
 
-    /// AX 元素走訪結果。呼叫端負責讀取屬性後呼叫 `cleanup()` 釋放所有 CFTypeRef。
+    /// AX 元素走访结果。呼叫端负责读取属性后呼叫 `cleanup()` 释放所有 CFTypeRef。
     struct FocusedElementContext {
         system_wide: AXUIElementRef,
         app: AXUIElementRef,
@@ -252,8 +252,8 @@ mod macos {
         }
     }
 
-    /// 走訪 AX 樹取得當前聚焦的文字輸入元素。
-    /// 共用邏輯：system-wide → focused app → focused element → role check → WebArea child。
+    /// 走访 AX 树取得当前聚焦的文字输入元素。
+    /// 共用逻辑：system-wide → focused app → focused element → role check → WebArea child。
     fn resolve_focused_text_element() -> Option<FocusedElementContext> {
         let system_wide = unsafe { AXUIElementCreateSystemWide() };
         if system_wide.is_null() {
@@ -332,7 +332,7 @@ mod macos {
         }
     }
 
-    // ========== 選取狀態偵測（#24/#25 編輯模式判定） ==========
+    // ========== 选取状态侦测（#24/#25 编辑模式判定） ==========
 
     use super::SelectionState;
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -345,16 +345,16 @@ mod macos {
     static SELECTION_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
     static SELECTION_WORKER: OnceLock<Option<Mutex<SyncSender<SelectionRespTx>>>> = OnceLock::new();
 
-    /// 讀取聚焦元素的選取長度（AXSelectedTextRange.length）。
-    /// length > 0 = 真的有選取；length == 0 = 只有游標、沒選取
-    /// （編輯器「無選取時 Cmd+C 複製整行」不影響 AX 層的選取範圍，故能分辨）。
+    /// 读取聚焦元素的选取长度（AXSelectedTextRange.length）。
+    /// length > 0 = 真的有选取；length == 0 = 只有游标、没选取
+    /// （编辑器「无选取时 Cmd+C 复制整行」不影响 AX 层的选取范围，故能分辨）。
     fn get_selection_length(element: AXUIElementRef) -> Option<i64> {
         read_selected_text_range(element).map(|range| range.length)
     }
 
-    /// Electron/Chromium 的無障礙樹是惰性啟用的：對焦點 App 設
-    /// AXManualAccessibility=true 可強制喚醒完整樹（Electron 官方支援的旗標）。
-    /// 對原生 App 設此屬性會失敗，無副作用。
+    /// Electron/Chromium 的无障碍树是惰性启用的：对焦点 App 设
+    /// AXManualAccessibility=true 可强制唤醒完整树（Electron 官方支援的旗标）。
+    /// 对原生 App 设此属性会失败，无副作用。
     fn poke_focused_app_manual_accessibility() {
         let system_wide = unsafe { AXUIElementCreateSystemWide() };
         if system_wide.is_null() {
@@ -371,27 +371,27 @@ mod macos {
         unsafe { CFRelease(system_wide) };
     }
 
-    /// 依已解析的聚焦文字元素分類選取狀態。消耗 ctx 並負責釋放。
+    /// 依已解析的聚焦文字元素分类选取状态。消耗 ctx 并负责释放。
     fn classify_selection(ctx: FocusedElementContext) -> SelectionState {
         let state = match get_selection_length(ctx.target_element) {
             Some(len) if len > 0 => {
                 match get_ax_string_attribute(ctx.target_element, K_AX_SELECTED_TEXT_ATTRIBUTE) {
                     Some(text) if !text.trim().is_empty() => SelectionState::selection(text),
-                    // 長度 > 0 但文字讀不到/為空 = 橋接失真（Electron 已知失效模式），
-                    // 交給剪貼簿後備嘗試撈回真實選取
+                    // 长度 > 0 但文字读不到/为空 = 桥接失真（Electron 已知失效模式），
+                    // 交给剪贴簿后备尝试捞回真实选取
                     _ => SelectionState::unavailable(),
                 }
             }
             Some(_) => SelectionState::no_selection(),
-            // 元素是文字輸入類但範圍屬性不支援 → 無法判定
+            // 元素是文字输入类但范围属性不支援 → 无法判定
             None => SelectionState::unavailable(),
         };
         ctx.cleanup();
         state
     }
 
-    /// 阻塞式選取偵測：第一次解析失敗時戳醒 Electron 樹再試一次。
-    /// 全程只做被動 AX 查詢，不模擬任何按鍵。
+    /// 阻塞式选取侦测：第一次解析失败时戳醒 Electron 树再试一次。
+    /// 全程只做被动 AX 查询，不模拟任何按键。
     fn selection_probe_blocking() -> SelectionState {
         if let Some(ctx) = resolve_focused_text_element() {
             return classify_selection(ctx);
@@ -404,20 +404,20 @@ mod macos {
         }
     }
 
-    /// 入口：AX 讀取跑在單一常駐 worker 執行緒上、最多等 SELECTION_READ_TIMEOUT_MS
-    /// （AX 為同步跨進程呼叫，目標 App 卡死不可拖住 command thread——
-    /// 對齊 windows_impl 的守衛模式；常駐而非每次 spawn，卡死時最多損失
-    /// 一條執行緒、不會隨熱鍵次數無上界累積）。逾時 / 忙碌一律回 unavailable，
-    /// 由前端剪貼簿後備接手。
+    /// 入口：AX 读取跑在单一常驻 worker 执行绪上、最多等 SELECTION_READ_TIMEOUT_MS
+    /// （AX 为同步跨进程呼叫，目标 App 卡死不可拖住 command thread——
+    /// 对齐 windows_impl 的守卫模式；常驻而非每次 spawn，卡死时最多损失
+    /// 一条执行绪、不会随热键次数无上界累积）。逾时 / 忙碌一律回 unavailable，
+    /// 由前端剪贴簿后备接手。
     pub fn read_selection_state_impl() -> SelectionState {
         let sender = match selection_worker_sender() {
             Some(s) => s,
             None => return SelectionState::unavailable(),
         };
 
-        // single-flight：熱鍵連按時避免 AX 讀取堆疊。
-        // 旗標由「呼叫端」在所有路徑後無條件清掉，不依賴 worker
-        // （worker 卡死時遲到結果只會送進已 drop 的 receiver 而被丟棄）
+        // single-flight：热键连按时避免 AX 读取堆叠。
+        // 旗标由「呼叫端」在所有路径后无条件清掉，不依赖 worker
+        // （worker 卡死时迟到结果只会送进已 drop 的 receiver 而被丢弃）
         if SELECTION_IN_FLIGHT.swap(true, Ordering::AcqRel) {
             return SelectionState::unavailable();
         }
@@ -430,7 +430,7 @@ mod macos {
     fn selection_read_once(sender: &SyncSender<SelectionRespTx>) -> SelectionState {
         let (resp_tx, resp_rx) = sync_channel::<SelectionState>(1);
         if sender.try_send(resp_tx).is_err() {
-            // worker 還卡在上一個請求（目標 App 的 AX server 無回應）
+            // worker 还卡在上一个请求（目标 App 的 AX server 无回应）
             return SelectionState::unavailable();
         }
         resp_rx
@@ -457,7 +457,7 @@ mod macos {
     fn selection_worker_loop(req_rx: Receiver<SelectionRespTx>) {
         while let Ok(resp_tx) = req_rx.recv() {
             let result = selection_probe_blocking();
-            // 呼叫端可能已逾時離開（receiver drop）：try_send 失敗直接丟棄
+            // 呼叫端可能已逾时离开（receiver drop）：try_send 失败直接丢弃
             let _ = resp_tx.try_send(result);
         }
     }
@@ -517,7 +517,7 @@ mod macos {
         #[test]
         fn test_extract_excerpt_cjk_characters() {
             let text =
-                "這是一段很長的中文測試文字，用來驗證游標附近截取功能是否正確處理多位元組字元";
+                "这是一段很长的中文测试文字，用来验证游标附近截取功能是否正确处理多位元组字元";
             let result = extract_excerpt(text, Some(10), 5);
             assert_eq!(result.chars().count(), 10); // 5 before + 5 after
         }
@@ -554,15 +554,15 @@ mod windows_impl {
         UIA_TextPattern2Id, UIA_TextPatternId, UIA_ValuePatternId,
     };
 
-    /// 游標前後各取的字數（對齊 macOS CONTEXT_CHARS）。
+    /// 游标前后各取的字数（对齐 macOS CONTEXT_CHARS）。
     const CONTEXT_CHARS: i32 = 50;
-    /// TextPattern GetText 上限＝游標前後 excerpt 寬度（caret ± CONTEXT_CHARS）。
-    /// 設成 excerpt 寬度，確保即使 provider 未照 MoveEndpointByUnit 收斂，
-    /// 回傳的仍是「從 range 起點（caret 前緣）」起算的 caret 區段，不會被 cap_tail 從尾端截掉。
+    /// TextPattern GetText 上限＝游标前后 excerpt 宽度（caret ± CONTEXT_CHARS）。
+    /// 设成 excerpt 宽度，确保即使 provider 未照 MoveEndpointByUnit 收敛，
+    /// 回传的仍是「从 range 起点（caret 前缘）」起算的 caret 区段，不会被 cap_tail 从尾端截掉。
     const GET_TEXT_CAP: i32 = CONTEXT_CHARS * 2;
-    /// ValuePattern 整欄值 fallback 的字元上限（隱私 / 成本保護）。
+    /// ValuePattern 整栏值 fallback 的字元上限（隐私 / 成本保护）。
     const MAX_VALUE_CHARS: usize = 600;
-    /// 單次 UIA 讀取 timeout，需小於前端輪詢間隔（500ms），避免阻塞 command thread。
+    /// 单次 UIA 读取 timeout，需小于前端轮询间隔（500ms），避免阻塞 command thread。
     const READ_TIMEOUT_MS: u64 = 250;
 
     type RespTx = SyncSender<Option<String>>;
@@ -570,32 +570,32 @@ mod windows_impl {
     static IN_FLIGHT: AtomicBool = AtomicBool::new(false);
     static WORKER: OnceLock<Option<Mutex<SyncSender<RespTx>>>> = OnceLock::new();
 
-    /// 入口：把讀取請求送到專用 UIA 執行緒，最多等 `READ_TIMEOUT_MS`。
-    /// 任何失敗 / 逾時 / 忙碌一律回 `Ok(None)`（與 macOS 一致，靜默降級）。
+    /// 入口：把读取请求送到专用 UIA 执行绪，最多等 `READ_TIMEOUT_MS`。
+    /// 任何失败 / 逾时 / 忙碌一律回 `Ok(None)`（与 macOS 一致，静默降级）。
     ///
-    /// 契約：回傳游標附近「有上限」的文字（TextPattern excerpt ≤ ~100 字，
-    /// 或 ValuePattern 整欄值 ≤ `MAX_VALUE_CHARS` 字），絕不回傳整份文件。
+    /// 契约：回传游标附近「有上限」的文字（TextPattern excerpt ≤ ~100 字，
+    /// 或 ValuePattern 整栏值 ≤ `MAX_VALUE_CHARS` 字），绝不回传整份文件。
     pub fn read_focused_text_field_impl() -> Result<Option<String>, String> {
         let sender = match worker_sender() {
             Some(s) => s,
             None => return Ok(None),
         };
 
-        // single-flight：已有讀取進行中就放棄這次，避免輪詢呼叫堆疊阻塞。
+        // single-flight：已有读取进行中就放弃这次，避免轮询呼叫堆叠阻塞。
         if IN_FLIGHT.swap(true, Ordering::AcqRel) {
             return Ok(None);
         }
 
-        // 由「呼叫端」在所有路徑（成功 / 逾時 / 送出失敗）後清掉 IN_FLIGHT，
-        // 不依賴 worker 清旗標：若某次 UIA 呼叫永久卡死、worker 回不來，
-        // 旗標才不會永久卡 true 而使功能靜默失效。每次呼叫各有獨立 oneshot
-        // channel，卡死 worker 的遲到結果只會送進已 drop 的 receiver 而被丟棄。
+        // 由「呼叫端」在所有路径（成功 / 逾时 / 送出失败）后清掉 IN_FLIGHT，
+        // 不依赖 worker 清旗标：若某次 UIA 呼叫永久卡死、worker 回不来，
+        // 旗标才不会永久卡 true 而使功能静默失效。每次呼叫各有独立 oneshot
+        // channel，卡死 worker 的迟到结果只会送进已 drop 的 receiver 而被丢弃。
         let outcome = read_once(&sender);
         IN_FLIGHT.store(false, Ordering::Release);
         Ok(outcome)
     }
 
-    /// 送一次讀取請求並等 `READ_TIMEOUT_MS`；逾時 / 送出失敗一律回 `None`。
+    /// 送一次读取请求并等 `READ_TIMEOUT_MS`；逾时 / 送出失败一律回 `None`。
     fn read_once(sender: &SyncSender<RespTx>) -> Option<String> {
         let (resp_tx, resp_rx) = sync_channel::<Option<String>>(1);
         if sender.try_send(resp_tx).is_err() {
@@ -613,8 +613,8 @@ mod windows_impl {
         Some(guard.clone())
     }
 
-    /// 啟動長壽 MTA 執行緒，內含快取的 `IUIAutomation`。
-    /// 回傳 `None` 代表 COM / UIA 初始化失敗（此平台功能等同 no-op）。
+    /// 启动长寿 MTA 执行绪，内含快取的 `IUIAutomation`。
+    /// 回传 `None` 代表 COM / UIA 初始化失败（此平台功能等同 no-op）。
     fn spawn_worker() -> Option<Mutex<SyncSender<RespTx>>> {
         let (req_tx, req_rx) = sync_channel::<RespTx>(1);
         let (ready_tx, ready_rx) = sync_channel::<bool>(0);
@@ -631,7 +631,7 @@ mod windows_impl {
     }
 
     fn worker_loop(req_rx: Receiver<RespTx>, ready_tx: SyncSender<bool>) {
-        // 此執行緒專用 MTA COM，存活整個 process 生命週期；COM 物件不跨執行緒傳遞。
+        // 此执行绪专用 MTA COM，存活整个 process 生命周期；COM 物件不跨执行绪传递。
         unsafe {
             let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
         }
@@ -650,23 +650,23 @@ mod windows_impl {
 
         while let Ok(resp_tx) = req_rx.recv() {
             let result = read_excerpt(&automation);
-            // 即使呼叫端已逾時離開（receiver 被 drop）也不阻塞；IN_FLIGHT 由呼叫端清。
+            // 即使呼叫端已逾时离开（receiver 被 drop）也不阻塞；IN_FLIGHT 由呼叫端清。
             let _ = resp_tx.try_send(result);
         }
 
         unsafe { CoUninitialize() };
     }
 
-    /// 讀取目前聚焦元素游標附近文字。全程在 worker 執行緒上跑。
+    /// 读取目前聚焦元素游标附近文字。全程在 worker 执行绪上跑。
     fn read_excerpt(automation: &IUIAutomation) -> Option<String> {
         let element = unsafe { automation.GetFocusedElement() }.ok()?;
 
-        // 隱私保護：聚焦在密碼 / 受保護欄位時不讀取，避免把密碼 / token / API key 送 LLM。
+        // 隐私保护：聚焦在密码 / 受保护栏位时不读取，避免把密码 / token / API key 送 LLM。
         if is_password_element(&element) {
             return None;
         }
 
-        // 1) 優先：TextPattern 游標附近 excerpt（涵蓋 contenteditable，如 Teams / 文件編輯器）。
+        // 1) 优先：TextPattern 游标附近 excerpt（涵盖 contenteditable，如 Teams / 文件编辑器）。
         if let Some(text) = read_via_text_pattern(&element) {
             let trimmed = text.trim();
             if !trimmed.is_empty() {
@@ -674,7 +674,7 @@ mod windows_impl {
             }
         }
 
-        // 2) Fallback：ValuePattern 整欄值（涵蓋原生 input / textarea），capped。
+        // 2) Fallback：ValuePattern 整栏值（涵盖原生 input / textarea），capped。
         if let Some(text) = read_via_value_pattern(&element) {
             let trimmed = text.trim();
             if !trimmed.is_empty() {
@@ -685,8 +685,8 @@ mod windows_impl {
         None
     }
 
-    /// 聚焦元素是否為密碼 / 受保護欄位（讀不到屬性時保守視為「是」→ fail-closed，
-    /// 對未正確暴露 IsPassword 的第三方欄位較安全，避免把可能的密碼 / token 送 LLM）。
+    /// 聚焦元素是否为密码 / 受保护栏位（读不到属性时保守视为「是」→ fail-closed，
+    /// 对未正确暴露 IsPassword 的第三方栏位较安全，避免把可能的密码 / token 送 LLM）。
     fn is_password_element(element: &IUIAutomationElement) -> bool {
         unsafe { element.CurrentIsPassword() }
             .map(|b| b.as_bool())
@@ -711,7 +711,7 @@ mod windows_impl {
         }
     }
 
-    /// 取得游標 range：先試 `TextPattern2.GetCaretRange`，再 fallback 到 `TextPattern.GetSelection()[0]`。
+    /// 取得游标 range：先试 `TextPattern2.GetCaretRange`，再 fallback 到 `TextPattern.GetSelection()[0]`。
     fn caret_range(element: &IUIAutomationElement) -> Option<IUIAutomationTextRange> {
         unsafe {
             if let Ok(tp2) =
@@ -749,7 +749,7 @@ mod windows_impl {
         }
     }
 
-    /// 取字串末尾最多 `max` 個字元（以 char 計，CJK 安全）。
+    /// 取字串末尾最多 `max` 个字元（以 char 计，CJK 安全）。
     fn cap_tail(s: &str, max: usize) -> String {
         let chars: Vec<char> = s.chars().collect();
         if chars.len() <= max {
@@ -780,8 +780,8 @@ mod windows_impl {
 
         #[test]
         fn test_cap_tail_cjk() {
-            let s = "這是一段中文測試文字";
-            assert_eq!(cap_tail(s, 4), "測試文字");
+            let s = "这是一段中文测试文字";
+            assert_eq!(cap_tail(s, 4), "测试文字");
             assert_eq!(cap_tail(s, 4).chars().count(), 4);
         }
 

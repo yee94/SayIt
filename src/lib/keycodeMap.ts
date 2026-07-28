@@ -5,13 +5,13 @@ import {
 import i18n from "../i18n";
 
 /**
- * DOM event.code → 平台原生 keycode 映射模組
+ * DOM event.code → 平台原生 keycode 映射模组
  *
  * macOS keycode: CGEvent keycode (u16)
  * Windows VK code: Virtual-Key code (u16)
  *
- * 注意：兩者數值體系完全不同（如 F5: macOS=96, Windows=0x74）。
- * keycode 為平台相依值，不可跨平台使用。
+ * 注意：两者数值体系完全不同（如 F5: macOS=96, Windows=0x74）。
+ * keycode 为平台相依值，不可跨平台使用。
  */
 
 // ─── macOS CGEvent keycodes ────────────────────────────────────
@@ -483,7 +483,7 @@ export function isPresetEquivalentKey(domCode: string): boolean {
   return PRESET_DOM_CODES.has(domCode);
 }
 
-// macOS keycode 衝突：這些鍵與 F13-F15 共用 keycode，按其中一個會觸發另一個
+// macOS keycode 冲突：这些键与 F13-F15 共用 keycode，按其中一个会触发另一个
 const MAC_KEYCODE_COLLISION_KEYS: Set<string> = new Set([
   "PrintScreen", // keycode 105 = F13
   "ScrollLock", // keycode 107 = F14

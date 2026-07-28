@@ -26,9 +26,9 @@ const svgDefs = `
   </linearGradient>
 `;
 
-// date 為本地時間的 YYYY-MM-DD（與 store 補零、SQL 'localtime' 一致）。
-// 必須用本地建構子解析；new Date("YYYY-MM-DD") 會以 UTC 解讀，
-// 在 UTC- 時區會讓刻度標籤/tooltip 顯示前一天。
+// date 为本地时间的 YYYY-MM-DD（与 store 补零、SQL 'localtime' 一致）。
+// 必须用本地建构子解析；new Date("YYYY-MM-DD") 会以 UTC 解读，
+// 在 UTC- 时区会让刻度标签/tooltip 显示前一天。
 function parseLocalDateKey(key: string): Date {
   const [year, month, day] = key.split("-").map(Number);
   return new Date(year, month - 1, day);
@@ -39,8 +39,8 @@ const yAccessor = [(d: DailyUsageTrend) => d.count];
 const fillColor = () => "url(#fillCount)";
 const lineColor = () => chartConfig.value.count.color;
 
-// 在「補零後的完整區間」上均勻挑最多 7 個真實日期當刻度，
-// 確保刻度落在實際資料點上，避免資料稀疏時 D3 在窄 domain 內塞出重複日期標籤。
+// 在「补零后的完整区间」上均匀挑最多 7 个真实日期当刻度，
+// 确保刻度落在实际资料点上，避免资料稀疏时 D3 在窄 domain 内塞出重复日期标签。
 const xTickValues = computed<number[]>(() => {
   const data = props.data;
   if (data.length === 0) return [];

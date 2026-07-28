@@ -114,7 +114,7 @@ describe("getTranscriptionErrorMessage", () => {
     ).toBe("转录服务暂时无法使用");
   });
 
-  // ── Rust 端實際透過 Tauri invoke reject 的「純字串」形式（#37/#38 真實情境）──
+  // ── Rust 端实际通过 Tauri invoke reject 的「纯字符串」形式（#37/#38 真实场景）──
   it("[P0] 纯字串 Groq API returned error (429) 应映射为请求过于频繁", () => {
     expect(
       getTranscriptionErrorMessage(

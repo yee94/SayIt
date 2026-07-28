@@ -24,7 +24,7 @@ describe("autoUpdater.ts", () => {
     vi.restoreAllMocks();
   });
 
-  it("[P0] 無更新時應回傳 up-to-date", async () => {
+  it("[P0] 无更新时应回传 up-to-date", async () => {
     mockCheck.mockResolvedValue(null);
 
     const { checkForAppUpdate } = await import("../../src/lib/autoUpdater");
@@ -34,7 +34,7 @@ describe("autoUpdater.ts", () => {
     expect(mockCheck).toHaveBeenCalledOnce();
   });
 
-  it("[P0] 有更新時應回傳 update-available 且不觸發下載", async () => {
+  it("[P0] 有更新时应回传 update-available 且不触发下载", async () => {
     const mockDownload = vi.fn().mockResolvedValue(undefined);
     mockCheck.mockResolvedValue({
       version: "1.2.0",
@@ -49,7 +49,7 @@ describe("autoUpdater.ts", () => {
     expect(mockDownload).not.toHaveBeenCalled();
   });
 
-  it("[P0] check 失敗應回傳 error 結果且不拋錯", async () => {
+  it("[P0] check 失败应回传 error 结果且不抛错", async () => {
     mockCheck.mockRejectedValue(new Error("Network error"));
 
     const { checkForAppUpdate } = await import("../../src/lib/autoUpdater");
@@ -62,7 +62,7 @@ describe("autoUpdater.ts", () => {
     );
   });
 
-  it("[P0] downloadUpdate 應只下載不安裝", async () => {
+  it("[P0] downloadUpdate 应只下载不安装", async () => {
     const mockDownload = vi.fn().mockResolvedValue(undefined);
     const mockInstall = vi.fn();
     mockCheck.mockResolvedValue({
@@ -82,7 +82,7 @@ describe("autoUpdater.ts", () => {
     expect(mockInvoke).not.toHaveBeenCalled();
   });
 
-  it("[P0] installAndRelaunch 應安裝並重啟", async () => {
+  it("[P0] installAndRelaunch 应安装并重启", async () => {
     const mockDownload = vi.fn().mockResolvedValue(undefined);
     const mockInstall = vi.fn().mockResolvedValue(undefined);
     mockCheck.mockResolvedValue({
@@ -101,7 +101,7 @@ describe("autoUpdater.ts", () => {
     expect(mockInvoke).toHaveBeenCalledWith("request_app_restart");
   });
 
-  it("[P0] downloadInstallAndRelaunch 應一鍵完成", async () => {
+  it("[P0] downloadInstallAndRelaunch 应一键完成", async () => {
     const mockDownload = vi.fn().mockResolvedValue(undefined);
     const mockInstall = vi.fn().mockResolvedValue(undefined);
     mockCheck.mockResolvedValue({
@@ -121,7 +121,7 @@ describe("autoUpdater.ts", () => {
     expect(mockInvoke).toHaveBeenCalledWith("request_app_restart");
   });
 
-  it("[P0] 無暫存更新時 downloadUpdate 應拋錯", async () => {
+  it("[P0] 无暂存更新时 downloadUpdate 应抛错", async () => {
     mockCheck.mockResolvedValue(null);
 
     const { checkForAppUpdate, downloadUpdate } = await import(
@@ -132,7 +132,7 @@ describe("autoUpdater.ts", () => {
     await expect(downloadUpdate()).rejects.toThrow("No pending update");
   });
 
-  it("[P0] 下載失敗時 downloadUpdate 應拋錯", async () => {
+  it("[P0] 下载失败时 downloadUpdate 应抛错", async () => {
     const mockDownload = vi
       .fn()
       .mockRejectedValue(new Error("Download failed"));

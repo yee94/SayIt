@@ -94,8 +94,8 @@ export function buildSystemPrompt(
 }
 
 /**
- * 移除 reasoning model 回應中的 <think>...</think> 區塊，
- * 只保留最終輸出內容。
+ * 移除 reasoning model 回应中的 <think>...</think> 区块，
+ * 只保留最终输出内容。
  */
 export function stripReasoningTags(text: string): string {
   return text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
@@ -162,7 +162,7 @@ export async function enhanceText(
     : null;
 
   const enhancedContent = stripReasoningTags(result.text);
-  // 空回應時 fallback 原文，避免把空白貼進輸入框
+  // 空回应时 fallback 原文，避免把空白贴进输入框
   return {
     text: enhancedContent || rawText,
     usage,

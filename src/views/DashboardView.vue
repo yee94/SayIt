@@ -43,7 +43,7 @@ const historyStore = useHistoryStore();
 const settingsStore = useSettingsStore();
 const router = useRouter();
 
-// Doubao ASR / 自訂 LLM 皆無內建免費額度表，Dashboard 改顯示今日實際用量。
+// Doubao ASR / 自订 LLM 皆无内建免费额度表，Dashboard 改显示今日实际用量。
 const isPaidWhisperProvider = computed(() => true);
 
 const isPaidLlmProvider = computed(() => true);
@@ -52,8 +52,8 @@ const hasAnyPaidProvider = computed(
   () => isPaidWhisperProvider.value || isPaidLlmProvider.value,
 );
 
-// Gemini 免費額度已不公開（依帳號浮動、僅能在 AI Studio 查詢）：
-// registry 將其 freeQuotaRpd 設 0 → 額度條自動略過，改以「今日用量」呈現
+// Gemini 免费额度已不公开（依帐号浮动、仅能在 AI Studio 查询）：
+// registry 将其 freeQuotaRpd 设 0 → 额度条自动略过，改以「今日用量」呈现
 const isQuotaHiddenLlmProvider = computed(() => {
   if (isPaidLlmProvider.value) return false;
   const lConfig = findLlmModelConfig(settingsStore.selectedLlmModelId);
@@ -64,7 +64,7 @@ const quotaDimensionList = computed(() => {
   const usage = historyStore.dashboardStats.dailyQuotaUsage;
   const dimensionList: { remaining: number; label: string }[] = [];
 
-  // 免費 Whisper（Groq）才顯示額度維度；limit 為 0 的維度略過避免誤導
+  // 免费 Whisper（Groq）才显示额度维度；limit 为 0 的维度略过避免误导
   if (!isPaidWhisperProvider.value) {
     const wConfig = findWhisperModelConfig(settingsStore.selectedWhisperModelId);
     const wRpdLimit = wConfig?.freeQuotaRpd ?? 2000;
@@ -84,7 +84,7 @@ const quotaDimensionList = computed(() => {
     }
   }
 
-  // 免費 LLM（Groq/Gemini）才顯示額度維度
+  // 免费 LLM（Groq/Gemini）才显示额度维度
   if (!isPaidLlmProvider.value) {
     const lConfig = findLlmModelConfig(settingsStore.selectedLlmModelId);
     const lRpdLimit = lConfig?.freeQuotaRpd ?? 1000;
@@ -108,7 +108,7 @@ const quotaDimensionList = computed(() => {
 
 const hasFreeQuota = computed(() => quotaDimensionList.value.length > 0);
 
-// 計費方案（OpenAI/Anthropic）無免費額度，改顯示今日實際用量
+// 计费方案（OpenAI/Anthropic）无免费额度，改显示今日实际用量
 const paidUsageList = computed(() => {
   const usage = historyStore.dashboardStats.dailyQuotaUsage;
   const list: { label: string }[] = [];
@@ -178,7 +178,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="app-page">
-    <!-- 統計卡片 -->
+    <!-- 统计卡片 -->
     <div class="grid grid-cols-3 gap-3">
       <Card>
         <CardHeader class="pb-2">
@@ -246,7 +246,7 @@ onBeforeUnmount(() => {
                 </div>
               </CardHeader>
               <CardContent>
-                <!-- 免費額度（免費服務）-->
+                <!-- 免费额度（免费服务）-->
                 <template v-if="hasFreeQuota">
                   <p class="text-2xl font-bold text-foreground">
                     {{ Math.round(quotaRemainingPercent * 100) }}%
@@ -263,7 +263,7 @@ onBeforeUnmount(() => {
                   </p>
                 </template>
 
-                <!-- 付費服務今日用量（混用與全付費共用同一段；混用為次要樣式 + 分隔線）-->
+                <!-- 付费服务今日用量（混用与全付费共用同一段；混用为次要样式 + 分隔线）-->
                 <div
                   v-if="paidUsageList.length > 0"
                   class="space-y-1"
@@ -278,7 +278,7 @@ onBeforeUnmount(() => {
                   </p>
                 </div>
 
-                <!-- 全付費提示（混用不顯示，避免與免費額度 % 矛盾）-->
+                <!-- 全付费提示（混用不显示，避免与免费额度 % 矛盾）-->
                 <p
                   v-if="!hasFreeQuota && paidUsageList.length > 0"
                   class="text-xs text-muted-foreground mt-1.5"
@@ -343,7 +343,7 @@ onBeforeUnmount(() => {
       </TooltipProvider>
     </div>
 
-    <!-- 每日使用趨勢圖表 -->
+    <!-- 每日使用趋势图表 -->
     <Card class="mt-4">
       <CardHeader>
         <CardTitle class="text-base">{{ $t("dashboard.usageTrend") }}</CardTitle>
@@ -354,7 +354,7 @@ onBeforeUnmount(() => {
       </CardContent>
     </Card>
 
-    <!-- 最近轉錄 -->
+    <!-- 最近转录 -->
     <Card class="mt-4">
       <CardHeader class="flex-row items-center justify-between">
         <CardTitle class="text-base">{{ $t("dashboard.recentTranscriptions") }}</CardTitle>
@@ -367,7 +367,7 @@ onBeforeUnmount(() => {
         </Button>
       </CardHeader>
       <CardContent>
-        <!-- 空狀態 -->
+        <!-- 空状态 -->
         <div
           v-if="historyStore.recentTranscriptionList.length === 0"
           class="rounded-lg border border-dashed border-border px-4 py-8 text-center text-muted-foreground"

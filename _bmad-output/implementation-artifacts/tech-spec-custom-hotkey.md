@@ -1,5 +1,5 @@
 ---
-title: '自訂快捷鍵支援（Custom Hotkey）'
+title: '自订快捷键支援（Custom Hotkey）'
 slug: 'custom-hotkey'
 created: '2026-03-05'
 status: 'implementation-complete'
@@ -12,7 +12,7 @@ reviewed: true
 review_findings_addressed: 15
 ---
 
-# Tech-Spec: 自訂快捷鍵支援（Custom Hotkey）
+# Tech-Spec: 自订快捷键支援（Custom Hotkey）
 
 **Created:** 2026-03-05
 
@@ -20,73 +20,73 @@ review_findings_addressed: 15
 
 ### Problem Statement
 
-目前使用者只能從固定的 9 個修飾鍵（Fn、Option、Control、Command、Shift 等）中選擇觸發鍵，無法使用其他按鍵（如 F5、CapsLock、~ 等非修飾鍵）。這限制了使用者根據自身習慣配置最順手的快捷鍵。
+目前使用者只能从固定的 9 个修饰键（Fn、Option、Control、Command、Shift 等）中选择触发键，无法使用其他按键（如 F5、CapsLock、~ 等非修饰键）。这限制了使用者根据自身习惯配置最顺手的快捷键。
 
 ### Solution
 
-採用兩層設計：
-- **簡易模式**（現狀保留）：Select 下拉選單，提供平台推薦的修飾鍵快速選擇
-- **進階模式**（新增）：按鍵錄製（Record）UI，使用者點擊錄製按鈕後按下任意單鍵，系統自動捕捉為觸發鍵
+采用两层设计：
+- **简易模式**（现状保留）：Select 下拉选单，提供平台推荐的修饰键快速选择
+- **进阶模式**（新增）：按键录制（Record）UI，使用者点击录制按钮后按下任意单键，系统自动捕捉为触发键
 
-包含衝突偵測機制——若使用者選擇的按鍵為常見系統快捷鍵，顯示警告但仍允許設定。
+包含冲突侦测机制——若使用者选择的按键为常见系统快捷键，显示警告但仍允许设定。
 
-自訂鍵設定獨立持久化——切換模式不會遺失設定。
+自订键设定独立持久化——切换模式不会遗失设定。
 
 ### Scope
 
 **In Scope:**
-- 前端：簡易模式 / 進階模式切換 UI
-- 前端：按鍵錄製 UI（點擊「錄製」→ 按任意鍵 → 捕捉並顯示按鍵名稱）
-- 前端：衝突偵測警告（危險鍵 + 已有 preset 的鍵）
-- 前端：DOM keydown 盲區說明（Fn、媒體鍵等系統鍵無法錄製）
-- Rust (macOS)：擴充 CGEventTap 回呼支援任意 keycode 比對（FlagsChanged + KeyDown/KeyUp）
-- Rust (Windows)：擴充 SetWindowsHookExW 回呼支援任意 VK code 比對
-- Rust：`TriggerKey` 型別擴充 + serde 序列化測試驗證
-- Store：獨立持久化 custom key（`customTriggerKey` 欄位），切模式不遺失
-- IPC：`update_hotkey_config` command 擴充支援 custom keycode
+- 前端：简易模式 / 进阶模式切换 UI
+- 前端：按键录制 UI（点击「录制」→ 按任意键 → 捕捉并显示按键名称）
+- 前端：冲突侦测警告（危险键 + 已有 preset 的键）
+- 前端：DOM keydown 盲区说明（Fn、媒体键等系统键无法录制）
+- Rust (macOS)：扩充 CGEventTap 回呼支援任意 keycode 比对（FlagsChanged + KeyDown/KeyUp）
+- Rust (Windows)：扩充 SetWindowsHookExW 回呼支援任意 VK code 比对
+- Rust：`TriggerKey` 型别扩充 + serde 序列化测试验证
+- Store：独立持久化 custom key（`customTriggerKey` 栏位），切模式不遗失
+- IPC：`update_hotkey_config` command 扩充支援 custom keycode
 
 **Out of Scope:**
-- 複合組合鍵（Cmd+Shift+X 等多鍵同時按下）
-- 修改 HUD 動畫或錄音流程
-- 觸發模式變更（Hold/Toggle 維持現狀，與本功能正交）
+- 复合组合键（Cmd+Shift+X 等多键同时按下）
+- 修改 HUD 动画或录音流程
+- 触发模式变更（Hold/Toggle 维持现状，与本功能正交）
 
 ## Context for Development
 
 ### Codebase Patterns
 
-1. **TriggerKey 封閉 enum 鏡像模式**：Rust `TriggerKey` enum 與 TS `TriggerKey` 字串聯合型別完全鏡像，透過 `#[serde(rename_all = "camelCase")]` 序列化為 JSON。前端用字串字面型別（`"fn" | "option" | ...`），Rust 用 enum variant。
-2. **設定持久化鏈路**：UI → `useSettingsStore.saveHotkeyConfig()` → `tauri-plugin-store` 寫入 `settings.json` → `invoke("update_hotkey_config")` 同步 Rust state → `emitEvent(SETTINGS_UPDATED)` 廣播所有視窗。
-3. **Rust 鍵碼比對模式**：macOS 透過 `matches_trigger_key_macos(keycode, &trigger)` 比對 CGEventTap 回傳的 keycode；Windows 在 `hook_proc` 中用 `match trigger { ... kbd.vkCode == VK_XXX }` 比對。兩者都是封閉 match，新增 `Custom` variant 需在兩處加入分支。
-4. **修飾鍵 vs 一般鍵的事件差異**：macOS CGEventTap 中，修飾鍵只觸發 `FlagsChanged` 事件（flag-based 檢測），一般鍵觸發 `KeyDown`/`KeyUp`。目前只監聽 `FlagsChanged`+Fn fallback，支援一般鍵需要**擴充 `KeyDown`/`KeyUp` 處理分支**。
-5. **DOM keyCode vs 平台 keycode 差異**：WebView `KeyboardEvent.code` 是 Web 標準（如 `"F5"`、`"KeyA"`），需映射到 macOS keycode（如 F5=96）和 Windows VK code（如 F5=0x74）。
-6. **DOM keydown 盲區**：Fn 鍵不觸發 DOM keydown 事件（無 `"Fn"` code）、Media keys 被系統攔截、CapsLock 在 WKWebView 中 keyup 行為不一致。錄製 UI 必須處理「按了但收不到事件」的情況。
-7. **平台偵測**：現有程式碼用 `navigator.userAgent.includes("Mac")`（`useSettingsStore.ts:26`、`SettingsView.vue:44`），新模組應統一使用同一偵測方式。
+1. **TriggerKey 封闭 enum 镜像模式**：Rust `TriggerKey` enum 与 TS `TriggerKey` 字串联合型别完全镜像，透过 `#[serde(rename_all = "camelCase")]` 序列化为 JSON。前端用字串字面型别（`"fn" | "option" | ...`），Rust 用 enum variant。
+2. **设定持久化链路**：UI → `useSettingsStore.saveHotkeyConfig()` → `tauri-plugin-store` 写入 `settings.json` → `invoke("update_hotkey_config")` 同步 Rust state → `emitEvent(SETTINGS_UPDATED)` 广播所有视窗。
+3. **Rust 键码比对模式**：macOS 透过 `matches_trigger_key_macos(keycode, &trigger)` 比对 CGEventTap 回传的 keycode；Windows 在 `hook_proc` 中用 `match trigger { ... kbd.vkCode == VK_XXX }` 比对。两者都是封闭 match，新增 `Custom` variant 需在两处加入分支。
+4. **修饰键 vs 一般键的事件差异**：macOS CGEventTap 中，修饰键只触发 `FlagsChanged` 事件（flag-based 检测），一般键触发 `KeyDown`/`KeyUp`。目前只监听 `FlagsChanged`+Fn fallback，支援一般键需要**扩充 `KeyDown`/`KeyUp` 处理分支**。
+5. **DOM keyCode vs 平台 keycode 差异**：WebView `KeyboardEvent.code` 是 Web 标准（如 `"F5"`、`"KeyA"`），需映射到 macOS keycode（如 F5=96）和 Windows VK code（如 F5=0x74）。
+6. **DOM keydown 盲区**：Fn 键不触发 DOM keydown 事件（无 `"Fn"` code）、Media keys 被系统拦截、CapsLock 在 WKWebView 中 keyup 行为不一致。录制 UI 必须处理「按了但收不到事件」的情况。
+7. **平台侦测**：现有程式码用 `navigator.userAgent.includes("Mac")`（`useSettingsStore.ts:26`、`SettingsView.vue:44`），新模组应统一使用同一侦测方式。
 
 ### Files to Reference
 
 | File | Purpose |
 | ---- | ------- |
-| `src/types/settings.ts:4-18` | `TriggerKey` 型別定義、`HotkeyConfig` 介面 |
-| `src/stores/useSettingsStore.ts:25-28` | `getDefaultTriggerKey()` 平台預設 |
+| `src/types/settings.ts:4-18` | `TriggerKey` 型别定义、`HotkeyConfig` 介面 |
+| `src/stores/useSettingsStore.ts:25-28` | `getDefaultTriggerKey()` 平台预设 |
 | `src/stores/useSettingsStore.ts:53-65` | `syncHotkeyConfigToRust()` — invoke IPC |
-| `src/stores/useSettingsStore.ts:129-158` | `saveHotkeyConfig()` — 持久化 + 同步 + 廣播 |
-| `src/views/SettingsView.vue:43-88` | 快捷鍵 UI 區塊（Select + mode toggle） |
-| `src/views/SettingsView.vue:309-389` | 快捷鍵 template |
+| `src/stores/useSettingsStore.ts:129-158` | `saveHotkeyConfig()` — 持久化 + 同步 + 广播 |
+| `src/views/SettingsView.vue:43-88` | 快捷键 UI 区块（Select + mode toggle） |
+| `src/views/SettingsView.vue:309-389` | 快捷键 template |
 | `src-tauri/src/plugins/hotkey_listener.rs:12-27` | Rust `TriggerKey` enum |
 | `src-tauri/src/plugins/hotkey_listener.rs:49-74` | `HotkeyListenerState` + `update_config()` |
-| `src-tauri/src/plugins/hotkey_listener.rs:78-129` | `handle_key_event()` — Hold/Toggle 邏輯（不需修改） |
-| `src-tauri/src/plugins/hotkey_listener.rs:142-150` | macOS keycode 常數 |
-| `src-tauri/src/plugins/hotkey_listener.rs:213-224` | `matches_trigger_key_macos()` — 鍵碼比對 |
-| `src-tauri/src/plugins/hotkey_listener.rs:228-241` | `is_modifier_pressed()` — flag 檢測 |
+| `src-tauri/src/plugins/hotkey_listener.rs:78-129` | `handle_key_event()` — Hold/Toggle 逻辑（不需修改） |
+| `src-tauri/src/plugins/hotkey_listener.rs:142-150` | macOS keycode 常数 |
+| `src-tauri/src/plugins/hotkey_listener.rs:213-224` | `matches_trigger_key_macos()` — 键码比对 |
+| `src-tauri/src/plugins/hotkey_listener.rs:228-241` | `is_modifier_pressed()` — flag 检测 |
 | `src-tauri/src/plugins/hotkey_listener.rs:260-334` | CGEventTap 回呼（FlagsChanged/KeyDown/KeyUp） |
-| `src-tauri/src/plugins/hotkey_listener.rs:379-389` | Windows VK code 常數 |
-| `src-tauri/src/plugins/hotkey_listener.rs:441-477` | Windows `hook_proc` — VK code 比對 |
+| `src-tauri/src/plugins/hotkey_listener.rs:379-389` | Windows VK code 常数 |
+| `src-tauri/src/plugins/hotkey_listener.rs:441-477` | Windows `hook_proc` — VK code 比对 |
 | `src-tauri/src/lib.rs:87-99` | `update_hotkey_config` Tauri command |
-| `src/lib/errorUtils.ts` | 錯誤訊息本地化 |
+| `src/lib/errorUtils.ts` | 错误讯息本地化 |
 
 ### Technical Decisions
 
-**TD-1: TriggerKey 擴充為 tagged union**
+**TD-1: TriggerKey 扩充为 tagged union**
 
 Rust:
 ```rust
@@ -114,36 +114,36 @@ export interface CustomTriggerKey {
 export type TriggerKey = PresetTriggerKey | CustomTriggerKey;
 ```
 
-Serde externally tagged 表示法將 `Custom { keycode: 96 }` 序列化為 `{ "custom": { "keycode": 96 } }`。**此假設必須用 Rust 單元測試 `assert_eq!(serde_json::to_string(...), ...)` 驗證，不可僅靠口頭斷言**。（Review F1）
+Serde externally tagged 表示法将 `Custom { keycode: 96 }` 序列化为 `{ "custom": { "keycode": 96 } }`。**此假设必须用 Rust 单元测试 `assert_eq!(serde_json::to_string(...), ...)` 验证，不可仅靠口头断言**。（Review F1）
 
-**keycode 語意**：`keycode: u16` 的值在 macOS 是 CGEvent keycode，在 Windows 是 VK code。兩者數值體系完全不同（如 F5: macOS=96, Windows=0x74）。此欄位為平台相依值，不可跨平台使用。（Review F5）
+**keycode 语意**：`keycode: u16` 的值在 macOS 是 CGEvent keycode，在 Windows 是 VK code。两者数值体系完全不同（如 F5: macOS=96, Windows=0x74）。此栏位为平台相依值，不可跨平台使用。（Review F5）
 
-**TD-2: 按鍵錄製使用前端 DOM `keydown` + 映射表**
+**TD-2: 按键录制使用前端 DOM `keydown` + 映射表**
 
-新增 `src/lib/keycodeMap.ts`，匯出：
+新增 `src/lib/keycodeMap.ts`，汇出：
 - `domCodeToMacKeycode: Record<string, number>` — DOM `event.code` → macOS keycode
 - `domCodeToWindowsVkCode: Record<string, number>` — DOM `event.code` → Windows VK code
-- `KEY_DISPLAY_NAMES: Record<string, string>` — `event.code` → 顯示名稱
-- `getPlatformKeycode(domCode: string): number | null` — 取得當前平台的原生 keycode
-- `getKeyDisplayName(domCode: string): string` — 取得按鍵顯示名稱
-- `DANGEROUS_KEYS: Set<string>` — 衝突偵測用的危險鍵清單
-- `PRESET_DOM_CODES: Set<string>` — 對應現有 preset 修飾鍵的 DOM code 集合（用於提示使用者切回簡易模式）
+- `KEY_DISPLAY_NAMES: Record<string, string>` — `event.code` → 显示名称
+- `getPlatformKeycode(domCode: string): number | null` — 取得当前平台的原生 keycode
+- `getKeyDisplayName(domCode: string): string` — 取得按键显示名称
+- `DANGEROUS_KEYS: Set<string>` — 冲突侦测用的危险键清单
+- `PRESET_DOM_CODES: Set<string>` — 对应现有 preset 修饰键的 DOM code 集合（用于提示使用者切回简易模式）
 - `isDangerousKey(domCode: string): boolean`
-- `isPresetEquivalentKey(domCode: string): boolean` — 檢查是否為已有 preset 的修飾鍵
+- `isPresetEquivalentKey(domCode: string): boolean` — 检查是否为已有 preset 的修饰键
 
-平台偵測使用與現有程式碼一致的 `navigator.userAgent.includes("Mac")` 方式。（Review F6：統一現有做法而非引入新依賴）
+平台侦测使用与现有程式码一致的 `navigator.userAgent.includes("Mac")` 方式。（Review F6：统一现有做法而非引入新依赖）
 
-**已知 DOM keydown 盲區**（Review F3）：
-- **Fn 鍵**：不觸發 DOM keydown（無 `"Fn"` code），完全無法錄製
-- **Media keys**（播放/暫停/音量）：被 macOS 系統攔截，WebView 收不到
-- **Power / Eject / Touch Bar 專用鍵**：不產生 DOM 事件
-- CapsLock 的 keyup 在某些 WebView 中不觸發
+**已知 DOM keydown 盲区**（Review F3）：
+- **Fn 键**：不触发 DOM keydown（无 `"Fn"` code），完全无法录制
+- **Media keys**（播放/暂停/音量）：被 macOS 系统拦截，WebView 收不到
+- **Power / Eject / Touch Bar 专用键**：不产生 DOM 事件
+- CapsLock 的 keyup 在某些 WebView 中不触发
 
-→ 錄製 UI 超時訊息改為「未偵測到按鍵，部分系統鍵（Fn、媒體鍵）無法錄製，請使用簡易模式」
+→ 录制 UI 超时讯息改为「未侦测到按键，部分系统键（Fn、媒体键）无法录制，请使用简易模式」
 
-**TD-3: CGEventTap 回呼擴充 KeyDown/KeyUp 處理**
+**TD-3: CGEventTap 回呼扩充 KeyDown/KeyUp 处理**
 
-Custom key 若為非修飾鍵，不會觸發 `FlagsChanged`，需在 `KeyDown`/`KeyUp` 分支加入：
+Custom key 若为非修饰键，不会触发 `FlagsChanged`，需在 `KeyDown`/`KeyUp` 分支加入：
 ```rust
 CGEventType::KeyDown => {
     if let TriggerKey::Custom { keycode: custom_kc } = &trigger {
@@ -155,7 +155,7 @@ CGEventType::KeyDown => {
 }
 ```
 
-若 Custom key 恰好是修飾鍵，`FlagsChanged` 分支也需處理（flag-based 檢測）���
+若 Custom key 恰好是修饰键，`FlagsChanged` 分支也需处理（flag-based 检测）���
 ```rust
 CGEventType::FlagsChanged => {
     // ...existing modifier logic...
@@ -171,11 +171,11 @@ CGEventType::FlagsChanged => {
     }
 }
 ```
-注意：`is_modifier_pressed` 對已知修飾鍵 keycode（含 Fn=63）回傳 `Some(bool)` 基於 CGEventFlags；未知 keycode 回傳 `None` 時 fallback 至 toggle-based。
+注意：`is_modifier_pressed` 对已知修饰键 keycode（含 Fn=63）回传 `Some(bool)` 基于 CGEventFlags；未知 keycode 回传 `None` 时 fallback 至 toggle-based。
 
-**CapsLock 注意**（Review F4）：CapsLock（keycode 57）在 macOS 的 `FlagsChanged` 行為特殊——按住不放時只觸發一次事件，且 macOS 有系統層級延遲（長按切換輸入法）。toggle-based 檢測在 Hold 模式下可能不可靠。已將 CapsLock 加入 `DANGEROUS_KEYS` 並標註警告。
+**CapsLock 注意**（Review F4）：CapsLock（keycode 57）在 macOS 的 `FlagsChanged` 行为特殊——按住不放时只触发一次事件，且 macOS 有系统层级延迟（长按切换输入法）。toggle-based 检测在 Hold 模式下可能不可靠。已将 CapsLock 加入 `DANGEROUS_KEYS` 并标注警告。
 
-**TD-4: Windows hook_proc 擴充**
+**TD-4: Windows hook_proc 扩充**
 
 ```rust
 let matches = match trigger {
@@ -185,23 +185,23 @@ let matches = match trigger {
 };
 ```
 
-`u16 as u32` 零擴展安全，Windows VK code 實際範圍 0-254 不會超過 u16 上限。
+`u16 as u32` 零扩展安全，Windows VK code 实际范围 0-254 不会超过 u16 上限。
 
-**TD-5: 衝突偵測清單**
+**TD-5: 冲突侦测清单**
 
-`DANGEROUS_KEYS` 包含（Review F9 擴充）：
-- **通用危險鍵**：`Escape`, `Enter`, `Space`, `Tab`, `Backspace`, `Delete`
-- **系統鍵**：`MetaLeft`, `MetaRight`（Win/Cmd）
-- **CapsLock**（macOS 行為不可靠，額外警告標註）
-- **功能鍵風險**：`F1`（Help）, `F11`（全螢幕）, `PrintScreen`, `NumLock`, `ScrollLock`, `Insert`, `Pause`
+`DANGEROUS_KEYS` 包含（Review F9 扩充）：
+- **通用危险键**：`Escape`, `Enter`, `Space`, `Tab`, `Backspace`, `Delete`
+- **系统键**：`MetaLeft`, `MetaRight`（Win/Cmd）
+- **CapsLock**（macOS 行为不可靠，额外警告标注）
+- **功能键风险**：`F1`（Help）, `F11`（全萤幕）, `PrintScreen`, `NumLock`, `ScrollLock`, `Insert`, `Pause`
 
-**TD-6: 按鍵顯示名稱**
+**TD-6: 按键显示名称**
 
-映射表同時提供 displayName，UI 顯示人類可讀名稱。持久化存 keycode 數字，顯示時查表。
+映射表同时提供 displayName，UI 显示人类可读名称。持久化存 keycode 数字，显示时查表。
 
-**TD-7: 自訂鍵獨立持久化**（Review F7）
+**TD-7: 自订键独立持久化**（Review F7）
 
-`settings.json` 結構：
+`settings.json` 结构：
 ```json
 {
   "hotkeyTriggerKey": "fn",
@@ -211,53 +211,53 @@ let matches = match trigger {
 }
 ```
 
-- `hotkeyTriggerKey`：當前 active 的觸發鍵（preset 或 custom 值）
-- `customTriggerKey`：獨立保存的自訂鍵設定（切到簡易模式時保留，不清除）
-- `customTriggerKeyDomCode`：保存 DOM code 字串，用於反查顯示名稱（避免 keycode → display name 的反向映射）
+- `hotkeyTriggerKey`：当前 active 的触发键（preset 或 custom 值）
+- `customTriggerKey`：独立保存的自订键设定（切到简易模式时保留，不清除）
+- `customTriggerKeyDomCode`：保存 DOM code 字串，用于反查显示名称（避免 keycode → display name 的反向映射）
 
-切到簡易模式 → `hotkeyTriggerKey` 改為 preset 值，`customTriggerKey` 不動
-切回自訂模式 → `hotkeyTriggerKey` 改為 `customTriggerKey` 的值
+切到简易模式 → `hotkeyTriggerKey` 改为 preset 值，`customTriggerKey` 不动
+切回自订模式 → `hotkeyTriggerKey` 改为 `customTriggerKey` 的值
 
-**TD-8: 錄到已有 preset 鍵的處理**（Review F12）
+**TD-8: 录到已有 preset 键的处理**（Review F12）
 
-當錄製的 `event.code` 在 `PRESET_DOM_CODES` 中（如 `"ShiftLeft"` → 對應 preset `Shift`），顯示提示：「此按鍵已在簡易模式中可用，建議切換至簡易模式」。不阻擋，使用者可忽略繼續存為 Custom。
+当录制的 `event.code` 在 `PRESET_DOM_CODES` 中（如 `"ShiftLeft"` → 对应 preset `Shift`），显示提示：「此按键已在简易模式中可用，建议切换至简易模式」。不阻挡，使用者可忽略继续存为 Custom。
 
 ## Implementation Plan
 
-### Task 依賴（Review F8）
+### Task 依赖（Review F8）
 
 ```
-Task 1 (keycodeMap) ──→ Task 2 (TS 型別) ──→ Task 5 (Store) ──→ Task 6 (UI)
+Task 1 (keycodeMap) ──→ Task 2 (TS 型别) ──→ Task 5 (Store) ──→ Task 6 (UI)
                                             ↗                       ↑
                         Task 3 (Rust macOS) ─┘                      │
                         Task 4 (Rust Windows)─┘                     │
                         Task 7 (errorUtils) ────────────────────────┘
 ```
 
-建議執行順序：`1 → 2 → [3, 4 平行] → 5 → 7 → 6`
+建议执行顺序：`1 → 2 → [3, 4 平行] → 5 → 7 → 6`
 
 ### Tasks
 
-- [x] **Task 1: 新增按鍵映射模組 `src/lib/keycodeMap.ts`**
+- [x] **Task 1: 新增按键映射模组 `src/lib/keycodeMap.ts`**
   - File: `src/lib/keycodeMap.ts`（新建）
   - Action: 建立 DOM `event.code` → 平台原生 keycode 映射表
-  - 內容：
-    - `domCodeToMacKeycode` 映射（覆蓋 F1-F12、字母鍵 A-Z、數字鍵 0-9、符號鍵、CapsLock、功能鍵等約 80-100 鍵）
-    - `domCodeToWindowsVkCode` 映射（同上範圍）
-    - `KEY_DISPLAY_NAMES: Record<string, string>` — `event.code` → 顯示名稱（如 `"F5"`, `"CapsLock"`, `"A"`）
-    - `getPlatformKeycode(domCode: string): number | null` — 平台偵測用 `navigator.userAgent.includes("Mac")`，與現有程式碼一致
-    - `getKeyDisplayName(domCode: string): string` — 返回顯示名稱，fallback 為 `domCode` 本身
-    - `DANGEROUS_KEYS: Set<string>` — 完整清單：`Escape, Enter, Space, Tab, Backspace, Delete, MetaLeft, MetaRight, CapsLock, F1, F11, PrintScreen, NumLock, ScrollLock, Insert, Pause`
+  - 内容：
+    - `domCodeToMacKeycode` 映射（覆盖 F1-F12、字母键 A-Z、数字键 0-9、符号键、CapsLock、功能键等约 80-100 键）
+    - `domCodeToWindowsVkCode` 映射（同上范围）
+    - `KEY_DISPLAY_NAMES: Record<string, string>` — `event.code` → 显示名称（如 `"F5"`, `"CapsLock"`, `"A"`）
+    - `getPlatformKeycode(domCode: string): number | null` — 平台侦测用 `navigator.userAgent.includes("Mac")`，与现有程式码一致
+    - `getKeyDisplayName(domCode: string): string` — 返回显示名称，fallback 为 `domCode` 本身
+    - `DANGEROUS_KEYS: Set<string>` — 完整清单：`Escape, Enter, Space, Tab, Backspace, Delete, MetaLeft, MetaRight, CapsLock, F1, F11, PrintScreen, NumLock, ScrollLock, Insert, Pause`
     - `isDangerousKey(domCode: string): boolean`
-    - `PRESET_DOM_CODES: Set<string>` — `ShiftLeft, ShiftRight, ControlLeft, ControlRight, AltLeft, AltRight, MetaLeft, MetaRight` 等對應現有 preset 的 DOM code
+    - `PRESET_DOM_CODES: Set<string>` — `ShiftLeft, ShiftRight, ControlLeft, ControlRight, AltLeft, AltRight, MetaLeft, MetaRight` 等对应现有 preset 的 DOM code
     - `isPresetEquivalentKey(domCode: string): boolean`
-    - `getDangerousKeyWarning(domCode: string): string | null` — CapsLock 回傳額外警告「macOS 上 CapsLock 在 Hold 模式下可能不穩定」，其他危險鍵回傳通用警告
-  - Notes: 純函式模組，無 Vue/Tauri 依賴。平台偵測函式接受可選參數方便測試。
+    - `getDangerousKeyWarning(domCode: string): string | null` — CapsLock 回传额外警告「macOS 上 CapsLock 在 Hold 模式下可能不稳定」，其他危险键回传通用警告
+  - Notes: 纯函式模组，无 Vue/Tauri 依赖。平台侦测函式接受可选参数方便测试。
 
-- [x] **Task 2: 擴充 TypeScript 型別定義**
+- [x] **Task 2: 扩充 TypeScript 型别定义**
   - File: `src/types/settings.ts`
-  - Action: 將 `TriggerKey` 從字串聯合型別擴充為支援 custom variant
-  - 具體變更：
+  - Action: 将 `TriggerKey` 从字串联合型别扩充为支援 custom variant
+  - 具体变更：
     ```typescript
     export type PresetTriggerKey =
       | "fn" | "option" | "rightOption" | "command"
@@ -278,143 +278,143 @@ Task 1 (keycodeMap) ──→ Task 2 (TS 型別) ──→ Task 5 (Store) ──
       return typeof key === "object" && "custom" in key;
     }
     ```
-  - Notes: `HotkeyConfig` 介面不變。型別守衛供 UI 和 Store 判斷使用。
+  - Notes: `HotkeyConfig` 介面不变。型别守卫供 UI 和 Store 判断使用。
 
-- [x] **Task 3: 擴充 Rust `TriggerKey` enum + serde 測試**
+- [x] **Task 3: 扩充 Rust `TriggerKey` enum + serde 测试**
   - File: `src-tauri/src/plugins/hotkey_listener.rs`
-  - Action: 在 `TriggerKey` enum 新增 `Custom` variant + 擴充 macOS 處理
-  - 具體變更：
+  - Action: 在 `TriggerKey` enum 新增 `Custom` variant + 扩充 macOS 处理
+  - 具体变更：
     - 在 enum 末尾新增 `Custom { keycode: u16 }`
     - 在 `matches_trigger_key_macos()` 新增：`TriggerKey::Custom { keycode: custom_kc } => keycode == *custom_kc`
     - 在 `is_modifier_pressed()` 新增：`TriggerKey::Custom { .. } => None`
-    - 擴充 CGEventTap 回呼 `FlagsChanged`：Custom + keycode 匹配 → `is_modifier_pressed` flag-based 檢測（已知修飾鍵），fallback toggle-based（未知鍵）
-    - 擴充 CGEventTap 回呼 `KeyDown`：Custom + keycode 匹配 → `handle_key_event(true)`
-    - 擴充 CGEventTap 回呼 `KeyUp`：Custom + keycode 匹配 → `handle_key_event(false)`
-    - **新增 `#[cfg(test)]` 測試**（Review F1）：
+    - 扩充 CGEventTap 回呼 `FlagsChanged`：Custom + keycode 匹配 → `is_modifier_pressed` flag-based 检测（已知修饰键），fallback toggle-based（未知键）
+    - 扩充 CGEventTap 回呼 `KeyDown`：Custom + keycode 匹配 → `handle_key_event(true)`
+    - 扩充 CGEventTap 回呼 `KeyUp`：Custom + keycode 匹配 → `handle_key_event(false)`
+    - **新增 `#[cfg(test)]` 测试**（Review F1）：
       - `test_custom_trigger_key_serde_serialize`：`assert_eq!(serde_json::to_value(TriggerKey::Custom { keycode: 96 }).unwrap(), json!({"custom": {"keycode": 96}}))`
-      - `test_custom_trigger_key_serde_deserialize`：從 `json!({"custom": {"keycode": 96}})` 反序列化
-      - `test_preset_trigger_key_serde_roundtrip`：驗證 `"fn"` 字串序列化/反序列化不受 Custom variant 影響
-      - `test_matches_trigger_key_macos_custom`：驗證 Custom variant 的比對
+      - `test_custom_trigger_key_serde_deserialize`：从 `json!({"custom": {"keycode": 96}})` 反序列化
+      - `test_preset_trigger_key_serde_roundtrip`：验证 `"fn"` 字串序列化/反序列化不受 Custom variant 影响
+      - `test_matches_trigger_key_macos_custom`：验证 Custom variant 的比对
   - Notes: `handle_key_event()` 不需修改
 
-- [x] **Task 4: 擴充 Windows hook_proc**
+- [x] **Task 4: 扩充 Windows hook_proc**
   - File: `src-tauri/src/plugins/hotkey_listener.rs`
-  - Action: 在 `windows_hook` 模組的 `hook_proc` match 分支加入 Custom
-  - 具體變更：`TriggerKey::Custom { keycode } => kbd.vkCode == keycode as u32`
-  - Notes: Windows hook 已統一處理 KeyDown/KeyUp，不需額外分支。可與 Task 3 平行。
+  - Action: 在 `windows_hook` 模组的 `hook_proc` match 分支加入 Custom
+  - 具体变更：`TriggerKey::Custom { keycode } => kbd.vkCode == keycode as u32`
+  - Notes: Windows hook 已统一处理 KeyDown/KeyUp，不需额外分支。可与 Task 3 平行。
 
-- [x] **Task 5: 擴充 Pinia Store（獨立持久化）**
+- [x] **Task 5: 扩充 Pinia Store（独立持久化）**
   - File: `src/stores/useSettingsStore.ts`
-  - Action: 支援 `CustomTriggerKey` + 獨立持久化自訂鍵設定
-  - 具體變更：
+  - Action: 支援 `CustomTriggerKey` + 独立持久化自订键设定
+  - 具体变更：
     - 新增 state：`customTriggerKey: ref<CustomTriggerKey | null>(null)` 和 `customTriggerKeyDomCode: ref<string>("")`
-    - `saveHotkeyConfig(key: TriggerKey, mode: TriggerMode)`：若 key 為 custom，同時寫入 `hotkeyTriggerKey` 和 `customTriggerKey` + `customTriggerKeyDomCode`
-    - `saveCustomTriggerKey(keycode: number, domCode: string, mode: TriggerMode)`：新增專用函式，同時更新 active key 和 custom key 儲存
-    - `switchToPresetMode(presetKey: TriggerKey, mode: TriggerMode)`：切到簡易模式，只更新 `hotkeyTriggerKey`，不清除 `customTriggerKey`
-    - `switchToCustomMode(mode: TriggerMode)`：切到自訂模式，從 `customTriggerKey` 還原 active key
-    - `loadSettings()`：額外讀取 `customTriggerKey` 和 `customTriggerKeyDomCode`
+    - `saveHotkeyConfig(key: TriggerKey, mode: TriggerMode)`：若 key 为 custom，同时写入 `hotkeyTriggerKey` 和 `customTriggerKey` + `customTriggerKeyDomCode`
+    - `saveCustomTriggerKey(keycode: number, domCode: string, mode: TriggerMode)`：新增专用函式，同时更新 active key 和 custom key 储存
+    - `switchToPresetMode(presetKey: TriggerKey, mode: TriggerMode)`：切到简易模式，只更新 `hotkeyTriggerKey`，不清除 `customTriggerKey`
+    - `switchToCustomMode(mode: TriggerMode)`：切到自订模式，从 `customTriggerKey` 还原 active key
+    - `loadSettings()`：额外读取 `customTriggerKey` 和 `customTriggerKeyDomCode`
     - 新增 helper：`getTriggerKeyDisplayName(key: TriggerKey): string`
     - **修正 log 格式**（Review F13）：`console.log(\`[useSettingsStore] Hotkey config saved: key=${JSON.stringify(key)}, mode=${mode}\`)`
-    - **向後相容驗證**（Review F2）：`loadSettings()` 中加入防禦：若 `store.get("hotkeyTriggerKey")` 回傳字串，直接當 PresetTriggerKey 使用；若回傳物件，當 CustomTriggerKey 使用
-  - Notes: `syncHotkeyConfigToRust()` 簽名不變，Rust serde 自動處理
+    - **向后相容验证**（Review F2）：`loadSettings()` 中加入防御：若 `store.get("hotkeyTriggerKey")` 回传字串，直接当 PresetTriggerKey 使用；若回传物件，当 CustomTriggerKey 使用
+  - Notes: `syncHotkeyConfigToRust()` 签名不变，Rust serde 自动处理
 
-- [x] **Task 6: 實作按鍵錄製 UI + 兩層切換**
+- [x] **Task 6: 实作按键录制 UI + 两层切换**
   - File: `src/views/SettingsView.vue`
-  - Action: 在快捷鍵設定 Card 中新增兩層 UI
-  - 具體變更：
-    - **模式切換**：在觸發鍵 Select 上方新增「簡易 / 自訂」切換（用兩個按鈕，類似現有 Hold/Toggle 切換樣式）
-    - **簡易模式**（`isCustomMode = false`）：保持現有 Select 下拉邏輯不變
-    - **自訂模式**（`isCustomMode = true`）：
-      - 顯示當前自訂鍵名稱（從 `customTriggerKeyDomCode` 查表）或「未設定」
-      - 一個「錄製」Button，點擊後進入錄製狀態
-      - 錄製狀態：Button 文字變為「請按下按鍵...」，脈動動畫（`animate-pulse`）
-      - **動態註冊 keydown listener**（Review F11）：僅在 `isRecording = true` 時 `addEventListener`，錄製結束時 `removeEventListener`。不要掛整個元件生命週期。
-      - 錄製 keydown handler：
+  - Action: 在快捷键设定 Card 中新增两层 UI
+  - 具体变更：
+    - **模式切换**：在触发键 Select 上方新增「简易 / 自订」切换（用两个按钮，类似现有 Hold/Toggle 切换样式）
+    - **简易模式**（`isCustomMode = false`）：保持现有 Select 下拉逻辑不变
+    - **自订模式**（`isCustomMode = true`）：
+      - 显示当前自订键名称（从 `customTriggerKeyDomCode` 查表）或「未设定」
+      - 一个「录制」Button，点击后进入录制状态
+      - 录制状态：Button 文字变为「请按下按键...」，脉动动画（`animate-pulse`）
+      - **动态注册 keydown listener**（Review F11）：仅在 `isRecording = true` 时 `addEventListener`，录制结束时 `removeEventListener`。不要挂整个元件生命周期。
+      - 录制 keydown handler：
         - `event.preventDefault()` + `event.stopPropagation()`
-        - Escape → 取消錄製
+        - Escape → 取消录制
         - 捕捉 `event.code` → `getPlatformKeycode()` 取得 keycode
-        - keycode 為 null → 顯示「不支援此按鍵」錯誤
-        - `isDangerousKey()` → 顯示黃色警告（`getDangerousKeyWarning()` 取得訊息），仍儲存
-        - `isPresetEquivalentKey()` → 顯示提示「此按鍵已在簡易模式中可用，建議切換至簡易模式」（Review F12），仍儲存
+        - keycode 为 null → 显示「不支援此按键」错误
+        - `isDangerousKey()` → 显示黄色警告（`getDangerousKeyWarning()` 取得讯息），仍储存
+        - `isPresetEquivalentKey()` → 显示提示「此按键已在简易模式中可用，建议切换至简易模式」（Review F12），仍储存
         - 正常 → `settingsStore.saveCustomTriggerKey(keycode, domCode, currentMode)`
-      - 錄製超時 10 秒，超時訊息：「未偵測到按鍵。部分系統鍵（Fn、媒體鍵）無法錄製，請使用簡易模式。」（Review F3）
-      - 錄製按鈕下方小字：「Fn、媒體鍵等系統鍵請使用簡易模式」（Review F3）
-    - **模式切換聯動**（Review F7）：
-      - 從簡易切到自訂：若有保存的 `customTriggerKey`，自動還原為 active key；否則顯示「未設定」等待錄製
-      - 從自訂切到簡易：active key 切回平台預設 preset key，**但 `customTriggerKey` 保留不清除**
-    - **初始化**：`onMounted` 時根據 `settingsStore.hotkeyConfig?.triggerKey` 判斷是 preset 還是 custom，設定 `isCustomMode` 初始值
-    - **系統級快捷鍵限制說明**（Review F10）：`event.preventDefault()` 無法攔截系統級快捷鍵（Cmd+Q、Win+L 等），在錄製 UI 不需額外處理，但超時提示已覆蓋此情境
-  - Notes: 使用 shadcn-vue `Button` 元件。警告用黃色（`text-yellow-400` 或語意色彩），提示用藍色（`text-blue-400`）。
+      - 录制超时 10 秒，超时讯息：「未侦测到按键。部分系统键（Fn、媒体键）无法录制，请使用简易模式。」（Review F3）
+      - 录制按钮下方小字：「Fn、媒体键等系统键请使用简易模式」（Review F3）
+    - **模式切换联动**（Review F7）：
+      - 从简易切到自订：若有保存的 `customTriggerKey`，自动还原为 active key；否则显示「未设定」等待录制
+      - 从自订切到简易：active key 切回平台预设 preset key，**但 `customTriggerKey` 保留不清除**
+    - **初始化**：`onMounted` 时根据 `settingsStore.hotkeyConfig?.triggerKey` 判断是 preset 还是 custom，设定 `isCustomMode` 初始值
+    - **系统级快捷键限制说明**（Review F10）：`event.preventDefault()` 无法拦截系统级快捷键（Cmd+Q、Win+L 等），在录制 UI 不需额外处理，但超时提示已覆盖此情境
+  - Notes: 使用 shadcn-vue `Button` 元件。警告用黄色（`text-yellow-400` 或语意色彩），提示用蓝色（`text-blue-400`）。
 
-- [x] **Task 7: 新增衝突警告錯誤訊息**
+- [x] **Task 7: 新增冲突警告错误讯息**
   - File: `src/lib/errorUtils.ts`
-  - Action: 新增快捷鍵相關警告/提示訊息函式
-  - 具體變更：
-    - `getHotkeyConflictWarning(domCode: string): string` — 通用：「此按鍵（{displayName}）可能與系統快捷鍵衝突，建議選擇其他按鍵」
-    - `getHotkeyCapslockWarning(): string` — CapsLock 專用：「CapsLock 在 macOS 的 Hold 模式下可能不穩定，建議使用 Toggle 模式或選擇其他按鍵」
-    - `getHotkeyPresetHint(domCode: string): string` — preset 提示：「此按鍵已在簡易模式中可用，建議切換至簡易模式」
-    - `getHotkeyRecordingTimeoutMessage(): string` — 超時：「未偵測到按鍵。部分系統鍵（Fn、媒體鍵）無法錄製，請使用簡易模式。」
-    - `getHotkeyUnsupportedKeyMessage(): string` — 不支援：「不支援此按鍵」
-  - Notes: 所有訊息繁體中文。警告為黃色（非錯誤），提示為藍色。
+  - Action: 新增快捷键相关警告/提示讯息函式
+  - 具体变更：
+    - `getHotkeyConflictWarning(domCode: string): string` — 通用：「此按键（{displayName}）可能与系统快捷键冲突，建议选择其他按键」
+    - `getHotkeyCapslockWarning(): string` — CapsLock 专用：「CapsLock 在 macOS 的 Hold 模式下可能不稳定，建议使用 Toggle 模式或选择其他按键」
+    - `getHotkeyPresetHint(domCode: string): string` — preset 提示：「此按键已在简易模式中可用，建议切换至简易模式」
+    - `getHotkeyRecordingTimeoutMessage(): string` — 超时：「未侦测到按键。部分系统键（Fn、媒体键）无法录制，请使用简易模式。」
+    - `getHotkeyUnsupportedKeyMessage(): string` — 不支援：「不支援此按键」
+  - Notes: 所有讯息繁体中文。警告为黄色（非错误），提示为蓝色。
 
 ### Acceptance Criteria
 
-- [x] **AC 1**: Given 使用者在簡易模式下, when 從 Select 選擇 "Fn" 觸發鍵, then 行為與現有功能完全相同（向後相容）
-- [x] **AC 2**: Given 使用者切換到自訂模式, when 點擊「錄製」按鈕並按下 F5 鍵, then 系統捕捉 F5 並顯示「F5」作為當前觸發鍵
-- [x] **AC 3**: Given 使用者已錄製 F5 為觸發鍵, when 在任意應用程式中按下 F5, then SayIt 觸發錄音（Hold 模式：按住開始、放開停止）
-- [x] **AC 4**: Given 使用者已錄製 F5 為觸發鍵（Toggle 模式）, when 按下 F5, then SayIt 開始錄音；再按 F5 則停止錄音
-- [x] **AC 5**: Given 使用者在錄製狀態中, when 按下 Escape, then 取消錄製（不設定觸發鍵），回到非錄製狀態
-- [x] **AC 6**: Given 使用者在錄製狀態中, when 等待超過 10 秒未按鍵, then 自動取消錄製，顯示「未偵測到按鍵。部分系統鍵（Fn、媒體鍵）無法錄製，請使用簡易模式。」
-- [x] **AC 7**: Given 使用者在錄製狀態中, when 按下 Enter 鍵, then 顯示黃色警告「此按鍵可能與系統快捷鍵衝突」，但仍成功設定為觸發鍵
-- [x] **AC 8**: Given 使用者在錄製狀態中, when 按下 WebView 無法映射的按鍵, then 顯示「不支援此按鍵」錯誤，不設定觸發鍵
-- [x] **AC 9**: Given 使用者設定自訂鍵後關閉並重啟 App, when App 啟動載入 settings.json, then 自訂鍵正確還原，Rust 端正確監聽
-- [x] **AC 10**: Given 使用者設定自訂鍵後, when 切回簡易模式再切回自訂模式, then 自訂鍵設定仍保留（不需重新錄製）
-- [x] **AC 11**: Given 舊版 settings.json 存有 `"hotkeyTriggerKey": "fn"`, when 新版 App 啟動, then 正確讀取為 preset 觸發鍵（向後相容）
-- [x] **AC 12（macOS）**: Given 使用者錄製 CapsLock 為觸發鍵, when 按下 CapsLock, then CGEventTap 的 FlagsChanged 正確觸發 handle_key_event，且顯示 CapsLock 專用警告
-- [x] **AC 13（Windows）**: Given 使用者錄製 F5 為觸發鍵, when 按下 F5, then Windows keyboard hook 正確觸發 handle_key_event
-- [x] **AC 14**: Given 使用者在自訂模式錄製了 Left Shift（已有 preset）, when 錄製完成, then 顯示藍色提示「此按鍵已在簡易模式中可用」，仍儲存為 custom key
-- [x] **AC 15**: Given Rust 端 `TriggerKey::Custom { keycode: 96 }`, when serde 序列化, then 輸出為 `{"custom":{"keycode":96}}`（有 Rust 單元測試驗證）
-- [x] **AC 16**: Given 使用者在非錄製狀態, when 在設定頁面輸入 API Key 或 Prompt 文字, then keydown listener 不會被觸發（動態註冊）
+- [x] **AC 1**: Given 使用者在简易模式下, when 从 Select 选择 "Fn" 触发键, then 行为与现有功能完全相同（向后相容）
+- [x] **AC 2**: Given 使用者切换到自订模式, when 点击「录制」按钮并按下 F5 键, then 系统捕捉 F5 并显示「F5」作为当前触发键
+- [x] **AC 3**: Given 使用者已录制 F5 为触发键, when 在任意应用程式中按下 F5, then SayIt 触发录音（Hold 模式：按住开始、放开停止）
+- [x] **AC 4**: Given 使用者已录制 F5 为触发键（Toggle 模式）, when 按下 F5, then SayIt 开始录音；再按 F5 则停止录音
+- [x] **AC 5**: Given 使用者在录制状态中, when 按下 Escape, then 取消录制（不设定触发键），回到非录制状态
+- [x] **AC 6**: Given 使用者在录制状态中, when 等待超过 10 秒未按键, then 自动取消录制，显示「未侦测到按键。部分系统键（Fn、媒体键）无法录制，请使用简易模式。」
+- [x] **AC 7**: Given 使用者在录制状态中, when 按下 Enter 键, then 显示黄色警告「此按键可能与系统快捷键冲突」，但仍成功设定为触发键
+- [x] **AC 8**: Given 使用者在录制状态中, when 按下 WebView 无法映射的按键, then 显示「不支援此按键」错误，不设定触发键
+- [x] **AC 9**: Given 使用者设定自订键后关闭并重启 App, when App 启动载入 settings.json, then 自订键正确还原，Rust 端正确监听
+- [x] **AC 10**: Given 使用者设定自订键后, when 切回简易模式再切回自订模式, then 自订键设定仍保留（不需重新录制）
+- [x] **AC 11**: Given 旧版 settings.json 存有 `"hotkeyTriggerKey": "fn"`, when 新版 App 启动, then 正确读取为 preset 触发键（向后相容）
+- [x] **AC 12（macOS）**: Given 使用者录制 CapsLock 为触发键, when 按下 CapsLock, then CGEventTap 的 FlagsChanged 正确触发 handle_key_event，且显示 CapsLock 专用警告
+- [x] **AC 13（Windows）**: Given 使用者录制 F5 为触发键, when 按下 F5, then Windows keyboard hook 正确触发 handle_key_event
+- [x] **AC 14**: Given 使用者在自订模式录制了 Left Shift（已有 preset）, when 录制完成, then 显示蓝色提示「此按键已在简易模式中可用」，仍储存为 custom key
+- [x] **AC 15**: Given Rust 端 `TriggerKey::Custom { keycode: 96 }`, when serde 序列化, then 输出为 `{"custom":{"keycode":96}}`（有 Rust 单元测试验证）
+- [x] **AC 16**: Given 使用者在非录制状态, when 在设定页面输入 API Key 或 Prompt 文字, then keydown listener 不会被触发（动态注册）
 
 ## Additional Context
 
 ### Dependencies
 
-- 無新外部依賴——僅新增一個 `src/lib/keycodeMap.ts` 內部映射模組
-- Rust 端無新 crate 依賴——`Custom { keycode: u16 }` 直接用現有 serde 序列化
-- 依賴現有模組：`useFeedbackMessage` composable（顯示警告/成功訊息）、shadcn-vue `Button` 元件
+- 无新外部依赖——仅新增一个 `src/lib/keycodeMap.ts` 内部映射模组
+- Rust 端无新 crate 依赖——`Custom { keycode: u16 }` 直接用现有 serde 序列化
+- 依赖现有模组：`useFeedbackMessage` composable（显示警告/成功讯息）、shadcn-vue `Button` 元件
 
 ### Testing Strategy
 
-**單元測試（Vitest）：**
+**单元测试（Vitest）：**
 - `tests/unit/keycode-map.test.ts`：
-  - `getPlatformKeycode()` 對常見鍵的映射正確性（F1-F12, A-Z, 0-9, CapsLock）
-  - `isDangerousKey()` 偵測完整清單
-  - `isPresetEquivalentKey()` 偵測
-  - `getKeyDisplayName()` 回傳值
-  - `getDangerousKeyWarning()` 對 CapsLock 回傳專用警告
-- `tests/unit/types.test.ts`：擴充現有測試，驗證 `isPresetTriggerKey()` / `isCustomTriggerKey()` 型別守衛
+  - `getPlatformKeycode()` 对常见键的映射正确性（F1-F12, A-Z, 0-9, CapsLock）
+  - `isDangerousKey()` 侦测完整清单
+  - `isPresetEquivalentKey()` 侦测
+  - `getKeyDisplayName()` 回传值
+  - `getDangerousKeyWarning()` 对 CapsLock 回传专用警告
+- `tests/unit/types.test.ts`：扩充现有测试，验证 `isPresetTriggerKey()` / `isCustomTriggerKey()` 型别守卫
 
-**Rust 測試：**
+**Rust 测试：**
 - 在 `hotkey_listener.rs` 的 `#[cfg(test)]` 中新增：
-  - `test_custom_trigger_key_serde_serialize`：精確驗證 JSON 輸出
-  - `test_custom_trigger_key_serde_deserialize`：驗證反序列化
-  - `test_preset_trigger_key_backward_compat`：驗證 `"fn"` 字串不受新 variant 影響
-  - `test_matches_trigger_key_macos_custom`：驗證 Custom variant 的比對
+  - `test_custom_trigger_key_serde_serialize`：精确验证 JSON 输出
+  - `test_custom_trigger_key_serde_deserialize`：验证反序列化
+  - `test_preset_trigger_key_backward_compat`：验证 `"fn"` 字串不受新 variant 影响
+  - `test_matches_trigger_key_macos_custom`：验证 Custom variant 的比对
 
-**手動測試：**
-- macOS: 錄製 F5 → 按 F5 觸發錄音 → 放開停止
-- macOS: 錄製 CapsLock → 測試 FlagsChanged 路徑 + 警告顯示
-- Windows: 錄製 F5 → 按 F5 觸發錄音
-- 兩平台：簡易↔自訂模式切換（自訂鍵保留驗證）、App 重啟還原、Escape 取消、10 秒超時訊息
-- 向後相容：用舊版 settings.json 啟動新版 App
+**手动测试：**
+- macOS: 录制 F5 → 按 F5 触发录音 → 放开停止
+- macOS: 录制 CapsLock → 测试 FlagsChanged 路径 + 警告显示
+- Windows: 录制 F5 → 按 F5 触发录音
+- 两平台：简易↔自订模式切换（自订键保留验证）、App 重启还原、Escape 取消、10 秒超时讯息
+- 向后相容：用旧版 settings.json 启动新版 App
 
 ### Notes
 
-- **高風險項：DOM keyCode → macOS keycode 映射表準確性**。映射表需手動維護，若有遺漏會導致「不支援此按鍵」。建議先覆蓋最常見的 80 個鍵，後續根據使用者回報補充。
-- **CapsLock 在 macOS 的特殊行為**：CapsLock 觸發 `FlagsChanged` 事件（keycode 57），有系統層級延遲（長按切換輸入法），且 Hold 模式下可能不可靠。已加入 `DANGEROUS_KEYS` + 專用警告。
-- **Hold 模式 + 一般��的語意**：一般鍵（如 F5）有明確的 KeyDown/KeyUp，Hold 模式語意清晰。修飾鍵走 FlagsChanged flag-based 路徑（`is_modifier_pressed` 查 CGEventFlags）；未知修飾鍵 fallback toggle-based。Preset Fn 只回應 keycode 63 的 FlagsChanged（避免 Globe 鍵系統事件干擾）。
-- **DOM keydown 盲區**：Fn、Media keys、Power 等完全不觸發 DOM 事件，錄製 UI 已加入超時提示和說明文字。
-- **系統級快捷鍵**：`event.preventDefault()` 無法攔截 Cmd+Q、Win+L 等。錄製中按這些鍵可能導致 App 退出或系統鎖定，此為 OS 層級限制，不做額外處理。
-- 觸發模式（Hold / Toggle）與本功能正交，`handle_key_event()` 不需修改。
-- 向後相容：serde externally tagged enum 對舊格式字串（如 `"fn"`）反序列化為 unit variant，Custom variant 不影響。Rust 測試驗證此假設。
+- **高风险项：DOM keyCode → macOS keycode 映射表准确性**。映射表需手动维护，若有遗漏会导致「不支援此按键」。建议先覆盖最常见的 80 个键，后续根据使用者回报补充。
+- **CapsLock 在 macOS 的特殊行为**：CapsLock 触发 `FlagsChanged` 事件（keycode 57），有系统层级延迟（长按切换输入法），且 Hold 模式下可能不可靠。已加入 `DANGEROUS_KEYS` + 专用警告。
+- **Hold 模式 + 一般��的语意**：一般键（如 F5）有明确的 KeyDown/KeyUp，Hold 模式语意清晰。修饰键走 FlagsChanged flag-based 路径（`is_modifier_pressed` 查 CGEventFlags）；未知修饰键 fallback toggle-based。Preset Fn 只回应 keycode 63 的 FlagsChanged（避免 Globe 键系统事件干扰）。
+- **DOM keydown 盲区**：Fn、Media keys、Power 等完全不触发 DOM 事件，录制 UI 已加入超时提示和说明文字。
+- **系统级快捷键**：`event.preventDefault()` 无法拦截 Cmd+Q、Win+L 等。录制中按这些键可能导致 App 退出或系统锁定，此为 OS 层级限制，不做额外处理。
+- 触发模式（Hold / Toggle）与本功能正交，`handle_key_event()` 不需修改。
+- 向后相容：serde externally tagged enum 对旧格式字串（如 `"fn"`）反序列化为 unit variant，Custom variant 不影响。Rust 测试验证此假设。

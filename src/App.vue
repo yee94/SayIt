@@ -42,12 +42,12 @@ onMounted(async () => {
   // 初始化 DB（供 vocabularyStore 使用）
   let isDatabaseReady = false;
   try {
-    // 等 Dashboard 完成 migration 再存取連線池，避免併發破壞 migration。
-    // 逾時（Dashboard 缺席或 migration 過久）才 fallback 直接連線；
-    // connectToDatabase() 自帶 retry，HUD 的 DB 讀取亦各有錯誤處理。
+    // 等 Dashboard 完成 migration 再存取连线池，避免并发破坏 migration。
+    // 逾时（Dashboard 缺席或 migration 过久）才 fallback 直接连线；
+    // connectToDatabase() 自带 retry，HUD 的 DB 读取亦各有错误处理。
     const databaseReady = await waitForDatabaseReady();
     if (!databaseReady) {
-      console.warn("[App] DATABASE_READY 逾時，改用 connectToDatabase fallback");
+      console.warn("[App] DATABASE_READY 逾时，改用 connectToDatabase fallback");
     }
     await connectToDatabase();
     isDatabaseReady = true;
@@ -55,7 +55,7 @@ onMounted(async () => {
     console.error("[App] Database init failed:", err);
   }
 
-  // 載入詞彙（供 transcriber + enhancer 使用），DB 初始化失敗時跳過
+  // 载入词汇（供 transcriber + enhancer 使用），DB 初始化失败时跳过
   if (isDatabaseReady) {
     try {
       await vocabularyStore.fetchTermList();
@@ -64,12 +64,12 @@ onMounted(async () => {
     }
   }
 
-  // 監聽設定變更（Main Window 設定異動時同步到 HUD Window）
+  // 监听设定变更（Main Window 设定异动时同步到 HUD Window）
   unlistenSettingsUpdated = await listenToEvent(SETTINGS_UPDATED, () => {
     void settingsStore.refreshCrossWindowSettings();
   });
 
-  // 監聽詞彙變更（Main Window 新增/刪除詞彙時同步）
+  // 监听词汇变更（Main Window 新增/删除词汇时同步）
   unlistenVocabularyChanged = await listenToEvent(
     VOCABULARY_CHANGED,
     () => {
@@ -81,7 +81,7 @@ onMounted(async () => {
   await appWindow.show();
   await voiceFlowStore.initialize();
 
-  // 啟動時直接顯示 main-window（dashboard），然後隱藏 overlay
+  // 启动时直接显示 main-window（dashboard），然后隐藏 overlay
   try {
     const mainWindow = await Window.getByLabel("main-window");
     if (mainWindow) {

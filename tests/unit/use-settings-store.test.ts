@@ -85,7 +85,7 @@ describe("useSettingsStore", () => {
 
       await store.loadSettings();
 
-      // 在 Node.js 環境中 navigator.userAgent 不含 "Mac"，預設為 rightAlt
+      // 在 Node.js 环境中 navigator.userAgent 不含 "Mac"，预设为 rightAlt
       expect(store.hotkeyConfig?.triggerKey).toBeDefined();
       expect(store.hotkeyConfig?.triggerMode).toBe("hold");
     });
@@ -131,7 +131,7 @@ describe("useSettingsStore", () => {
       await store.loadSettings();
 
       // store.get 在第一次 loadSettings 中被呼叫多次（key, mode, apiKey, prompt）
-      // 第二次不應再呼叫
+      // 第二次不应再呼叫
       const callCountAfterFirst = mockStoreGet.mock.calls.length;
       await store.loadSettings();
       expect(mockStoreGet.mock.calls.length).toBe(callCountAfterFirst);
@@ -280,7 +280,7 @@ describe("useSettingsStore", () => {
       );
       const store = useSettingsStore();
 
-      // 先切到 custom 模式，getAiPrompt() 才回傳 aiPrompt ref 值
+      // 先切到 custom 模式，getAiPrompt() 才回传 aiPrompt ref 值
       await store.savePromptMode("custom");
       await store.saveAiPrompt("自订 prompt 内容");
 
@@ -310,7 +310,7 @@ describe("useSettingsStore", () => {
       await store.saveAiPrompt("自订内容");
       await store.resetAiPrompt();
 
-      // 應恢復為當前語言的預設 prompt（非空）
+      // 应恢复为当前语言的预设 prompt（非空）
       expect(store.getAiPrompt()).not.toBe("自订内容");
       expect(store.getAiPrompt().length).toBeGreaterThan(0);
       expect(mockStoreSet).toHaveBeenCalledWith(
@@ -553,7 +553,7 @@ describe("useSettingsStore", () => {
 
     it("[P0] store 无 selectedTranscriptionLocale 时应预设为 selectedLocale（迁移）", async () => {
       mockStoreData.set("selectedLocale", "ko");
-      // 不設定 selectedTranscriptionLocale 以觸發遷移邏輯
+      // 不设定 selectedTranscriptionLocale 以触发迁移逻辑
 
       const { useSettingsStore } = await import(
         "../../src/stores/useSettingsStore"
@@ -583,7 +583,7 @@ describe("useSettingsStore", () => {
     });
 
     it("[P0] getWhisperLanguageCode 在 auto 模式下应回传 null", async () => {
-      mockStoreData.set("selectedLocale", "zh-TW");
+      mockStoreData.set("selectedLocale", "zh-CN");
       mockStoreData.set("selectedTranscriptionLocale", "auto");
 
       const { useSettingsStore } = await import(

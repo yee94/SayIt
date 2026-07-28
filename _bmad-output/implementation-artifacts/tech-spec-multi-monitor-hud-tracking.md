@@ -18,72 +18,72 @@ test_patterns: ['Rust #[cfg(test)] unit tests for coordinate calculation', 'Vite
 
 ### Problem Statement
 
-HUD 視窗在應用程式啟動時固定定位於主螢幕頂部置中。在多螢幕環境下，使用者在副螢幕上工作並觸發快捷鍵時，HUD 仍然出現在主螢幕，造成視覺斷裂和體驗不佳。
+HUD 视窗在应用程式启动时固定定位于主萤幕顶部置中。在多萤幕环境下，使用者在副萤幕上工作并触发快捷键时，HUD 仍然出现在主萤幕，造成视觉断裂和体验不佳。
 
 ### Solution
 
-實作雙層多螢幕追蹤機制：
-1. **Hotkey 觸發時** — 偵測滑鼠游標座標，判定所在螢幕，將 HUD 定位到該螢幕頂部水平置中
-2. **HUD 顯示期間** — 啟動輕量輪詢（約 250ms），持續偵測游標是否跨螢幕，若是則即時搬移 HUD 到新螢幕頂部置中
-3. **HUD 開始消失時** — 停止輪詢，collapse 動畫期間不再追蹤
-4. **HUD 隱藏後** — 零額外開銷
+实作双层多萤幕追踪机制：
+1. **Hotkey 触发时** — 侦测滑鼠游标座标，判定所在萤幕，将 HUD 定位到该萤幕顶部水平置中
+2. **HUD 显示期间** — 启动轻量轮询（约 250ms），持续侦测游标是否跨萤幕，若是则即时搬移 HUD 到新萤幕顶部置中
+3. **HUD 开始消失时** — 停止轮询，collapse 动画期间不再追踪
+4. **HUD 隐藏后** — 零额外开销
 
 ### Scope
 
 **In Scope:**
-- macOS + Windows 雙平台滑鼠游標座標偵測
-- 從游標座標判定所在螢幕（Tauri `available_monitors()` + 座標區間比對）
-- HUD 視窗動態重新定位（目標螢幕水平置中、Y = monitor top position）
-- 輪詢生命週期管理（HUD show 時啟動 / transition to idle 時停止）
-- DPI scale factor 正確處理（沿用現有 `calculate_centered_window_x` 邏輯）
+- macOS + Windows 双平台滑鼠游标座标侦测
+- 从游标座标判定所在萤幕（Tauri `available_monitors()` + 座标区间比对）
+- HUD 视窗动态重新定位（目标萤幕水平置中、Y = monitor top position）
+- 轮询生命周期管理（HUD show 时启动 / transition to idle 时停止）
+- DPI scale factor 正确处理（沿用现有 `calculate_centered_window_x` 逻辑）
 
 **Out of Scope:**
-- Notch 特殊 Y 偏移處理（一律貼螢幕頂端）
-- 螢幕熱插拔偵測（運行中新增/移除螢幕）
-- Dashboard 視窗的多螢幕處理
+- Notch 特殊 Y 偏移处理（一律贴萤幕顶端）
+- 萤幕热插拔侦测（运行中新增/移除萤幕）
+- Dashboard 视窗的多萤幕处理
 
 ## Context for Development
 
 ### Codebase Patterns
 
-- **平台隔離**: 使用 `#[cfg(target_os = "macos")]` / `#[cfg(target_os = "windows")]` 分離平台特定邏輯
-- **視窗定位**: 多螢幕追蹤使用 `LogicalPosition` 設定座標（繞過 tao cross-DPI bug），啟動定位仍用 `PhysicalPosition`
-- **前端→Rust 通訊**: `invoke('command_name', { args })` 呼叫 Tauri Command，返回 `Result<T, String>`
-- **HUD 生命週期**: `showHud()` → `window.show()` + `setIgnoreCursorEvents(true)`，`hideHud()` → `window.hide()`
-- **狀態機驅動**: `transitionTo()` 控制 HUD 狀態轉換，recording/transcribing/enhancing 觸發 showHud()，idle 觸發 hideHud()
-- **showHud() 是 fire-and-forget**: `transitionTo()` 中以 `showHud().catch(...)` 呼叫（無 await），但 `showHud()` 內部的 await 順序仍然保證先定位再顯示
+- **平台隔离**: 使用 `#[cfg(target_os = "macos")]` / `#[cfg(target_os = "windows")]` 分离平台特定逻辑
+- **视窗定位**: 多萤幕追踪使用 `LogicalPosition` 设定座标（绕过 tao cross-DPI bug），启动定位仍用 `PhysicalPosition`
+- **前端→Rust 通讯**: `invoke('command_name', { args })` 呼叫 Tauri Command，返回 `Result<T, String>`
+- **HUD 生命周期**: `showHud()` → `window.show()` + `setIgnoreCursorEvents(true)`，`hideHud()` → `window.hide()`
+- **状态机驱动**: `transitionTo()` 控制 HUD 状态转换，recording/transcribing/enhancing 触发 showHud()，idle 触发 hideHud()
+- **showHud() 是 fire-and-forget**: `transitionTo()` 中以 `showHud().catch(...)` 呼叫（无 await），但 `showHud()` 内部的 await 顺序仍然保证先定位再显示
 
 ### Files to Reference
 
 | File | Purpose |
 | ---- | ------- |
-| `src-tauri/src/lib.rs` | 現有 `calculate_centered_window_x()` + startup 定位 + 平台視窗配置 |
-| `src/stores/useVoiceFlowStore.ts` | HUD show/hide 生命週期 + hotkey event listeners |
-| `src-tauri/src/plugins/hotkey_listener.rs` | 平台隔離 pattern 參考 + CGEvent/Windows hooks 使用方式 |
-| `src-tauri/Cargo.toml` | 已有 core-graphics 0.24 + windows 0.61 依賴 |
-| `src-tauri/capabilities/default.json` | Tauri capability 白名單（需新增 `setPosition` 權限） |
-| `src/components/NotchHud.vue` | HUD 固定寬度 350px（visual），視窗邏輯寬度 400px |
+| `src-tauri/src/lib.rs` | 现有 `calculate_centered_window_x()` + startup 定位 + 平台视窗配置 |
+| `src/stores/useVoiceFlowStore.ts` | HUD show/hide 生命周期 + hotkey event listeners |
+| `src-tauri/src/plugins/hotkey_listener.rs` | 平台隔离 pattern 参考 + CGEvent/Windows hooks 使用方式 |
+| `src-tauri/Cargo.toml` | 已有 core-graphics 0.24 + windows 0.61 依赖 |
+| `src-tauri/capabilities/default.json` | Tauri capability 白名单（需新增 `setPosition` 权限） |
+| `src/components/NotchHud.vue` | HUD 固定宽度 350px（visual），视窗逻辑宽度 400px |
 
 ### Technical Decisions
 
-- **游標座標取得方式**:
-  - macOS: 透過 `CGEventCreate(NULL)` + `CGEventGetLocation()` C API — 返回 points（邏輯像素），原點在主螢幕左上角（y 向下增長）
-  - Windows: `GetCursorPos()` — 返回 virtual screen 座標，原點在主螢幕左上角
-  - ⚠️ **需實測驗證**: 以上座標系統描述基於文件推理，實作時需在真實多螢幕環境（特別是不同 DPI 組合）下驗證座標匹配是否正確
-- **螢幕匹配邏輯**:
-  - macOS: Tauri monitor position 是 physical pixels，需除以各自的 `scale_factor` 轉為 logical 後與游標 points 比對
-  - Windows: Tauri monitor position 與 `GetCursorPos` 座標系統應一致，直接比對
-  - ⚠️ **需實測驗證**: Windows 上 `GetCursorPos` 返回值可能受 DPI awareness context 影響（logical vs physical），需確認 Tauri 進程的 DPI awareness 模式並驗證座標是否匹配
-- **Rust 端完成所有計算**: 新 Tauri Command 回傳最終 `LogicalPosition`（`f64` 座標），前端只負責 `setPosition(new LogicalPosition(x, y))`
-- **⚠️ tao cross-DPI bug 繞過（2026-03-04 修正）**: tao `set_outer_position()` 使用 `self.scale_factor()`（視窗「當前」螢幕的 sf）來將 `PhysicalPosition` 轉為 logical，而非「目標」螢幕的 sf。在 mixed-DPI 環境下（如 Retina 2x + 外接 1x），這會導致座標被錯誤的 sf 除，HUD 定位到錯誤螢幕。解法：改傳 `LogicalPosition`，其 `to_logical()` 只做 `.cast()`（no-op），完全繞過錯誤的除法。證據位置：`tao-0.34.5/src/platform_impl/macos/window.rs:729-735`
-- **HUD 視窗寬度常數**: 抽取為 Rust 常數 `HUD_WINDOW_WIDTH_LOGICAL = 400.0`，取代現有 startup 中的 hardcoded 值，前端 invoke 時傳入相同值
-- **輪詢間隔 250ms**: 平衡即時性與效能，HUD 可見期間運行
-- **輪詢停止時機**: `transitionTo("idle")` 時停止輪詢（非 `hideHud()` 時）。collapse 動畫期間不追蹤，避免消失中的 HUD 突然跳螢幕
-- **Monitor key 比對**: 用螢幕的 physical position `"{x},{y}"` 作為 key，前端快取比對避免不必要的 `setPosition()` 呼叫
-- **啟動時定位保留**: `setup()` 中的初始定位邏輯保留，使用 `PhysicalPosition` + `calculate_centered_window_x()`（啟動時視窗在主螢幕上，tao 的 sf 正確，無需繞過）
-- **螢幕匹配 fallback**: `find_monitor_for_cursor()` 若無精確匹配，改為找距離游標最近的螢幕中心（而非固定 index 0），防禦 mixed-DPI rounding 間隙
-- **並行呼叫防護**: `repositionHudToCurrentMonitor()` 使用 `isRepositioning` flag 防止多個 invoke 並行執行（250ms 輪詢間隔下，若前一次 IPC 尚未回傳則跳過本次）
-- **CGEvent 記憶體安全**: macOS `CGEventCreate` 返回的 event 物件必須以 scope guard 確保 `CFRelease`，即使中途 panic 也不 leak（每 250ms 呼叫一次，leak 會累積）
+- **游标座标取得方式**:
+  - macOS: 透过 `CGEventCreate(NULL)` + `CGEventGetLocation()` C API — 返回 points（逻辑像素），原点在主萤幕左上角（y 向下增长）
+  - Windows: `GetCursorPos()` — 返回 virtual screen 座标，原点在主萤幕左上角
+  - ⚠️ **需实测验证**: 以上座标系统描述基于文件推理，实作时需在真实多萤幕环境（特别是不同 DPI 组合）下验证座标匹配是否正确
+- **萤幕匹配逻辑**:
+  - macOS: Tauri monitor position 是 physical pixels，需除以各自的 `scale_factor` 转为 logical 后与游标 points 比对
+  - Windows: Tauri monitor position 与 `GetCursorPos` 座标系统应一致，直接比对
+  - ⚠️ **需实测验证**: Windows 上 `GetCursorPos` 返回值可能受 DPI awareness context 影响（logical vs physical），需确认 Tauri 进程的 DPI awareness 模式并验证座标是否匹配
+- **Rust 端完成所有计算**: 新 Tauri Command 回传最终 `LogicalPosition`（`f64` 座标），前端只负责 `setPosition(new LogicalPosition(x, y))`
+- **⚠️ tao cross-DPI bug 绕过（2026-03-04 修正）**: tao `set_outer_position()` 使用 `self.scale_factor()`（视窗「当前」萤幕的 sf）来将 `PhysicalPosition` 转为 logical，而非「目标」萤幕的 sf。在 mixed-DPI 环境下（如 Retina 2x + 外接 1x），这会导致座标被错误的 sf 除，HUD 定位到错误萤幕。解法：改传 `LogicalPosition`，其 `to_logical()` 只做 `.cast()`（no-op），完全绕过错误的除法。证据位置：`tao-0.34.5/src/platform_impl/macos/window.rs:729-735`
+- **HUD 视窗宽度常数**: 抽取为 Rust 常数 `HUD_WINDOW_WIDTH_LOGICAL = 400.0`，取代现有 startup 中的 hardcoded 值，前端 invoke 时传入相同值
+- **轮询间隔 250ms**: 平衡即时性与效能，HUD 可见期间运行
+- **轮询停止时机**: `transitionTo("idle")` 时停止轮询（非 `hideHud()` 时）。collapse 动画期间不追踪，避免消失中的 HUD 突然跳萤幕
+- **Monitor key 比对**: 用萤幕的 physical position `"{x},{y}"` 作为 key，前端快取比对避免不必要的 `setPosition()` 呼叫
+- **启动时定位保留**: `setup()` 中的初始定位逻辑保留，使用 `PhysicalPosition` + `calculate_centered_window_x()`（启动时视窗在主萤幕上，tao 的 sf 正确，无需绕过）
+- **萤幕匹配 fallback**: `find_monitor_for_cursor()` 若无精确匹配，改为找距离游标最近的萤幕中心（而非固定 index 0），防御 mixed-DPI rounding 间隙
+- **并行呼叫防护**: `repositionHudToCurrentMonitor()` 使用 `isRepositioning` flag 防止多个 invoke 并行执行（250ms 轮询间隔下，若前一次 IPC 尚未回传则跳过本次）
+- **CGEvent 记忆体安全**: macOS `CGEventCreate` 返回的 event 物件必须以 scope guard 确保 `CFRelease`，即使中途 panic 也不 leak（每 250ms 呼叫一次，leak 会累积）
 
 ## Implementation Plan
 
@@ -91,166 +91,166 @@ HUD 視窗在應用程式啟動時固定定位於主螢幕頂部置中。在多�
 
 - [x] Task 1: 新增 Tauri capability `core:window:allow-set-position`
   - File: `src-tauri/capabilities/default.json`
-  - Action: 在 `permissions` 陣列中加入 `"core:window:allow-set-position"`
-  - Notes: `Window.setPosition()` 不在 `core:window:default` 內，必須顯式授權，否則前端呼叫會被 Tauri 權限系統擋下
+  - Action: 在 `permissions` 阵列中加入 `"core:window:allow-set-position"`
+  - Notes: `Window.setPosition()` 不在 `core:window:default` 内，必须显式授权，否则前端呼叫会被 Tauri 权限系统挡下
 
-- [x] Task 2: 新增 `HUD_WINDOW_WIDTH_LOGICAL` 常數和 `HudTargetPosition` 回傳型別
+- [x] Task 2: 新增 `HUD_WINDOW_WIDTH_LOGICAL` 常数和 `HudTargetPosition` 回传型别
   - File: `src-tauri/src/lib.rs`
   - Action: 在 `calculate_centered_window_x()` 附近新增：
-    - `const HUD_WINDOW_WIDTH_LOGICAL: f64 = 400.0;` 常數
-    - `HudTargetPosition` struct，包含 `x: f64`, `y: f64`, `monitor_key: String`（logical 座標）
-  - Notes: `#[derive(Serialize)]` + `#[serde(rename_all = "camelCase")]`。同時將 `setup()` 中的 hardcoded `400.0` 替換為此常數
+    - `const HUD_WINDOW_WIDTH_LOGICAL: f64 = 400.0;` 常数
+    - `HudTargetPosition` struct，包含 `x: f64`, `y: f64`, `monitor_key: String`（logical 座标）
+  - Notes: `#[derive(Serialize)]` + `#[serde(rename_all = "camelCase")]`。同时将 `setup()` 中的 hardcoded `400.0` 替换为此常数
 
-- [x] Task 3: 新增 macOS 游標座標取得函式
+- [x] Task 3: 新增 macOS 游标座标取得函式
   - File: `src-tauri/src/lib.rs`
   - Action: 新增 `#[cfg(target_os = "macos")] fn get_cursor_position() -> (f64, f64)` 函式
-  - Notes: 使用 `CGEventCreate(NULL)` + `CGEventGetLocation()` C FFI 呼叫。需宣告 `extern "C"` block 引入 `CGEventCreate`, `CGEventGetLocation`, `CFRelease`。**必須使用 scope guard（或 defer pattern）確保 `CFRelease` 被呼叫**，避免每 250ms 一次的記憶體 leak。返回值為 points（邏輯座標），原點在主螢幕左上角
+  - Notes: 使用 `CGEventCreate(NULL)` + `CGEventGetLocation()` C FFI 呼叫。需宣告 `extern "C"` block 引入 `CGEventCreate`, `CGEventGetLocation`, `CFRelease`。**必须使用 scope guard（或 defer pattern）确保 `CFRelease` 被呼叫**，避免每 250ms 一次的记忆体 leak。返回值为 points（逻辑座标），原点在主萤幕左上角
 
-- [x] Task 4: 新增 Windows 游標座標取得函式
+- [x] Task 4: 新增 Windows 游标座标取得函式
   - File: `src-tauri/src/lib.rs`
   - Action: 新增 `#[cfg(target_os = "windows")] fn get_cursor_position() -> (f64, f64)` 函式
-  - Notes: 使用 `windows::Win32::UI::WindowsAndMessaging::GetCursorPos`（已在 Cargo.toml features 中）。⚠️ 實作時需驗證返回座標是否與 Tauri `Monitor.position()` 在同一座標系統中
+  - Notes: 使用 `windows::Win32::UI::WindowsAndMessaging::GetCursorPos`（已在 Cargo.toml features 中）。⚠️ 实作时需验证返回座标是否与 Tauri `Monitor.position()` 在同一座标系统中
 
-- [x] Task 5: 新增螢幕匹配輔助函式
+- [x] Task 5: 新增萤幕匹配辅助函式
   - File: `src-tauri/src/lib.rs`
-  - Action: 新增 `find_monitor_for_cursor()` 純函式，接受游標座標和螢幕列表參數，回傳匹配螢幕的 index
-  - Notes: macOS 路徑需將 monitor physical position 除以 scale_factor 轉為 logical 後比對。Windows 路徑直接比對 physical 座標。設計為純函式以便單元測試（接受抽象化的 monitor 資料 struct 而非 Tauri `Monitor` 物件）。**需處理負值座標**（副螢幕在主螢幕上方或左方時 position 為負）
+  - Action: 新增 `find_monitor_for_cursor()` 纯函式，接受游标座标和萤幕列表参数，回传匹配萤幕的 index
+  - Notes: macOS 路径需将 monitor physical position 除以 scale_factor 转为 logical 后比对。Windows 路径直接比对 physical 座标。设计为纯函式以便单元测试（接受抽象化的 monitor 资料 struct 而非 Tauri `Monitor` 物件）。**需处理负值座标**（副萤幕在主萤幕上方或左方时 position 为负）
 
 - [x] Task 6: 新增 `get_hud_target_position` Tauri Command
   - File: `src-tauri/src/lib.rs`
   - Action: 新增 `#[command] fn get_hud_target_position(app: tauri::AppHandle, window_width: f64) -> Result<HudTargetPosition, String>`
-  - Notes: 流程：(1) 呼叫 `get_cursor_position()` 取得游標座標 (2) `app.available_monitors()` 取得螢幕列表 (3) `find_monitor_for_cursor()` 匹配螢幕 (4) 對匹配螢幕呼叫 `calculate_centered_window_x_logical()` 計算 logical X 偏移 (5) HUD X = monitor_logical_x + centered_x_logical (6) HUD Y = monitor_logical_y（螢幕頂端 logical 座標） (7) monitor_key = `"{physical_x},{physical_y}"` (8) 回傳 `HudTargetPosition`（logical 座標）。若無螢幕精確匹配，fallback 到最近螢幕
+  - Notes: 流程：(1) 呼叫 `get_cursor_position()` 取得游标座标 (2) `app.available_monitors()` 取得萤幕列表 (3) `find_monitor_for_cursor()` 匹配萤幕 (4) 对匹配萤幕呼叫 `calculate_centered_window_x_logical()` 计算 logical X 偏移 (5) HUD X = monitor_logical_x + centered_x_logical (6) HUD Y = monitor_logical_y（萤幕顶端 logical 座标） (7) monitor_key = `"{physical_x},{physical_y}"` (8) 回传 `HudTargetPosition`（logical 座标）。若无萤幕精确匹配，fallback 到最近萤幕
 
-- [x] Task 7: 註冊新 Command 到 invoke_handler
+- [x] Task 7: 注册新 Command 到 invoke_handler
   - File: `src-tauri/src/lib.rs`
   - Action: 在 `tauri::generate_handler![]` 中加入 `get_hud_target_position`
-  - Notes: 位於 `run()` 函式中的 `.invoke_handler()` 區塊
+  - Notes: 位于 `run()` 函式中的 `.invoke_handler()` 区块
 
-- [x] Task 8: 前端新增 `HudTargetPosition` 介面 + 重定位邏輯
+- [x] Task 8: 前端新增 `HudTargetPosition` 介面 + 重定位逻辑
   - File: `src/stores/useVoiceFlowStore.ts`
-  - Action: 新增以下內容：
+  - Action: 新增以下内容：
     - `HudTargetPosition` 介面（`x: number`, `y: number`, `monitorKey: string`）
-    - `HUD_WINDOW_WIDTH_LOGICAL = 400` 常數
-    - `MONITOR_POLL_INTERVAL_MS = 250` 常數
-    - `monitorPollTimer` 變數（`ReturnType<typeof setInterval> | null`）
-    - `lastMonitorKey` 變數（`string`）
-    - `isRepositioning` 變數（`boolean`，並行呼叫防護）
-    - `repositionHudToCurrentMonitor()` async 函式：檢查 `isRepositioning` flag，若為 true 則跳過；否則 set flag → invoke `get_hud_target_position` → 比對 `monitorKey` → 若變更則 `window.setPosition(new LogicalPosition(x, y))` → clear flag
-    - `startMonitorPolling()` 函式：啟動 setInterval 每 250ms 呼叫 `repositionHudToCurrentMonitor()`
-    - `stopMonitorPolling()` 函式：clearInterval + 重設 `lastMonitorKey` + 重設 `isRepositioning`
-  - Notes: 需新增 import `LogicalPosition` from `@tauri-apps/api/dpi`（使用 LogicalPosition 繞過 tao cross-DPI bug）。`repositionHudToCurrentMonitor()` 中的錯誤靜默處理（log 但不影響 HUD 顯示流程），錯誤時必須 clear `isRepositioning` flag
+    - `HUD_WINDOW_WIDTH_LOGICAL = 400` 常数
+    - `MONITOR_POLL_INTERVAL_MS = 250` 常数
+    - `monitorPollTimer` 变数（`ReturnType<typeof setInterval> | null`）
+    - `lastMonitorKey` 变数（`string`）
+    - `isRepositioning` 变数（`boolean`，并行呼叫防护）
+    - `repositionHudToCurrentMonitor()` async 函式：检查 `isRepositioning` flag，若为 true 则跳过；否则 set flag → invoke `get_hud_target_position` → 比对 `monitorKey` → 若变更则 `window.setPosition(new LogicalPosition(x, y))` → clear flag
+    - `startMonitorPolling()` 函式：启动 setInterval 每 250ms 呼叫 `repositionHudToCurrentMonitor()`
+    - `stopMonitorPolling()` 函式：clearInterval + 重设 `lastMonitorKey` + 重设 `isRepositioning`
+  - Notes: 需新增 import `LogicalPosition` from `@tauri-apps/api/dpi`（使用 LogicalPosition 绕过 tao cross-DPI bug）。`repositionHudToCurrentMonitor()` 中的错误静默处理（log 但不影响 HUD 显示流程），错误时必须 clear `isRepositioning` flag
 
-- [x] Task 9: 修改 `showHud()` 整合重定位 + 輪詢
+- [x] Task 9: 修改 `showHud()` 整合重定位 + 轮询
   - File: `src/stores/useVoiceFlowStore.ts`
   - Action: 修改 `showHud()` 函式：
-    1. 重設 `lastMonitorKey = ""`（強制首次定位）
-    2. `await repositionHudToCurrentMonitor()`（先定位再顯示）
+    1. 重设 `lastMonitorKey = ""`（强制首次定位）
+    2. `await repositionHudToCurrentMonitor()`（先定位再显示）
     3. 保留原有 `window.show()` + `setIgnoreCursorEvents(true)`
     4. 呼叫 `startMonitorPolling()`
-  - Notes: `showHud()` 是 async 函式，內部 await 順序保證先定位再 show。雖然 `transitionTo()` 以 fire-and-forget 方式呼叫 `showHud()`，但這不影響 `showHud()` 內部的執行順序
+  - Notes: `showHud()` 是 async 函式，内部 await 顺序保证先定位再 show。虽然 `transitionTo()` 以 fire-and-forget 方式呼叫 `showHud()`，但这不影响 `showHud()` 内部的执行顺序
 
-- [x] Task 10: 修改 `transitionTo()` 在 idle transition 時停止輪詢
+- [x] Task 10: 修改 `transitionTo()` 在 idle transition 时停止轮询
   - File: `src/stores/useVoiceFlowStore.ts`
-  - Action: 在 `transitionTo()` 中 `nextStatus === "idle"` 分支的開頭加入 `stopMonitorPolling()` 呼叫
-  - Notes: 輪詢在 transition to idle 時立即停止，collapse 動畫 400ms 期間不再追蹤。避免消失中的 HUD 突然跳到另一螢幕的突兀行為
+  - Action: 在 `transitionTo()` 中 `nextStatus === "idle"` 分支的开头加入 `stopMonitorPolling()` 呼叫
+  - Notes: 轮询在 transition to idle 时立即停止，collapse 动画 400ms 期间不再追踪。避免消失中的 HUD 突然跳到另一萤幕的突兀行为
 
-- [x] Task 11: 修改 `cleanup()` 加入輪詢清理
+- [x] Task 11: 修改 `cleanup()` 加入轮询清理
   - File: `src/stores/useVoiceFlowStore.ts`
   - Action: 在 `cleanup()` 函式中加入 `stopMonitorPolling()` 呼叫
-  - Notes: 確保元件卸載時清理所有 interval
+  - Notes: 确保元件卸载时清理所有 interval
 
-- [x] Task 12: 新增 Rust 單元測試
+- [x] Task 12: 新增 Rust 单元测试
   - File: `src-tauri/src/lib.rs`
-  - Action: 在 `#[cfg(test)] mod tests` 中新增測試：
-    - `test_find_monitor_single_monitor` — 單螢幕場景，游標一定在該螢幕上
-    - `test_find_monitor_dual_horizontal` — 雙螢幕水平排列，游標在右螢幕
-    - `test_find_monitor_dual_vertical` — 雙螢幕垂直排列，副螢幕在上方（y 為負值）
-    - `test_find_monitor_dual_different_dpi` — 雙螢幕不同 DPI（macOS 場景）
-    - `test_find_monitor_cursor_at_boundary` — 游標在螢幕邊界上
-    - `test_find_monitor_cursor_negative_coords` — 游標在負座標區域（副螢幕在主螢幕左方/上方）
-    - `test_find_monitor_fallback` — 游標座標不在任何螢幕內（異常情況），fallback 到第一個螢幕
-  - Notes: `find_monitor_for_cursor()` 設計為純函式，接受 struct 參數而非 Tauri Monitor 物件，方便測試
+  - Action: 在 `#[cfg(test)] mod tests` 中新增测试：
+    - `test_find_monitor_single_monitor` — 单萤幕场景，游标一定在该萤幕上
+    - `test_find_monitor_dual_horizontal` — 双萤幕水平排列，游标在右萤幕
+    - `test_find_monitor_dual_vertical` — 双萤幕垂直排列，副萤幕在上方（y 为负值）
+    - `test_find_monitor_dual_different_dpi` — 双萤幕不同 DPI（macOS 场景）
+    - `test_find_monitor_cursor_at_boundary` — 游标在萤幕边界上
+    - `test_find_monitor_cursor_negative_coords` — 游标在负座标区域（副萤幕在主萤幕左方/上方）
+    - `test_find_monitor_fallback` — 游标座标不在任何萤幕内（异常情况），fallback 到第一个萤幕
+  - Notes: `find_monitor_for_cursor()` 设计为纯函式，接受 struct 参数而非 Tauri Monitor 物件，方便测试
 
 ### Acceptance Criteria
 
-- [x] AC 1: Given 使用者有雙螢幕且游標在副螢幕上，when 按下快捷鍵觸發錄音，then HUD 出現在副螢幕頂部水平置中
-- [x] AC 2: Given HUD 正在副螢幕上顯示（錄音中），when 使用者將滑鼠移動到主螢幕，then HUD 在 250ms 內移動到主螢幕頂部水平置中
-- [x] AC 3: Given 使用者只有單螢幕，when 按下快捷鍵，then HUD 行為與修改前完全一致（頂部置中）
-- [x] AC 4: Given 雙螢幕有不同 DPI（例如 MacBook Retina + 外接 1080p），when HUD 從 Retina 螢幕移到外接螢幕，then HUD 在外接螢幕上正確水平置中且不偏移
-- [x] AC 5: Given HUD 隱藏（idle 狀態），when 無操作，then 無輪詢 timer 在運行（零效能開銷）
-- [x] AC 6: Given `get_hud_target_position` command 執行失敗，when 按下快捷鍵，then HUD 仍然正常顯示（在最後已知位置），錯誤靜默 log 不影響流程
-- [x] AC 7: Given HUD 顯示中且游標未跨螢幕，when 輪詢觸發，then 不呼叫 `setPosition()`（透過 `monitorKey` 比對避免）
-- [x] AC 8: Given HUD 正在 collapse 動畫中（transition to idle 後 400ms 內），when 使用者將滑鼠移到其他螢幕，then HUD 不跟隨（輪詢已停止），在當前螢幕完成消失動畫
+- [x] AC 1: Given 使用者有双萤幕且游标在副萤幕上，when 按下快捷键触发录音，then HUD 出现在副萤幕顶部水平置中
+- [x] AC 2: Given HUD 正在副萤幕上显示（录音中），when 使用者将滑鼠移动到主萤幕，then HUD 在 250ms 内移动到主萤幕顶部水平置中
+- [x] AC 3: Given 使用者只有单萤幕，when 按下快捷键，then HUD 行为与修改前完全一致（顶部置中）
+- [x] AC 4: Given 双萤幕有不同 DPI（例如 MacBook Retina + 外接 1080p），when HUD 从 Retina 萤幕移到外接萤幕，then HUD 在外接萤幕上正确水平置中且不偏移
+- [x] AC 5: Given HUD 隐藏（idle 状态），when 无操作，then 无轮询 timer 在运行（零效能开销）
+- [x] AC 6: Given `get_hud_target_position` command 执行失败，when 按下快捷键，then HUD 仍然正常显示（在最后已知位置），错误静默 log 不影响流程
+- [x] AC 7: Given HUD 显示中且游标未跨萤幕，when 轮询触发，then 不呼叫 `setPosition()`（透过 `monitorKey` 比对避免）
+- [x] AC 8: Given HUD 正在 collapse 动画中（transition to idle 后 400ms 内），when 使用者将滑鼠移到其他萤幕，then HUD 不跟随（轮询已停止），在当前萤幕完成消失动画
 
 ## Additional Context
 
 ### Dependencies
 
-- 無新 Rust crate 依賴 — `core-graphics` 0.24（macOS）和 `windows` 0.61（Windows）已在 `Cargo.toml` 中
-- 無新 npm 依賴 — `@tauri-apps/api` 已包含 `LogicalPosition` 和 `Window.setPosition()`
-- **需新增 Tauri capability**: `core:window:allow-set-position`（Task 1）— `setPosition()` 不在 `core:window:default` 中，必須顯式授權
+- 无新 Rust crate 依赖 — `core-graphics` 0.24（macOS）和 `windows` 0.61（Windows）已在 `Cargo.toml` 中
+- 无新 npm 依赖 — `@tauri-apps/api` 已包含 `LogicalPosition` 和 `Window.setPosition()`
+- **需新增 Tauri capability**: `core:window:allow-set-position`（Task 1）— `setPosition()` 不在 `core:window:default` 中，必须显式授权
 
 ### Testing Strategy
 
-- **Rust 單元測試**: 14 個測試案例覆蓋 `find_monitor_for_cursor()` 和 `calculate_centered_window_x_logical()` 的各種場景，包含垂直排列、負座標、portrait 螢幕、mixed-DPI、closest fallback（Task 12 + 2026-03-04 修正新增）
-- **手動整合測試**: 雙螢幕環境下驗證 AC 1-8，特別注意：
-  - 不同 DPI 螢幕間的切換
-  - HUD 顯示/隱藏時的輪詢啟停
-  - 快速跨螢幕移動時的追蹤延遲
-  - collapse 動畫期間確認不追蹤
-  - ⚠️ **座標系統實測**: 第一次在真實多螢幕環境運行時，加上 debug log 印出游標座標和各螢幕的 position/size/scale_factor，確認座標比對邏輯正確
-- **現有測試迴歸**: `pnpm test` 確認 `useVoiceFlowStore` 現有測試不被破壞
+- **Rust 单元测试**: 14 个测试案例覆盖 `find_monitor_for_cursor()` 和 `calculate_centered_window_x_logical()` 的各种场景，包含垂直排列、负座标、portrait 萤幕、mixed-DPI、closest fallback（Task 12 + 2026-03-04 修正新增）
+- **手动整合测试**: 双萤幕环境下验证 AC 1-8，特别注意：
+  - 不同 DPI 萤幕间的切换
+  - HUD 显示/隐藏时的轮询启停
+  - 快速跨萤幕移动时的追踪延迟
+  - collapse 动画期间确认不追踪
+  - ⚠️ **座标系统实测**: 第一次在真实多萤幕环境运行时，加上 debug log 印出游标座标和各萤幕的 position/size/scale_factor，确认座标比对逻辑正确
+- **现有测试回归**: `pnpm test` 确认 `useVoiceFlowStore` 现有测试不被破坏
 
 ### Notes
 
-- **效能**: 每次輪詢是一個 `invoke()` IPC 呼叫 + Tauri `available_monitors()` 查詢。250ms 間隔下每秒 4 次，對系統負擔極小
-- **座標系統陷阱（⚠️ 需實測）**: macOS 游標座標是 logical pixels（points），Tauri monitor positions 是 physical pixels。比對時必須將 physical 除以 `scale_factor` 轉為 logical。Windows 的座標匹配取決於 Tauri 進程的 DPI awareness mode，需實測確認。實作時應在 `get_hud_target_position` 中加入 debug log 以便驗證
-- **視覺閃爍防護**: `showHud()` 中先 `repositionHudToCurrentMonitor()` 再 `window.show()`，確保 HUD 出現在正確位置而非先閃一下舊位置
-- **collapse 期間不追蹤**: 輪詢在 `transitionTo("idle")` 時停止，collapse 動畫 400ms 期間 HUD 固定在當前螢幕消失，避免消失中突然跳螢幕的突兀行為
-- **並行安全**: `isRepositioning` flag 確保同時只有一個 invoke IPC 在進行中，避免高負載下多個 `setPosition()` 互相競爭
-- **記憶體安全**: macOS `CGEventCreate` 必須配對 `CFRelease`，使用 scope guard 確保即使 panic 也不 leak
-- **未來考量（Out of Scope）**: 螢幕熱插拔可透過監聯 Tauri 的 `ScaleFactorChanged` / `Resized` 事件支援，但目前不在範圍內
+- **效能**: 每次轮询是一个 `invoke()` IPC 呼叫 + Tauri `available_monitors()` 查询。250ms 间隔下每秒 4 次，对系统负担极小
+- **座标系统陷阱（⚠️ 需实测）**: macOS 游标座标是 logical pixels（points），Tauri monitor positions 是 physical pixels。比对时必须将 physical 除以 `scale_factor` 转为 logical。Windows 的座标匹配取决于 Tauri 进程的 DPI awareness mode，需实测确认。实作时应在 `get_hud_target_position` 中加入 debug log 以便验证
+- **视觉闪烁防护**: `showHud()` 中先 `repositionHudToCurrentMonitor()` 再 `window.show()`，确保 HUD 出现在正确位置而非先闪一下旧位置
+- **collapse 期间不追踪**: 轮询在 `transitionTo("idle")` 时停止，collapse 动画 400ms 期间 HUD 固定在当前萤幕消失，避免消失中突然跳萤幕的突兀行为
+- **并行安全**: `isRepositioning` flag 确保同时只有一个 invoke IPC 在进行中，避免高负载下多个 `setPosition()` 互相竞争
+- **记忆体安全**: macOS `CGEventCreate` 必须配对 `CFRelease`，使用 scope guard 确保即使 panic 也不 leak
+- **未来考量（Out of Scope）**: 萤幕热插拔可透过监联 Tauri 的 `ScaleFactorChanged` / `Resized` 事件支援，但目前不在范围内
 
 ## Dev Agent Record
 
 ### Implementation Notes
 
 - **Date:** 2026-03-03
-- **macOS CGEvent FFI**: 使用 raw `extern "C"` FFI 呼叫 `CGEventCreate(NULL)` + `CGEventGetLocation()` + `CFRelease()`，因為 `core-graphics` 0.24 的 `CGEvent::new()` 需要非 Optional 的 `CGEventSource` 參數，無法直接傳 NULL
-- **MonitorInfo 抽象化**: 新增 `MonitorInfo` struct 將螢幕資訊抽象化，使 `find_monitor_for_cursor()` 成為純函式，方便單元測試（不需要 Tauri runtime）
-- **座標系統處理**: macOS 分支會將 monitor physical position 除以各自的 `scale_factor` 轉為 logical 後與游標 points 比對；Windows 分支直接用 physical 座標比對
-- **記憶體安全**: CGEventCreate 返回的指標手動 CFRelease — 不依賴 Rust wrapper 的 Drop，因為直接用了 C FFI
+- **macOS CGEvent FFI**: 使用 raw `extern "C"` FFI 呼叫 `CGEventCreate(NULL)` + `CGEventGetLocation()` + `CFRelease()`，因为 `core-graphics` 0.24 的 `CGEvent::new()` 需要非 Optional 的 `CGEventSource` 参数，无法直接传 NULL
+- **MonitorInfo 抽象化**: 新增 `MonitorInfo` struct 将萤幕资讯抽象化，使 `find_monitor_for_cursor()` 成为纯函式，方便单元测试（不需要 Tauri runtime）
+- **座标系统处理**: macOS 分支会将 monitor physical position 除以各自的 `scale_factor` 转为 logical 后与游标 points 比对；Windows 分支直接用 physical 座标比对
+- **记忆体安全**: CGEventCreate 返回的指标手动 CFRelease — 不依赖 Rust wrapper 的 Drop，因为直接用了 C FFI
 
 ### Implementation Notes (2026-03-04 Cross-DPI Fix)
 
 - **Date:** 2026-03-04
-- **問題**: 三螢幕環境（左 landscape + 中 Retina 2x + 右 portrait 1x），游標在 portrait 螢幕上時 HUD 出現在中間螢幕右側
-- **根因**: tao `set_outer_position()` 用 `self.scale_factor()`（視窗「當前」螢幕的 sf=2.0）將 PhysicalPosition 轉為 logical，而非用「目標」螢幕的 sf=1.0。1780 / 2.0 = 890，落在中間螢幕 [0, 1440) 範圍內
-- **修正**: `HudTargetPosition` 改為回傳 logical 座標（`f64`），前端改用 `LogicalPosition`。`Position::Logical` 的 `to_logical()` 只做 `.cast()`（no-op），完全繞過 tao 的錯誤除法
-- **新增 `calculate_centered_window_x_logical()`**: 回傳 `f64` logical 偏移量，與原有 `calculate_centered_window_x()` 並存（後者僅供 `setup()` 啟動定位使用）
-- **`find_monitor_for_cursor()` fallback 改進**: 從固定 `Some(0)` 改為找距離游標最近的螢幕中心，防禦 mixed-DPI rounding 間隙
-- **Debug logging**: `get_hud_target_position` 中加入 `[hud-tracking]` 前綴 log，印出游標座標、各螢幕 physical/logical bounds、匹配結果、最終 HUD logical position
-- **測試新增**: 6 個測試 — portrait 三螢幕 macOS、portrait 底部對齊、closest fallback、logical 置中計算（portrait/Retina/1080p）
-- **啟動定位不受影響**: `setup()` 仍用 `PhysicalPosition` + `calculate_centered_window_x()`，因啟動時視窗在主螢幕上，tao 的 sf 恰好正確
+- **问题**: 三萤幕环境（左 landscape + 中 Retina 2x + 右 portrait 1x），游标在 portrait 萤幕上时 HUD 出现在中间萤幕右侧
+- **根因**: tao `set_outer_position()` 用 `self.scale_factor()`（视窗「当前」萤幕的 sf=2.0）将 PhysicalPosition 转为 logical，而非用「目标」萤幕的 sf=1.0。1780 / 2.0 = 890，落在中间萤幕 [0, 1440) 范围内
+- **修正**: `HudTargetPosition` 改为回传 logical 座标（`f64`），前端改用 `LogicalPosition`。`Position::Logical` 的 `to_logical()` 只做 `.cast()`（no-op），完全绕过 tao 的错误除法
+- **新增 `calculate_centered_window_x_logical()`**: 回传 `f64` logical 偏移量，与原有 `calculate_centered_window_x()` 并存（后者仅供 `setup()` 启动定位使用）
+- **`find_monitor_for_cursor()` fallback 改进**: 从固定 `Some(0)` 改为找距离游标最近的萤幕中心，防御 mixed-DPI rounding 间隙
+- **Debug logging**: `get_hud_target_position` 中加入 `[hud-tracking]` 前缀 log，印出游标座标、各萤幕 physical/logical bounds、匹配结果、最终 HUD logical position
+- **测试新增**: 6 个测试 — portrait 三萤幕 macOS、portrait 底部对齐、closest fallback、logical 置中计算（portrait/Retina/1080p）
+- **启动定位不受影响**: `setup()` 仍用 `PhysicalPosition` + `calculate_centered_window_x()`，因启动时视窗在主萤幕上，tao 的 sf 恰好正确
 
 ### Completion Notes
 
 - 12/12 tasks 完成
-- 8/8 acceptance criteria 滿足（需手動整合測試驗證 AC 1-8）
-- Rust: 7 個新測試 + 19 個既有測試 = 26 tests passing
-- Frontend: 242 tests passing（零迴歸）
-- 無新 crate/npm 依賴
-- TypeScript 型別錯誤皆為預先存在的 shadcn block 元件問題，非本次修改引入
+- 8/8 acceptance criteria 满足（需手动整合测试验证 AC 1-8）
+- Rust: 7 个新测试 + 19 个既有测试 = 26 tests passing
+- Frontend: 242 tests passing（零回归）
+- 无新 crate/npm 依赖
+- TypeScript 型别错误皆为预先存在的 shadcn block 元件问题，非本次修改引入
 
 ### File List
 
 | File | Action |
 | ---- | ------ |
 | `src-tauri/capabilities/default.json` | Modified — 新增 `core:window:allow-set-position` |
-| `src-tauri/src/lib.rs` | Modified — 新增 `HUD_WINDOW_WIDTH_LOGICAL` 常數、`HudTargetPosition` struct（`f64` logical 座標）、`MonitorInfo` struct、`get_cursor_position()` (macOS/Windows)、`find_monitor_for_cursor()`（closest fallback）、`calculate_centered_window_x_logical()`、`get_hud_target_position` command（logical 座標 + debug log）、14 個單元測試；`setup()` 中 hardcoded 400.0 替換為常數 |
-| `src/stores/useVoiceFlowStore.ts` | Modified — 新增 `LogicalPosition` import、`HudTargetPosition` 介面、`MONITOR_POLL_INTERVAL_MS` 常數、`repositionHudToCurrentMonitor()`/`startMonitorPolling()`/`stopMonitorPolling()` 函式；修改 `showHud()` 整合重定位+輪詢、`transitionTo()` idle 時停止輪詢、`cleanup()` 加入輪詢清理 |
+| `src-tauri/src/lib.rs` | Modified — 新增 `HUD_WINDOW_WIDTH_LOGICAL` 常数、`HudTargetPosition` struct（`f64` logical 座标）、`MonitorInfo` struct、`get_cursor_position()` (macOS/Windows)、`find_monitor_for_cursor()`（closest fallback）、`calculate_centered_window_x_logical()`、`get_hud_target_position` command（logical 座标 + debug log）、14 个单元测试；`setup()` 中 hardcoded 400.0 替换为常数 |
+| `src/stores/useVoiceFlowStore.ts` | Modified — 新增 `LogicalPosition` import、`HudTargetPosition` 介面、`MONITOR_POLL_INTERVAL_MS` 常数、`repositionHudToCurrentMonitor()`/`startMonitorPolling()`/`stopMonitorPolling()` 函式；修改 `showHud()` 整合重定位+轮询、`transitionTo()` idle 时停止轮询、`cleanup()` 加入轮询清理 |
 
 ### Change Log
 
-- 2026-03-03: 實作 Multi-Monitor HUD Tracking — HUD 視窗根據游標所在螢幕動態重新定位，支援 macOS + Windows 雙平台
-- 2026-03-04: 修正 cross-DPI portrait 螢幕定位 bug — `PhysicalPosition` 改為 `LogicalPosition` 繞過 tao `set_outer_position` 在 mixed-DPI 環境下使用錯誤 scale_factor 轉換的問題；`HudTargetPosition` 改為 `f64` logical 座標；`find_monitor_for_cursor()` fallback 改為最近螢幕；新增 `calculate_centered_window_x_logical()`；新增 6 個 portrait/mixed-DPI/closest-fallback 測試案例；加入 `[hud-tracking]` debug logging
+- 2026-03-03: 实作 Multi-Monitor HUD Tracking — HUD 视窗根据游标所在萤幕动态重新定位，支援 macOS + Windows 双平台
+- 2026-03-04: 修正 cross-DPI portrait 萤幕定位 bug — `PhysicalPosition` 改为 `LogicalPosition` 绕过 tao `set_outer_position` 在 mixed-DPI 环境下使用错误 scale_factor 转换的问题；`HudTargetPosition` 改为 `f64` logical 座标；`find_monitor_for_cursor()` fallback 改为最近萤幕；新增 `calculate_centered_window_x_logical()`；新增 6 个 portrait/mixed-DPI/closest-fallback 测试案例；加入 `[hud-tracking]` debug logging

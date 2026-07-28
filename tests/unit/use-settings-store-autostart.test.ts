@@ -34,7 +34,7 @@ vi.mock("../../src/composables/useTauriEvents", () => ({
   SETTINGS_UPDATED: "settings:updated",
 }));
 
-describe("useSettingsStore — 自啟動功能", () => {
+describe("useSettingsStore — 自启动功能", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     mockIsEnabled.mockReset();
@@ -52,7 +52,7 @@ describe("useSettingsStore — 自啟動功能", () => {
   });
 
   describe("loadAutoStartStatus", () => {
-    it("[P0] 應讀取當前自啟動狀態 — 已啟用", async () => {
+    it("[P0] 应读取当前自启动状态 — 已启用", async () => {
       mockIsEnabled.mockResolvedValue(true);
 
       const { useSettingsStore } = await import(
@@ -64,7 +64,7 @@ describe("useSettingsStore — 自啟動功能", () => {
       expect(store.isAutoStartEnabled).toBe(true);
     });
 
-    it("[P0] 應讀取當前自啟動狀態 — 未啟用", async () => {
+    it("[P0] 应读取当前自启动状态 — 未启用", async () => {
       mockIsEnabled.mockResolvedValue(false);
 
       const { useSettingsStore } = await import(
@@ -76,7 +76,7 @@ describe("useSettingsStore — 自啟動功能", () => {
       expect(store.isAutoStartEnabled).toBe(false);
     });
 
-    it("[P0] isEnabled 失敗應靜默處理", async () => {
+    it("[P0] isEnabled 失败应静默处理", async () => {
       mockIsEnabled.mockRejectedValue(new Error("Permission denied"));
 
       const { useSettingsStore } = await import(
@@ -91,7 +91,7 @@ describe("useSettingsStore — 自啟動功能", () => {
   });
 
   describe("toggleAutoStart", () => {
-    it("[P0] 啟用 → 關閉：應呼叫 disable", async () => {
+    it("[P0] 启用 → 关闭：应呼叫 disable", async () => {
       mockIsEnabled.mockResolvedValue(true);
       mockDisable.mockResolvedValue(undefined);
 
@@ -108,7 +108,7 @@ describe("useSettingsStore — 自啟動功能", () => {
       expect(store.isAutoStartEnabled).toBe(false);
     });
 
-    it("[P0] 關閉 → 啟用：應呼叫 enable", async () => {
+    it("[P0] 关闭 → 启用：应呼叫 enable", async () => {
       mockIsEnabled.mockResolvedValue(false);
       mockEnable.mockResolvedValue(undefined);
 
@@ -125,7 +125,7 @@ describe("useSettingsStore — 自啟動功能", () => {
       expect(store.isAutoStartEnabled).toBe(true);
     });
 
-    it("[P0] toggle 失敗應拋出錯誤", async () => {
+    it("[P0] toggle 失败应抛出错误", async () => {
       mockIsEnabled.mockResolvedValue(false);
       mockEnable.mockRejectedValue(new Error("System error"));
 
@@ -141,7 +141,7 @@ describe("useSettingsStore — 自啟動功能", () => {
   });
 
   describe("initializeAutoStart", () => {
-    it("[P0] 首次啟動應自動啟用自啟動", async () => {
+    it("[P0] 首次启动应自动启用自启动", async () => {
       mockStoreGet.mockImplementation(async (key: string) => {
         if (key === "hasInitAutoStart") return null;
         return null;
@@ -160,7 +160,7 @@ describe("useSettingsStore — 自啟動功能", () => {
       expect(store.isAutoStartEnabled).toBe(true);
     });
 
-    it("[P0] 非首次啟動應讀取現有狀態", async () => {
+    it("[P0] 非首次启动应读取现有状态", async () => {
       mockStoreGet.mockImplementation(async (key: string) => {
         if (key === "hasInitAutoStart") return true;
         return null;
@@ -178,7 +178,7 @@ describe("useSettingsStore — 自啟動功能", () => {
       expect(store.isAutoStartEnabled).toBe(true);
     });
 
-    it("[P0] 初始化失敗應靜默處理", async () => {
+    it("[P0] 初始化失败应静默处理", async () => {
       mockStoreGet.mockRejectedValue(new Error("Store error"));
 
       const { useSettingsStore } = await import(

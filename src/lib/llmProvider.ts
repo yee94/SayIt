@@ -6,7 +6,7 @@ export const DEFAULT_LLM_MODEL_ID = "gpt-4o-mini";
 export const DEFAULT_LLM_TIMEOUT_MS = 30_000;
 export const DEFAULT_LLM_MAX_TOKENS = 8192;
 
-// ── 統一型別 ──────────────────────────────────────────────
+// ── 统一型别 ──────────────────────────────────────────────
 
 export interface LlmChatMessage {
   role: "system" | "user" | "assistant";

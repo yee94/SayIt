@@ -63,7 +63,7 @@ pub struct StopRecordingResult {
 struct RecordingInner {
     samples: Mutex<Vec<i16>>,
     should_stop: AtomicBool,
-    /// 即時 ASR 訂閱：錄音 callback 會 clone 一段 mono PCM 送出（不阻塞主緩衝）
+    /// 即时 ASR 订阅：录音 callback 会 clone 一段 mono PCM 送出（不阻塞主缓冲）
     live_pcm_tx: Mutex<Option<std::sync::mpsc::SyncSender<Vec<i16>>>>,
 }
 
@@ -87,7 +87,7 @@ impl AudioRecorderState {
         }
     }
 
-    /// 掛上即時 PCM 訂閱（需已在錄音中）。回傳目前 sample_rate。
+    /// 挂上即时 PCM 订阅（需已在录音中）。回传目前 sample_rate。
     pub fn attach_live_pcm_sink(
         &self,
         tx: std::sync::mpsc::SyncSender<Vec<i16>>,
@@ -106,7 +106,7 @@ impl AudioRecorderState {
         Ok(handle.sample_rate)
     }
 
-    /// 卸下即時 PCM 訂閱（sender drop 後 live ASR 端會收到結束）
+    /// 卸下即时 PCM 订阅（sender drop 后 live ASR 端会收到结束）
     pub fn detach_live_pcm_sink(&self) {
         let Ok(guard) = self.recording.lock() else {
             return;
@@ -176,7 +176,7 @@ pub fn start_audio_preview(
     preview_state: State<'_, AudioPreviewState>,
     device_name: String,
 ) -> Result<(), String> {
-    // 如果錄音正在進行中，不啟動預覽（AC 11）
+    // 如果录音正在进行中，不启动预览（AC 11）
     if let Some(recorder_state) = app.try_state::<AudioRecorderState>() {
         if let Ok(guard) = recorder_state.recording.lock() {
             if guard.is_some() {
@@ -186,7 +186,7 @@ pub fn start_audio_preview(
         }
     }
 
-    // 停止舊的 preview（join thread 確保裝置完全釋放）
+    // 停止旧的 preview（join thread 确保装置完全释放）
     stop_audio_preview_inner(&preview_state);
 
     let should_stop = Arc::new(AtomicBool::new(false));
@@ -201,7 +201,7 @@ pub fn start_audio_preview(
         })
         .map_err(|e| format!("Thread spawn failed: {e}"))?;
 
-    // 等待 stream 建立成功/失敗
+    // 等待 stream 建立成功/失败
     match ready_rx.recv() {
         Ok(Ok(())) => {
             let mut guard = preview_state
@@ -301,7 +301,7 @@ pub fn start_recording(
     state: State<'_, AudioRecorderState>,
     device_name: String,
 ) -> Result<(), AudioRecorderError> {
-    // 先取得 recording lock，防止 preview 在此期間重啟（F1+F7 race fix）
+    // 先取得 recording lock，防止 preview 在此期间重启（F1+F7 race fix）
     let mut guard = state
         .recording
         .lock()
@@ -312,7 +312,7 @@ pub fn start_recording(
         return Ok(());
     }
 
-    // 停止音量預覽（持有 recording lock，防止 preview 重啟）
+    // 停止音量预览（持有 recording lock，防止 preview 重启）
     if let Some(preview_state) = app.try_state::<AudioPreviewState>() {
         stop_audio_preview_inner(&preview_state);
     }
@@ -485,12 +485,12 @@ fn run_recording_thread(
         std::thread::sleep(std::time::Duration::from_millis(50));
     }
 
-    // 顯式 pause：呼叫 AudioOutputUnitStop 停止麥克風捕獲。
-    // 兜底防禦 cpal macOS disconnect listener 的 Arc 循環引用——
-    // 即使 Arc cycle 導致 drop 無法觸發 AudioUnit 清理，pause 也能確保麥克風停止。
-    // 已知限制：非預設裝置仍會因 Arc cycle 洩漏 ~1-2 KB/次（StreamInner + listener）。
+    // 显式 pause：呼叫 AudioOutputUnitStop 停止麦克风捕获。
+    // 兜底防御 cpal macOS disconnect listener 的 Arc 循环引用——
+    // 即使 Arc cycle 导致 drop 无法触发 AudioUnit 清理，pause 也能确保麦克风停止。
+    // 已知限制：非预设装置仍会因 Arc cycle 泄漏 ~1-2 KB/次（StreamInner + listener）。
     if let Err(e) = stream.pause() {
-        // ⚠️ 安全相關：pause 失敗意味著麥克風可能仍在捕獲，且 drop 也無法停止
+        // ⚠️ 安全相关：pause 失败意味着麦克风可能仍在捕获，且 drop 也无法停止
         eprintln!(
             "[audio-recorder] SECURITY: Failed to pause stream, mic may remain active: {e:?}"
         );
@@ -502,8 +502,8 @@ fn run_recording_thread(
 // ========== Preview Thread ==========
 
 const PREVIEW_EMIT_INTERVAL_MS: u64 = 30;
-/// 預覽音量的 dB 映射範圍：-60 dB → 0%, -20 dB → 100%
-/// AirPods Pro 等低增益麥克風的語音 RMS 約 0.005~0.018（-46 ~ -35 dB）
+/// 预览音量的 dB 映射范围：-60 dB → 0%, -20 dB → 100%
+/// AirPods Pro 等低增益麦克风的语音 RMS 约 0.005~0.018（-46 ~ -35 dB）
 const PREVIEW_DB_FLOOR: f32 = -60.0;
 const PREVIEW_DB_CEILING: f32 = -20.0;
 
@@ -513,7 +513,7 @@ fn run_preview_thread(
     device_name: String,
     ready_tx: std::sync::mpsc::Sender<Result<(), String>>,
 ) {
-    // ── 裝置選擇 ──
+    // ── 装置选择 ──
     let host = cpal::default_host();
     let device = match select_input_device(&host, &device_name, "audio-preview") {
         Some(d) => d,
@@ -533,7 +533,7 @@ fn run_preview_thread(
         }
     );
 
-    // ── 輸入格式 ──
+    // ── 输入格式 ──
     let selection = match determine_input_config(&device) {
         Ok(c) => c,
         Err(e) => {
@@ -544,7 +544,7 @@ fn run_preview_thread(
     let channels = selection.channels as usize;
 
     // ── 建立 preview stream ──
-    // 使用單一 Mutex 確保 sum_squares 和 sample_count 的原子讀寫（F4 fix）
+    // 使用单一 Mutex 确保 sum_squares 和 sample_count 的原子读写（F4 fix）
     let accumulator = Arc::new(Mutex::new((0.0f64, 0usize)));
     let accumulator_for_callback = accumulator.clone();
 
@@ -601,7 +601,7 @@ fn run_preview_thread(
     println!("[audio-preview] Preview started");
     let _ = ready_tx.send(Ok(()));
 
-    // ── 主迴圈：每 30ms 計算 RMS 並 emit ──
+    // ── 主回圈：每 30ms 计算 RMS 并 emit ──
     while !should_stop.load(Ordering::SeqCst) {
         std::thread::sleep(std::time::Duration::from_millis(PREVIEW_EMIT_INTERVAL_MS));
 
@@ -615,8 +615,8 @@ fn run_preview_thread(
             snapshot
         };
 
-        // 計算 RMS → dB → 正規化到 0.0~1.0
-        // 線性 RMS 對語音太低（正常說話 ~0.03），dB 尺度才符合人耳感知
+        // 计算 RMS → dB → 正规化到 0.0~1.0
+        // 线性 RMS 对语音太低（正常说话 ~0.03），dB 尺度才符合人耳感知
         let level = if count > 0 {
             let rms = (ss / count as f64).sqrt() as f32;
             if rms > 0.0 {
@@ -689,8 +689,8 @@ where
 
 // ========== Device Selection ==========
 
-/// 共用裝置選擇邏輯（F10 fix: 消除 recording/preview 間的重複）
-/// WORKAROUND: cpal 0.15.3 macOS CoreAudio 的 Arc cycle — 優先 default_input_device() 路徑
+/// 共用装置选择逻辑（F10 fix: 消除 recording/preview 间的重复）
+/// WORKAROUND: cpal 0.15.3 macOS CoreAudio 的 Arc cycle — 优先 default_input_device() 路径
 fn select_input_device(host: &cpal::Host, device_name: &str, tag: &str) -> Option<cpal::Device> {
     if device_name.is_empty() {
         host.default_input_device()
@@ -862,7 +862,7 @@ where
                     samples.extend_from_slice(&mono_batch);
                 }
 
-                // 即時 ASR：非阻塞送出本批 mono；滿了就丟這批，避免拖慢錄音 callback
+                // 即时 ASR：非阻塞送出本批 mono；满了就丢这批，避免拖慢录音 callback
                 if let Ok(sink) = inner_for_callback.live_pcm_tx.lock() {
                     if let Some(tx) = sink.as_ref() {
                         let _ = tx.try_send(mono_batch.clone());
@@ -1131,13 +1131,13 @@ mod tests {
     #[test]
     fn test_audio_preview_state_shutdown_no_panic() {
         let state = AudioPreviewState::new();
-        state.shutdown(); // 無 handle 時 shutdown 不 panic
+        state.shutdown(); // 无 handle 时 shutdown 不 panic
     }
 
     #[test]
     fn test_audio_preview_state_double_shutdown() {
         let state = AudioPreviewState::new();
-        // 模擬有 active preview（不含 thread，僅測試 flag + take 行為）
+        // 模拟有 active preview（不含 thread，仅测试 flag + take 行为）
         {
             let mut guard = state.handle.lock().unwrap();
             *guard = Some(PreviewHandle {

@@ -34,7 +34,7 @@ async function hasColumn(
   return columns.some((col) => col.name === columnName);
 }
 
-/** 冪等 ADD COLUMN：欄位已存在時跳過，避免 crash 後重試時 duplicate column 錯誤 */
+/** 幂等 ADD COLUMN：栏位已存在时跳过，避免 crash 后重试时 duplicate column 错误 */
 async function addColumnIfNotExists(
   connection: Database,
   tableName: string,
@@ -54,8 +54,8 @@ async function addColumnIfNotExists(
 }
 
 /**
- * Dashboard 專用：建立連線池 + 執行 migration。
- * 只有 main-window.ts（Dashboard）應呼叫此函式。
+ * Dashboard 专用：建立连线池 + 执行 migration。
+ * 只有 main-window.ts（Dashboard）应呼叫此函式。
  */
 export async function initializeDatabase(): Promise<Database> {
   if (db) return db;
@@ -71,10 +71,10 @@ export async function initializeDatabase(): Promise<Database> {
 }
 
 /**
- * HUD 專用：等待 Dashboard 建好連線池後複用，永不呼叫 Database.load()。
- * Database.load() 會在 Rust 端以 HashMap.insert() 覆蓋既有 Pool，
- * 若 Dashboard 正在用舊 Pool 跑 migration，transaction context 會遺失，
- * 導致 DROP TABLE 等破壞性操作失去 rollback 保護。
+ * HUD 专用：等待 Dashboard 建好连线池后复用，永不呼叫 Database.load()。
+ * Database.load() 会在 Rust 端以 HashMap.insert() 覆盖既有 Pool，
+ * 若 Dashboard 正在用旧 Pool 跑 migration，transaction context 会遗失，
+ * 导致 DROP TABLE 等破坏性操作失去 rollback 保护。
  */
 export async function connectToDatabase(
   maxRetries = 100,
@@ -97,13 +97,13 @@ export async function connectToDatabase(
     }
   }
 
-  // Fallback：Dashboard 尚未載入（極罕見），HUD 自行初始化
+  // Fallback：Dashboard 尚未载入（极罕见），HUD 自行初始化
   console.warn("[database] HUD fallback: initializing database directly");
   return doInitializeDatabase();
 }
 
 async function doInitializeDatabase(): Promise<Database> {
-  // 使用 local variable，確保只有 schema 全部建立成功才設定 singleton
+  // 使用 local variable，确保只有 schema 全部建立成功才设定 singleton
   const connection = await Database.load("sqlite:app.db");
 
   await connection.execute("PRAGMA journal_mode = WAL;");
@@ -200,7 +200,7 @@ async function doInitializeDatabase(): Promise<Database> {
   const v3CurrentVersion = v3VersionRows[0]?.version ?? 1;
 
   if (v3CurrentVersion < 3) {
-    // 先補上 weight/source 欄位，後續建立 idx_vocabulary_weight 才看得到 weight
+    // 先补上 weight/source 栏位，后续建立 idx_vocabulary_weight 才看得到 weight
     await addColumnIfNotExists(
       connection,
       "vocabulary",
@@ -212,25 +212,25 @@ async function doInitializeDatabase(): Promise<Database> {
       "source TEXT NOT NULL DEFAULT 'manual'",
     );
 
-    // 不使用顯式交易：tauri-plugin-sql 連線池無連線親和性，
-    // 跨 execute() 呼叫的 BEGIN/COMMIT 會落在不同連線而失敗
-    // （cannot commit - no transaction is active）。改為依賴冪等語句 +
-    // 下方關鍵表恢復邏輯確保可重複執行。
+    // 不使用显式交易：tauri-plugin-sql 连线池无连线亲和性，
+    // 跨 execute() 呼叫的 BEGIN/COMMIT 会落在不同连线而失败
+    // （cannot commit - no transaction is active）。改为依赖幂等语句 +
+    // 下方关键表恢复逻辑确保可重复执行。
     await connection.execute(
       "CREATE INDEX IF NOT EXISTS idx_vocabulary_weight ON vocabulary(weight DESC);",
     );
 
-    // api_usage 表重建（擴展 CHECK constraint 加入 'vocabulary_analysis'）
-    // SQLite 不支援 ALTER CONSTRAINT，必須重建
-    // 若上次 rebuild 在 DROP api_usage 後、RENAME 前崩潰，api_usage_new 會是
-    // 唯一資料副本，先還原成 api_usage，避免被下方 DROP 清掉造成資料遺失
+    // api_usage 表重建（扩展 CHECK constraint 加入 'vocabulary_analysis'）
+    // SQLite 不支援 ALTER CONSTRAINT，必须重建
+    // 若上次 rebuild 在 DROP api_usage 后、RENAME 前崩溃，api_usage_new 会是
+    // 唯一资料副本，先还原成 api_usage，避免被下方 DROP 清掉造成资料遗失
     if (
       !(await tableExists(connection, "api_usage")) &&
       (await tableExists(connection, "api_usage_new"))
     ) {
       await connection.execute("ALTER TABLE api_usage_new RENAME TO api_usage;");
     }
-    // 清除上次失敗可能殘留的暫存表（此時 api_usage 必為資料來源，drop 安全）
+    // 清除上次失败可能残留的暂存表（此时 api_usage 必为资料来源，drop 安全）
     await connection.execute("DROP TABLE IF EXISTS api_usage_new;");
     await connection.execute(`
       CREATE TABLE api_usage_new (
@@ -250,7 +250,7 @@ async function doInitializeDatabase(): Promise<Database> {
         FOREIGN KEY (transcription_id) REFERENCES transcriptions(id)
       );
     `);
-    // api_usage 可能在先前失敗的 migration 中被 DROP 而未 RENAME 回來
+    // api_usage 可能在先前失败的 migration 中被 DROP 而未 RENAME 回来
     const hasApiUsage = await tableExists(connection, "api_usage");
     if (hasApiUsage) {
       await connection.execute(
@@ -280,7 +280,7 @@ async function doInitializeDatabase(): Promise<Database> {
   const v4CurrentVersion = v4VersionRows[0]?.version ?? 1;
 
   if (v4CurrentVersion < 4) {
-    // 先補上 audio_file_path/status 欄位，後續建立 idx_transcriptions_status 才看得到 status
+    // 先补上 audio_file_path/status 栏位，后续建立 idx_transcriptions_status 才看得到 status
     await addColumnIfNotExists(
       connection,
       "transcriptions",
@@ -392,15 +392,15 @@ async function doInitializeDatabase(): Promise<Database> {
     );
   }
 
-  // --- 關鍵表驗證與恢復 ---
-  // 先前版本的 migration 可能因連線池覆蓋導致 DROP TABLE 後未 RENAME，
-  // 若 api_usage 不存在則以最新 schema 重建（資料已遺失，但 app 可正常運作）
+  // --- 关键表验证与恢复 ---
+  // 先前版本的 migration 可能因连线池覆盖导致 DROP TABLE 后未 RENAME，
+  // 若 api_usage 不存在则以最新 schema 重建（资料已遗失，但 app 可正常运作）
 
-  // vocabulary column 恢復（issue #27）：
-  // 某些 Windows 環境下 v3 migration 將 schema_version 推進到 ≥3，
-  // 但 weight/source column 卻沒成功落地，導致 INSERT 時報
+  // vocabulary column 恢复（issue #27）：
+  // 某些 Windows 环境下 v3 migration 将 schema_version 推进到 ≥3，
+  // 但 weight/source column 却没成功落地，导致 INSERT 时报
   // "table vocabulary has no column named source"。
-  // 這裡無條件重跑冪等的 addColumnIfNotExists，已存在則跳過、缺失則補上。
+  // 这里无条件重跑幂等的 addColumnIfNotExists，已存在则跳过、缺失则补上。
   if (await tableExists(connection, "vocabulary")) {
     await addColumnIfNotExists(
       connection,
@@ -415,7 +415,7 @@ async function doInitializeDatabase(): Promise<Database> {
   }
 
   if (!(await tableExists(connection, "api_usage"))) {
-    // 可能有殘留的 api_usage_new（上次 migration 建了但沒 RENAME 成功）
+    // 可能有残留的 api_usage_new（上次 migration 建了但没 RENAME 成功）
     if (await tableExists(connection, "api_usage_new")) {
       await connection.execute(
         "ALTER TABLE api_usage_new RENAME TO api_usage;",
@@ -448,7 +448,7 @@ async function doInitializeDatabase(): Promise<Database> {
     }
   }
 
-  // 只有全部 schema 建立成功才設定 singleton
+  // 只有全部 schema 建立成功才设定 singleton
   db = connection;
   console.log("[database] SQLite initialized with WAL mode");
 

@@ -140,7 +140,7 @@ export const useVocabularyStore = defineStore("vocabulary", () => {
     } catch (error) {
       const message = extractErrorMessage(error);
       if (message.includes("UNIQUE")) {
-        // 已存在，靜默處理（呼叫端會做 weight +1）
+        // 已存在，静默处理（呼叫端会做 weight +1）
         return;
       }
       console.error(`[vocabulary-store] addAiSuggestedTerm failed: ${message}`);
@@ -187,8 +187,8 @@ export const useVocabularyStore = defineStore("vocabulary", () => {
   }
 
   /**
-   * 批量匯入詞條（source=manual）。
-   * 已存在（大小寫不敏感）則跳過；成功後只刷新一次並廣播一次事件。
+   * 批量汇入词条（source=manual）。
+   * 已存在（大小写不敏感）则跳过；成功后只刷新一次并广播一次事件。
    */
   async function importTerms(
     terms: string[],
@@ -240,7 +240,7 @@ export const useVocabularyStore = defineStore("vocabulary", () => {
         `[vocabulary-store] importTerms failed: ${extractErrorMessage(error)}`,
       );
       captureError(error, { source: "vocabulary", step: "import" });
-      // 部分寫入後仍刷新，避免 UI 與 DB 不一致
+      // 部分写入后仍刷新，避免 UI 与 DB 不一致
       try {
         await fetchTermList();
       } catch {

@@ -39,198 +39,198 @@ workflowType: 'prd'
 
 ## Executive Summary
 
-SayIt 是一款跨平台桌面語音輸入工具，解決知識工作者「思考速度遠超打字速度」的核心瓶頸。使用者在任何應用程式中按住快捷鍵說話，放開後語音經 Groq Whisper API 轉錄，再由 Groq LLM 自動將口語轉為通順的繁體中文書面語（去除贅詞、重組句構、修正標點），直接貼入游標位置。
+SayIt 是一款跨平台桌面语音输入工具，解决知识工作者「思考速度远超打字速度」的核心瓶颈。使用者在任何应用程式中按住快捷键说话，放开后语音经 Groq Whisper API 转录，再由 Groq LLM 自动将口语转为通顺的简体中文书面语（去除赘词、重组句构、修正标点），直接贴入游标位置。
 
-現有方案要麼輸出品質不足以直接使用（macOS 內建聽寫無 AI 後處理），要麼設定繁複（VoiceInk 需管理 12+ AI 提供商與本地模型），要麼需付費訂閱（Typeless）。SayIt 的目標是提供一個安裝後只需設定 API Key 即可使用的工具，讓語音輸入成為文字輸入的自然延伸。
+现有方案要么输出品质不足以直接使用（macOS 内建听写无 AI 后处理），要么设定繁复（VoiceInk 需管理 12+ AI 提供商与本地模型），要么需付费订阅（Typeless）。SayIt 的目标是提供一个安装后只需设定 API Key 即可使用的工具，让语音输入成为文字输入的自然延伸。
 
-本專案基於已完成的 POC（Fn 鍵監聽 → 錄音 → Whisper 轉錄 → 剪貼簿貼上）進行功能擴展，新增 AI 文字整理、跨平台熱鍵系統、自訂詞彙字典、歷史記錄與 Dashboard UI。主要使用者為開發者與知識工作者，中期目標推廣至公司內部非技術角色。
+本专案基于已完成的 POC（Fn 键监听 → 录音 → Whisper 转录 → 剪贴簿贴上）进行功能扩展，新增 AI 文字整理、跨平台热键系统、自订词汇字典、历史记录与 Dashboard UI。主要使用者为开发者与知识工作者，中期目标推广至公司内部非技术角色。
 
 ### What Makes This Special
 
-1. **口語到書面語的無感橋接** — 過去語音輸入的瓶頸不在辨識準確度，而在輸出無法直接作為書面文字使用。Groq LLM 的低延遲讓 AI 後處理能在使用者無感的情況下完成口語→書面語轉換，首次實現「說完即可用」的體驗。
+1. **口语到书面语的无感桥接** — 过去语音输入的瓶颈不在辨识准确度，而在输出无法直接作为书面文字使用。Groq LLM 的低延迟让 AI 后处理能在使用者无感的情况下完成口语→书面语转换，首次实现「说完即可用」的体验。
 
-2. **刻意的極簡** — 設定只有三項（快捷鍵、API Key、AI Prompt），刻意排除多提供商、多語言、Per-App 設定等功能。一段 prompt 控制所有文字處理行為，降低認知負擔至零。
+2. **刻意的极简** — 设定只有三项（快捷键、API Key、AI Prompt），刻意排除多提供商、多语言、Per-App 设定等功能。一段 prompt 控制所有文字处理行为，降低认知负担至零。
 
-3. **即時感依賴低延遲基礎設施** — 選擇 Groq 作為唯一提供商不是偷懶，而是產品決策：端到端延遲 < 3 秒（含 AI 整理）是體驗的底線，Groq 的推論速度是讓這個體驗成立的技術前提。
+3. **即时感依赖低延迟基础设施** — 选择 Groq 作为唯一提供商不是偷懒，而是产品决策：端到端延迟 < 3 秒（含 AI 整理）是体验的底线，Groq 的推论速度是让这个体验成立的技术前提。
 
 ## Project Classification
 
-| 項目 | 值 |
+| 项目 | 值 |
 |------|-----|
-| **專案類型** | Desktop App（Tauri v2 跨平台桌面應用） |
-| **領域** | General（生產力 / 效率工具） |
-| **複雜度** | Low — 標準軟體需求，無法規限制 |
-| **專案脈絡** | Brownfield — 基於已完成 POC 擴展功能 |
+| **专案类型** | Desktop App（Tauri v2 跨平台桌面应用） |
+| **领域** | General（生产力 / 效率工具） |
+| **复杂度** | Low — 标准软体需求，无法规限制 |
+| **专案脉络** | Brownfield — 基于已完成 POC 扩展功能 |
 
 ## Success Criteria
 
 ### User Success
 
-| 指標 | 目標 | 衡量方式 |
+| 指标 | 目标 | 衡量方式 |
 |------|------|---------|
-| **輸出可用率** | > 90% 轉錄結果不需手動修改 | 貼上後監控使用者鍵盤輸入行為（刪除、修改），若無修改視為可用 |
-| **端到端延遲** | < 3 秒（放開按鍵到文字出現，含 AI 整理） | 歷史記錄中 `transcriptionDurationMs + enhancementDurationMs` |
-| **首次使用時間** | 安裝到第一次成功語音輸入 < 2 分鐘 | Onboarding 流程觀察 |
-| **日均使用次數** | >= 10 次/人 | Dashboard 歷史記錄統計 |
+| **输出可用率** | > 90% 转录结果不需手动修改 | 贴上后监控使用者键盘输入行为（删除、修改），若无修改视为可用 |
+| **端到端延迟** | < 3 秒（放开按键到文字出现，含 AI 整理） | 历史记录中 `transcriptionDurationMs + enhancementDurationMs` |
+| **首次使用时间** | 安装到第一次成功语音输入 < 2 分钟 | Onboarding 流程观察 |
+| **日均使用次数** | >= 10 次/人 | Dashboard 历史记录统计 |
 
 ### Business Success
 
-| 指標 | 目標 | 時間框架 |
+| 指标 | 目标 | 时间框架 |
 |------|------|---------|
-| **團隊採用率** | > 80% 日活 | 部署後 2 週 |
-| **持續使用** | 部署後使用者未主動停用 | 持續追蹤 |
-| **累計效率增益** | Dashboard 可見節省時間統計 | 持續累計 |
+| **团队采用率** | > 80% 日活 | 部署后 2 周 |
+| **持续使用** | 部署后使用者未主动停用 | 持续追踪 |
+| **累计效率增益** | Dashboard 可见节省时间统计 | 持续累计 |
 
-核心商業目標：內部效率工具，不涉及營收。成功 = 團隊成員自然地用語音取代大部分文字輸入場景。
+核心商业目标：内部效率工具，不涉及营收。成功 = 团队成员自然地用语音取代大部分文字输入场景。
 
 ### Technical Success
 
-| 指標 | 目標 |
+| 指标 | 目标 |
 |------|------|
-| **跨平台運作** | macOS 和 Windows 雙平台功能一致且穩定 |
-| **系統可用率** | > 99%（排除網路問題） |
-| **AI 整理使用率** | `count(wasEnhanced=true) / count(total)` 可追蹤 |
-| **品質回饋機制** | 貼上後鍵盤監控能正確偵測使用者修改行為 |
+| **跨平台运作** | macOS 和 Windows 双平台功能一致且稳定 |
+| **系统可用率** | > 99%（排除网路问题） |
+| **AI 整理使用率** | `count(wasEnhanced=true) / count(total)` 可追踪 |
+| **品质回馈机制** | 贴上后键盘监控能正确侦测使用者修改行为 |
 
 ### Measurable Outcomes
 
-- 使用者每日文字輸入效率體感提升，「想到但懶得打」的情況減少
-- AI 整理輸出品質隨 prompt 調校持續改善，可用率趨勢向上
-- 非技術角色能零學習成本上手，無需 IT 支援
+- 使用者每日文字输入效率体感提升，「想到但懒得打」的情况减少
+- AI 整理输出品质随 prompt 调校持续改善，可用率趋势向上
+- 非技术角色能零学习成本上手，无需 IT 支援
 
 ## Product Scope & Development Roadmap
 
 ### MVP — 已完成
 
-POC 已實作的核心流程：Fn 鍵監聽 → 麥克風錄音 → Groq Whisper API 轉錄 → 剪貼簿貼上 → Notch-style HUD 狀態顯示。已驗證技術可行性與基礎體驗。
+POC 已实作的核心流程：Fn 键监听 → 麦克风录音 → Groq Whisper API 转录 → 剪贴簿贴上 → Notch-style HUD 状态显示。已验证技术可行性与基础体验。
 
-### V2 Phase 1 — 完整功能版（本次開發範圍）
+### V2 Phase 1 — 完整功能版（本次开发范围）
 
-**策略：** 體驗完整化 — 在已驗證的技術基礎上，補齊讓產品「可日常使用」和「可推廣給他人」所需的全部能力。
+**策略：** 体验完整化 — 在已验证的技术基础上，补齐让产品「可日常使用」和「可推广给他人」所需的全部能力。
 
-| # | 功能 | 說明 |
+| # | 功能 | 说明 |
 |---|------|------|
-| 1 | 跨平台熱鍵系統 | `rdev` crate 統一監聽，macOS 預設 Fn、Windows 預設右 Alt，可自選修飾鍵，Hold + Toggle 雙模式 |
-| 2 | AI 文字整理 | Groq LLM + 可編輯 prompt，一次完成去口語、重組句構、標點修正。字數 < 10 字跳過 AI |
-| 3 | 自訂詞彙字典 | CRUD 管理，注入 Whisper API prompt + AI 上下文 |
-| 4 | 歷史記錄 | SQLite 持久化，供 Dashboard 統計與回顧 |
-| 5 | App UI — Dashboard | 統計卡片 + 最近轉錄列表 |
-| 6 | App UI — 歷史 / 字典 / 設定 | 歷史搜尋複製、詞彙 CRUD、快捷鍵 / API Key / Prompt 設定 |
-| 7 | HUD 狀態擴展 | 新增 `enhancing` 狀態，完整狀態機 |
+| 1 | 跨平台热键系统 | `rdev` crate 统一监听，macOS 预设 Fn、Windows 预设右 Alt，可自选修饰键，Hold + Toggle 双模式 |
+| 2 | AI 文字整理 | Groq LLM + 可编辑 prompt，一次完成去口语、重组句构、标点修正。字数 < 10 字跳过 AI |
+| 3 | 自订词汇字典 | CRUD 管理，注入 Whisper API prompt + AI 上下文 |
+| 4 | 历史记录 | SQLite 持久化，供 Dashboard 统计与回顾 |
+| 5 | App UI — Dashboard | 统计卡片 + 最近转录列表 |
+| 6 | App UI — 历史 / 字典 / 设定 | 历史搜寻复制、词汇 CRUD、快捷键 / API Key / Prompt 设定 |
+| 7 | HUD 状态扩展 | 新增 `enhancing` 状态，完整状态机 |
 
-#### 依賴分析與建議開發順序
+#### 依赖分析与建议开发顺序
 
 ```
-Layer 0 — 基礎架構（無依賴，其他功能的前提）
-├── [1] 跨平台熱鍵系統（rdev 取代 CGEventTap）
-└── [4] 歷史記錄（SQLite schema + tauri-plugin-sql 初始化）
+Layer 0 — 基础架构（无依赖，其他功能的前提）
+├── [1] 跨平台热键系统（rdev 取代 CGEventTap）
+└── [4] 历史记录（SQLite schema + tauri-plugin-sql 初始化）
 
-Layer 1 — 核心功能（依賴 Layer 0）
-├── [2] AI 文字整理（依賴 [1] 熱鍵觸發流程重構）
-├── [3] 自訂詞彙字典（依賴 [4] SQLite 資料庫）
-└── [7] HUD 狀態擴展（依賴 [2] 新增 enhancing 狀態）
+Layer 1 — 核心功能（依赖 Layer 0）
+├── [2] AI 文字整理（依赖 [1] 热键触发流程重构）
+├── [3] 自订词汇字典（依赖 [4] SQLite 资料库）
+└── [7] HUD 状态扩展（依赖 [2] 新增 enhancing 状态）
 
-Layer 2 — UI 層（依賴 Layer 0 + 1）
-├── [5] Dashboard（依賴 [4] 歷史記錄有資料）
-└── [6] 歷史/字典/設定頁面（依賴 [3][4] 資料層）
+Layer 2 — UI 层（依赖 Layer 0 + 1）
+├── [5] Dashboard（依赖 [4] 历史记录有资料）
+└── [6] 历史/字典/设定页面（依赖 [3][4] 资料层）
 ```
 
-| 順序 | 功能 | 原因 |
+| 顺序 | 功能 | 原因 |
 |------|------|------|
-| 1st | 跨平台熱鍵系統 | 基礎設施，rdev 替換影響整個觸發流程 |
-| 2nd | 歷史記錄（SQLite） | 資料層基礎，Dashboard 和統計都依賴它 |
-| 3rd | AI 文字整理 | 核心體驗升級，產品最大差異化來源 |
-| 4th | HUD 狀態擴展 | 跟隨 AI 整理，新增 enhancing 狀態 |
-| 5th | 自訂詞彙字典 | 依賴 SQLite，提升辨識品質 |
-| 6th | App UI（設定/歷史/字典） | 資料層就緒後建構 UI |
-| 7th | Dashboard | 最後做，需要足夠歷史資料才有意義 |
+| 1st | 跨平台热键系统 | 基础设施，rdev 替换影响整个触发流程 |
+| 2nd | 历史记录（SQLite） | 资料层基础，Dashboard 和统计都依赖它 |
+| 3rd | AI 文字整理 | 核心体验升级，产品最大差异化来源 |
+| 4th | HUD 状态扩展 | 跟随 AI 整理，新增 enhancing 状态 |
+| 5th | 自订词汇字典 | 依赖 SQLite，提升辨识品质 |
+| 6th | App UI（设定/历史/字典） | 资料层就绪后建构 UI |
+| 7th | Dashboard | 最后做，需要足够历史资料才有意义 |
 
-### Phase 2 — 體驗優化
+### Phase 2 — 体验优化
 
-| 功能 | 說明 |
+| 功能 | 说明 |
 |------|------|
-| VAD 靜音偵測 | Web Audio API，搭配 Toggle 模式自動停止 |
-| 串流轉錄 | WebSocket 即時字幕 |
-| Mini HUD | 適配無瀏海外接螢幕 |
-| 剪貼簿還原 | 貼上後延遲還原原始剪貼簿 |
+| VAD 静音侦测 | Web Audio API，搭配 Toggle 模式自动停止 |
+| 串流转录 | WebSocket 即时字幕 |
+| Mini HUD | 适配无浏海外接萤幕 |
+| 剪贴簿还原 | 贴上后延迟还原原始剪贴簿 |
 
-### Vision — 長期方向
+### Vision — 长期方向
 
-| 功能 | 說明 |
+| 功能 | 说明 |
 |------|------|
-| Per-App 設定 | 依前景 App 自動切換 prompt |
-| 多語言支援 | 英文、日文等 |
-| IT 集中管理 | API Key 統一配置、使用量監控 |
+| Per-App 设定 | 依前景 App 自动切换 prompt |
+| 多语言支援 | 英文、日文等 |
+| IT 集中管理 | API Key 统一配置、使用量监控 |
 
 ## User Journeys
 
-### Journey 1：Jackle — 全端工程師的日常（Success Path）
+### Journey 1：Jackle — 全端工程师的日常（Success Path）
 
-**Opening Scene：** 週三下午，Jackle 剛完成一個功能的 code review，需要在 GitHub PR 上留下一段詳細的 review comment。腦中有很多想法要表達，但一想到要把這些組織成書面文字就覺得煩。
+**Opening Scene：** 周三下午，Jackle 刚完成一个功能的 code review，需要在 GitHub PR 上留下一段详细的 review comment。脑中有很多想法要表达，但一想到要把这些组织成书面文字就觉得烦。
 
-**Rising Action：** 他把游標放在 GitHub comment 輸入框，按住 Fn 鍵開始說話：「這邊的 error handling 我覺得可以改一下，目前是直接 throw，但其實 caller 那邊沒有 catch，所以會變成 unhandled rejection，建議改成 return Result type 讓 caller 決定怎麼處理。」放開 Fn，HUD 顯示「轉錄中...」→「整理中...」→「已貼上 ✓」。
+**Rising Action：** 他把游标放在 GitHub comment 输入框，按住 Fn 键开始说话：「这边的 error handling 我觉得可以改一下，目前是直接 throw，但其实 caller 那边没有 catch，所以会变成 unhandled rejection，建议改成 return Result type 让 caller 决定怎么处理。」放开 Fn，HUD 显示「转录中...」→「整理中...」→「已贴上 ✓」。
 
-**Climax：** 文字出現在 comment 框中：已去除「我覺得」「其實」等口語贅詞，標點修正，句構重組為清晰的書面語。Jackle 掃一眼，不需修改，直接送出。
+**Climax：** 文字出现在 comment 框中：已去除「我觉得」「其实」等口语赘词，标点修正，句构重组为清晰的书面语。Jackle 扫一眼，不需修改，直接送出。
 
-**Resolution：** 整個過程不到 5 秒。Jackle 繼續下一個 PR，這已經是今天第 15 次使用語音輸入。他甚至不再意識到自己在「用工具」— 按 Fn 說話已經跟按鍵打字一樣自然。
+**Resolution：** 整个过程不到 5 秒。Jackle 继续下一个 PR，这已经是今天第 15 次使用语音输入。他甚至不再意识到自己在「用工具」— 按 Fn 说话已经跟按键打字一样自然。
 
-**揭示的需求：** 全域貼上（任何 App）、AI 整理品質、低延遲、Hold 模式觸發
-
----
-
-### Journey 2：Mia — 產品經理的會議筆記（Success Path）
-
-**Opening Scene：** 週一早上 standup 剛結束，Mia 需要在 Slack 上同步幾個決定給沒參加的同事。會議中討論了三個議題，她記得大致內容但懶得一個一個打。
-
-**Rising Action：** 她打開 Slack 對話框，按住 Fn：「剛才 standup 有三個決定，第一是 API 的 deadline 延到下週五，因為後端還在等第三方的文件。第二是 UX 的 prototype 已經確認，可以開始切版。第三是下週三要做一次 demo 給老闆看，需要準備投影片。」
-
-**Climax：** AI 整理後的輸出自動分成三個清晰的要點，去除了「剛才」「因為」等口語連接詞，每點精簡到一句話。Mia 看了覺得比自己打的還好。
-
-**Resolution：** 原本需要 5 分鐘打字整理的訊息，20 秒就完成了。Mia 開始養成「會議結束立刻語音同步」的習慣，團隊資訊同步效率明顯提升。
-
-**揭示的需求：** AI 整理的分段能力、長文處理品質、使用統計（Dashboard 看到累計節省時間的成就感）
+**揭示的需求：** 全域贴上（任何 App）、AI 整理品质、低延迟、Hold 模式触发
 
 ---
 
-### Journey 3：David — 業務的第一次使用（Onboarding Journey）
+### Journey 2：Mia — 产品经理的会议笔记（Success Path）
 
-**Opening Scene：** David 收到同事分享的安裝包，對「對電腦說話」這件事半信半疑。他用的是 Windows 筆電。
+**Opening Scene：** 周一早上 standup 刚结束，Mia 需要在 Slack 上同步几个决定给没参加的同事。会议中讨论了三个议题，她记得大致内容但懒得一个一个打。
 
-**Rising Action：** 安裝完成後，App 開啟設定頁面，只有一個輸入框要他填 Groq API Key。同事已經把 Key 傳給他了，貼上，完成。App 提示他試試按住右 Alt 說話。他有點彆扭地按住右 Alt，小聲說了一句：「嗯，測試一下，這個東西真的能用嗎？」
+**Rising Action：** 她打开 Slack 对话框，按住 Fn：「刚才 standup 有三个决定，第一是 API 的 deadline 延到下周五，因为后端还在等第三方的文件。第二是 UX 的 prototype 已经确认，可以开始切版。第三是下周三要做一次 demo 给老板看，需要准备投影片。」
 
-**Climax：** HUD 顯示狀態轉換，兩秒後文字出現在游標位置：「測試一下，這個東西真的能用嗎？」— 「嗯」被去掉了，標點正確。David 愣了一下，然後笑了。
+**Climax：** AI 整理后的输出自动分成三个清晰的要点，去除了「刚才」「因为」等口语连接词，每点精简到一句话。Mia 看了觉得比自己打的还好。
 
-**Resolution：** 他開始在 Email 回覆中使用，發現回覆客戶的速度變快了。一週後他已經不再覺得對電腦說話奇怪，反而覺得打字太慢。
+**Resolution：** 原本需要 5 分钟打字整理的讯息，20 秒就完成了。Mia 开始养成「会议结束立刻语音同步」的习惯，团队资讯同步效率明显提升。
 
-**揭示的需求：** Windows 平台支援（右 Alt 預設）、極簡 Onboarding（只需 API Key）、短文也能處理、首次體驗的「Aha moment」
-
----
-
-### Journey 4：Jackle — 錯誤恢復場景（Edge Case）
-
-**Opening Scene：** Jackle 正在寫一份技術文件，按住 Fn 說了一長段話。放開後 HUD 顯示「轉錄中...」但卡了超過 5 秒。
-
-**Rising Action：** HUD 顯示錯誤：「API 請求失敗 — 網路連線中斷」。Jackle 檢查網路，發現 Wi-Fi 斷了。他重新連上網路，再次按住 Fn 重新說一次。
-
-**Climax：** 這次正常完成，文字貼入。但他想到剛才那段話其實說得更好，可惜沒有留下來。
-
-**Resolution：** 他打開 Dashboard 的歷史記錄，發現失敗的那次沒有記錄（因為 API 沒回應）。他心想：如果錄音檔能暫存就好了，至少可以重新送出。但目前這不在功能範圍內，他接受了這個限制。
-
-**揭示的需求：** 錯誤狀態 HUD 顯示、錯誤訊息清晰、網路斷線優雅處理、歷史記錄僅記錄成功項（目前設計）、未來可考慮錄音暫存重送
+**揭示的需求：** AI 整理的分段能力、长文处理品质、使用统计（Dashboard 看到累计节省时间的成就感）
 
 ---
 
-### Journey 5：Mia — AI 整理品質不佳時（Edge Case）
+### Journey 3：David — 业务的第一次使用（Onboarding Journey）
 
-**Opening Scene：** Mia 在描述一個涉及專有名詞的需求，按住 Fn 說：「我們的 CRM 系統 Fortuna 需要跟 NoWayLM 的 API 做整合，用 OAuth 2.0 做認證。」
+**Opening Scene：** David 收到同事分享的安装包，对「对电脑说话」这件事半信半疑。他用的是 Windows 笔电。
 
-**Rising Action：** AI 整理後輸出把「Fortuna」辨識成「福圖納」，把「OAuth」變成「歐奧斯」。Mia 需要手動修改這幾個詞。
+**Rising Action：** 安装完成后，App 开启设定页面，只有一个输入框要他填 Groq API Key。同事已经把 Key 传给他了，贴上，完成。App 提示他试试按住右 Alt 说话。他有点别扭地按住右 Alt，小声说了一句：「嗯，测试一下，这个东西真的能用吗？」
 
-**Climax：** 她打開字典頁面，把「Fortuna」「NoWayLM」「OAuth」加入自訂詞彙。下次再說同樣的內容，這些專有名詞都正確辨識了。
+**Climax：** HUD 显示状态转换，两秒后文字出现在游标位置：「测试一下，这个东西真的能用吗？」— 「嗯」被去掉了，标点正确。David 愣了一下，然后笑了。
 
-**Resolution：** 隨著詞彙字典的累積，Mia 的辨識準確率越來越高，修改頻率持續下降。
+**Resolution：** 他开始在 Email 回复中使用，发现回复客户的速度变快了。一周后他已经不再觉得对电脑说话奇怪，反而觉得打字太慢。
 
-**揭示的需求：** 自訂詞彙字典的 CRUD、詞彙注入 Whisper prompt、詞彙注入 AI 上下文、品質隨使用時間改善的正向循環
+**揭示的需求：** Windows 平台支援（右 Alt 预设）、极简 Onboarding（只需 API Key）、短文也能处理、首次体验的「Aha moment」
+
+---
+
+### Journey 4：Jackle — 错误恢复场景（Edge Case）
+
+**Opening Scene：** Jackle 正在写一份技术文件，按住 Fn 说了一长段话。放开后 HUD 显示「转录中...」但卡了超过 5 秒。
+
+**Rising Action：** HUD 显示错误：「API 请求失败 — 网路连线中断」。Jackle 检查网路，发现 Wi-Fi 断了。他重新连上网路，再次按住 Fn 重新说一次。
+
+**Climax：** 这次正常完成，文字贴入。但他想到刚才那段话其实说得更好，可惜没有留下来。
+
+**Resolution：** 他打开 Dashboard 的历史记录，发现失败的那次没有记录（因为 API 没回应）。他心想：如果录音档能暂存就好了，至少可以重新送出。但目前这不在功能范围内，他接受了这个限制。
+
+**揭示的需求：** 错误状态 HUD 显示、错误讯息清晰、网路断线优雅处理、历史记录仅记录成功项（目前设计）、未来可考虑录音暂存重送
+
+---
+
+### Journey 5：Mia — AI 整理品质不佳时（Edge Case）
+
+**Opening Scene：** Mia 在描述一个涉及专有名词的需求，按住 Fn 说：「我们的 CRM 系统 Fortuna 需要跟 NoWayLM 的 API 做整合，用 OAuth 2.0 做认证。」
+
+**Rising Action：** AI 整理后输出把「Fortuna」辨识成「福图纳」，把「OAuth」变成「欧奥斯」。Mia 需要手动修改这几个词。
+
+**Climax：** 她打开字典页面，把「Fortuna」「NoWayLM」「OAuth」加入自订词汇。下次再说同样的内容，这些专有名词都正确辨识了。
+
+**Resolution：** 随着词汇字典的累积，Mia 的辨识准确率越来越高，修改频率持续下降。
+
+**揭示的需求：** 自订词汇字典的 CRUD、词汇注入 Whisper prompt、词汇注入 AI 上下文、品质随使用时间改善的正向循环
 
 ---
 
@@ -238,216 +238,216 @@ Layer 2 — UI 層（依賴 Layer 0 + 1）
 
 | Journey | 揭示的核心能力需求 |
 |---------|-------------------|
-| Jackle Success | 全域貼上、AI 整理、低延遲、Hold 模式 |
-| Mia Success | AI 分段能力、長文處理、Dashboard 統計 |
-| David Onboarding | Windows 支援、極簡設定、首次體驗品質 |
-| Jackle Error | 錯誤 HUD、網路斷線處理、歷史記錄 |
-| Mia Quality | 自訂詞彙 CRUD、Whisper/AI prompt 注入 |
+| Jackle Success | 全域贴上、AI 整理、低延迟、Hold 模式 |
+| Mia Success | AI 分段能力、长文处理、Dashboard 统计 |
+| David Onboarding | Windows 支援、极简设定、首次体验品质 |
+| Jackle Error | 错误 HUD、网路断线处理、历史记录 |
+| Mia Quality | 自订词汇 CRUD、Whisper/AI prompt 注入 |
 
-**能力交叉覆蓋：**
-- **跨平台熱鍵**：Journey 1, 3, 4
+**能力交叉覆盖：**
+- **跨平台热键**：Journey 1, 3, 4
 - **AI 文字整理**：Journey 1, 2, 5
-- **自訂詞彙字典**：Journey 5
-- **歷史記錄 + Dashboard**：Journey 2, 4
-- **HUD 狀態機**：Journey 1, 2, 3, 4
-- **設定頁面**：Journey 3
+- **自订词汇字典**：Journey 5
+- **历史记录 + Dashboard**：Journey 2, 4
+- **HUD 状态机**：Journey 1, 2, 3, 4
+- **设定页面**：Journey 3
 
 ## Desktop App Specific Requirements
 
 ### Project-Type Overview
 
-SayIt 是一款常駐 System Tray 的跨平台桌面應用，使用 Tauri v2 框架。應用程式需要深度整合作業系統層功能（全域熱鍵、剪貼簿、鍵盤模擬），同時維持輕量的資源佔用。雙視窗架構：HUD Overlay（狀態顯示）+ Main Window（Dashboard / 設定）。
+SayIt 是一款常驻 System Tray 的跨平台桌面应用，使用 Tauri v2 框架。应用程式需要深度整合作业系统层功能（全域热键、剪贴簿、键盘模拟），同时维持轻量的资源占用。双视窗架构：HUD Overlay（状态显示）+ Main Window（Dashboard / 设定）。
 
 ### Technical Architecture Considerations
 
 **跨平台策略：**
 
-| 項目 | macOS | Windows |
+| 项目 | macOS | Windows |
 |------|-------|---------|
 | 框架 | Tauri v2 | Tauri v2 |
 | 前端 | Vue 3 + TypeScript + Tailwind | 同左 |
-| 全域熱鍵 | `rdev` crate（預設 Fn） | `rdev` crate（預設右 Alt） |
-| 剪貼簿 | `arboard` crate | `arboard` crate |
-| 自動貼上 | AX API menu press（Cmd+V） | SendInput（Ctrl+V） |
-| 資料庫 | `tauri-plugin-sql`（SQLite） | 同左 |
-| 狀態管理 | Pinia | 同左 |
+| 全域热键 | `rdev` crate（预设 Fn） | `rdev` crate（预设右 Alt） |
+| 剪贴簿 | `arboard` crate | `arboard` crate |
+| 自动贴上 | AX API menu press（Cmd+V） | SendInput（Ctrl+V） |
+| 资料库 | `tauri-plugin-sql`（SQLite） | 同左 |
+| 状态管理 | Pinia | 同左 |
 
-**雙視窗架構：**
+**双视窗架构：**
 
-| 視窗 | 用途 | 特性 |
+| 视窗 | 用途 | 特性 |
 |------|------|------|
-| HUD Overlay | Notch-style 狀態顯示 | 始終置頂、不可互動、透明背景 |
-| Main Window | Dashboard / 歷史 / 字典 / 設定 | 標準視窗，從 System Tray 開啟 |
+| HUD Overlay | Notch-style 状态显示 | 始终置顶、不可互动、透明背景 |
+| Main Window | Dashboard / 历史 / 字典 / 设定 | 标准视窗，从 System Tray 开启 |
 
 ### Platform Support
 
-| 平台 | 支援等級 | 備註 |
+| 平台 | 支援等级 | 备注 |
 |------|---------|------|
-| macOS（Apple Silicon + Intel） | 完整支援 | 需 Accessibility 權限 |
-| Windows 10/11 | 完整支援 | 無特殊權限需求 |
-| Linux | 不支援 | 不在範圍內 |
+| macOS（Apple Silicon + Intel） | 完整支援 | 需 Accessibility 权限 |
+| Windows 10/11 | 完整支援 | 无特殊权限需求 |
+| Linux | 不支援 | 不在范围内 |
 
 ### System Integration
 
-| 整合項目 | 技術方案 | 備註 |
+| 整合项目 | 技术方案 | 备注 |
 |----------|---------|------|
-| 全域熱鍵監聽 | `rdev` crate | 跨平台統一，支援多種修飾鍵 |
-| 剪貼簿操作 | `arboard` crate | 備份→寫入→模擬貼上 |
-| 自動貼上 | AX API menu press / SendInput | macOS: AXPress Paste menu / Windows: Ctrl+V |
-| System Tray | Tauri 內建 | 常駐、右鍵選單、開啟 Main Window |
-| Accessibility 權限 | macOS CGEventTap | 首次啟動引導授權 |
-| 麥克風權限 | WebView `getUserMedia` | 首次錄音時系統提示 |
-| 開機自啟動 | `tauri-plugin-autostart` | 預設啟用，設定可關閉 |
-| 貼上後鍵盤監控 | `rdev` crate | 偵測使用者是否修改貼上內容，用於品質衡量 |
+| 全域热键监听 | `rdev` crate | 跨平台统一，支援多种修饰键 |
+| 剪贴簿操作 | `arboard` crate | 备份→写入→模拟贴上 |
+| 自动贴上 | AX API menu press / SendInput | macOS: AXPress Paste menu / Windows: Ctrl+V |
+| System Tray | Tauri 内建 | 常驻、右键选单、开启 Main Window |
+| Accessibility 权限 | macOS CGEventTap | 首次启动引导授权 |
+| 麦克风权限 | WebView `getUserMedia` | 首次录音时系统提示 |
+| 开机自启动 | `tauri-plugin-autostart` | 预设启用，设定可关闭 |
+| 贴上后键盘监控 | `rdev` crate | 侦测使用者是否修改贴上内容，用于品质衡量 |
 
 ### Update Strategy
 
-| 項目 | 方案 |
+| 项目 | 方案 |
 |------|------|
-| 更新機制 | `tauri-plugin-updater`（自動更新） |
-| 更新頻率 | 手動觸發檢查 + 啟動時自動檢查 |
-| 更新來源 | GitHub Releases 或自建更新伺服器 |
-| 使用者體驗 | 背景下載，提示重啟安裝 |
+| 更新机制 | `tauri-plugin-updater`（自动更新） |
+| 更新频率 | 手动触发检查 + 启动时自动检查 |
+| 更新来源 | GitHub Releases 或自建更新伺服器 |
+| 使用者体验 | 背景下载，提示重启安装 |
 
 ### Offline Capabilities
 
-本產品依賴 Groq Cloud API（Whisper + LLM），**無離線能力**。網路斷線時：
-- 錄音可正常進行
-- 轉錄/AI 整理會失敗，HUD 顯示錯誤訊息
-- 不提供離線 fallback（如本地模型），這是刻意的產品決策以維持極簡架構
+本产品依赖 Groq Cloud API（Whisper + LLM），**无离线能力**。网路断线时：
+- 录音可正常进行
+- 转录/AI 整理会失败，HUD 显示错误讯息
+- 不提供离线 fallback（如本地模型），这是刻意的产品决策以维持极简架构
 
 ### Implementation Considerations
 
-- **資源佔用**：常駐應用應維持低記憶體佔用（< 100MB），CPU 僅在錄音/API 呼叫時有負載
-- **安裝包格式**：macOS `.dmg` / Windows `.msi` 或 `.exe`
-- **程式碼簽署**：macOS 需 Apple Developer 簽署避免 Gatekeeper 攔截；Windows 需考慮 SmartScreen 信任
-- **資料儲存位置**：SQLite 資料庫存放於各平台標準 App Data 目錄
+- **资源占用**：常驻应用应维持低记忆体占用（< 100MB），CPU 仅在录音/API 呼叫时有负载
+- **安装包格式**：macOS `.dmg` / Windows `.msi` 或 `.exe`
+- **程式码签署**：macOS 需 Apple Developer 签署避免 Gatekeeper 拦截；Windows 需考虑 SmartScreen 信任
+- **资料储存位置**：SQLite 资料库存放于各平台标准 App Data 目录
 
 ## Risk Mitigation Strategy
 
 **Technical Risks：**
 
-| 風險 | 嚴重度 | 緩解策略 |
+| 风险 | 严重度 | 缓解策略 |
 |------|--------|---------|
-| `rdev` crate 跨平台一致性 | 高 | 最先開發，及早驗證 macOS/Windows 行為差異。若 rdev 不穩定，macOS 可退回 CGEventTap，Windows 用 rdev |
-| 貼上後鍵盤監控的準確度 | 中 | 需定義「修改」的判定邏輯（多久內、哪些按鍵算修改）。先做簡單版（貼上後 5 秒內有 Backspace/Delete 視為修改），再迭代 |
-| Groq API 穩定性與延遲波動 | 中 | 加入 timeout 機制（5 秒），超時直接貼上原始轉錄文字跳過 AI 整理 |
-| 雙視窗架構（HUD + Main Window）的 Tauri 行為 | 低 | POC 已驗證 HUD 視窗，Main Window 是標準 Tauri 視窗，風險低 |
+| `rdev` crate 跨平台一致性 | 高 | 最先开发，及早验证 macOS/Windows 行为差异。若 rdev 不稳定，macOS 可退回 CGEventTap，Windows 用 rdev |
+| 贴上后键盘监控的准确度 | 中 | 需定义「修改」的判定逻辑（多久内、哪些按键算修改）。先做简单版（贴上后 5 秒内有 Backspace/Delete 视为修改），再迭代 |
+| Groq API 稳定性与延迟波动 | 中 | 加入 timeout 机制（5 秒），超时直接贴上原始转录文字跳过 AI 整理 |
+| 双视窗架构（HUD + Main Window）的 Tauri 行为 | 低 | POC 已验证 HUD 视窗，Main Window 是标准 Tauri 视窗，风险低 |
 
 **Market Risks：**
 
-| 風險 | 緩解策略 |
+| 风险 | 缓解策略 |
 |------|---------|
-| 同事不願對電腦說話 | 首次體驗設計要讓 Aha moment 來得快（David Journey），用輸出品質說服而非功能說服 |
-| AI 整理品質不符預期 | Prompt 可編輯 + 詞彙字典雙重調校機制，使用者有控制權 |
+| 同事不愿对电脑说话 | 首次体验设计要让 Aha moment 来得快（David Journey），用输出品质说服而非功能说服 |
+| AI 整理品质不符预期 | Prompt 可编辑 + 词汇字典双重调校机制，使用者有控制权 |
 
-**Resource Risks：** 無。時間充足，單人全端開發，無外部依賴。
+**Resource Risks：** 无。时间充足，单人全端开发，无外部依赖。
 
 ## Functional Requirements
 
-### 語音觸發與錄音
+### 语音触发与录音
 
-- FR1: 使用者可透過全域快捷鍵觸發錄音，不需切換至 App 視窗
-- FR2: 使用者可自選觸發用的修飾鍵（macOS: Fn/Option/Ctrl/Cmd/Shift；Windows: 右Alt/左Alt/Ctrl/Shift）
-- FR3: 使用者可選擇 Hold 模式（按住錄音，放開停止）或 Toggle 模式（按一下開始，再按一下停止）
-- FR4: 系統在使用者觸發錄音時透過麥克風擷取音訊
-- FR5: 系統在錄音結束後將音訊封裝為 API 可接受的格式
+- FR1: 使用者可透过全域快捷键触发录音，不需切换至 App 视窗
+- FR2: 使用者可自选触发用的修饰键（macOS: Fn/Option/Ctrl/Cmd/Shift；Windows: 右Alt/左Alt/Ctrl/Shift）
+- FR3: 使用者可选择 Hold 模式（按住录音，放开停止）或 Toggle 模式（按一下开始，再按一下停止）
+- FR4: 系统在使用者触发录音时透过麦克风撷取音讯
+- FR5: 系统在录音结束后将音讯封装为 API 可接受的格式
 
-### 語音轉文字
+### 语音转文字
 
-- FR6: 系統可將錄音音訊送至 Groq Whisper API 取得轉錄結果；轉錄失敗時可從暫存錄音重送一次
-- FR7: 系統可將自訂詞彙清單注入 Whisper API prompt 參數以提升專有名詞辨識率
+- FR6: 系统可将录音音讯送至 Groq Whisper API 取得转录结果；转录失败时可从暂存录音重送一次
+- FR7: 系统可将自订词汇清单注入 Whisper API prompt 参数以提升专有名词辨识率
 
 ### AI 文字整理
 
-- FR8: 系統可將轉錄結果送至 Groq LLM 進行口語→書面語整理（去贅詞、重組句構、修正標點、適當分段）
-- FR9: 系統在轉錄字數低於門檻（約 10 字）時跳過 AI 整理，直接輸出原始轉錄
-- FR10: 使用者可編輯 AI 整理使用的 prompt
-- FR11: 使用者可將 prompt 重置為預設值
-- FR12: 系統可將剪貼簿內容與自訂詞彙清單作為上下文注入 AI 整理請求
+- FR8: 系统可将转录结果送至 Groq LLM 进行口语→书面语整理（去赘词、重组句构、修正标点、适当分段）
+- FR9: 系统在转录字数低于门槛（约 10 字）时跳过 AI 整理，直接输出原始转录
+- FR10: 使用者可编辑 AI 整理使用的 prompt
+- FR11: 使用者可将 prompt 重置为预设值
+- FR12: 系统可将剪贴簿内容与自订词汇清单作为上下文注入 AI 整理请求
 
-### 文字輸出
+### 文字输出
 
-- FR13: 系統可將最終文字（轉錄或 AI 整理後）自動貼入當前游標所在的任何應用程式
-- FR14: 系統透過剪貼簿寫入 + 模擬鍵盤貼上實現全域文字輸出
-- FR15: 系統可在貼上後監控使用者鍵盤輸入行為，判斷輸出是否被修改以衡量品質
+- FR13: 系统可将最终文字（转录或 AI 整理后）自动贴入当前游标所在的任何应用程式
+- FR14: 系统透过剪贴簿写入 + 模拟键盘贴上实现全域文字输出
+- FR15: 系统可在贴上后监控使用者键盘输入行为，判断输出是否被修改以衡量品质
 
-### 自訂詞彙字典
+### 自订词汇字典
 
-- FR16: 使用者可新增自訂詞彙（專案名、人名、技術術語）
-- FR17: 使用者可刪除已建立的自訂詞彙
-- FR18: 使用者可瀏覽完整的自訂詞彙清單
-- FR19: 系統可將詞彙清單同時注入 Whisper API 與 AI 整理上下文
+- FR16: 使用者可新增自订词汇（专案名、人名、技术术语）
+- FR17: 使用者可删除已建立的自订词汇
+- FR18: 使用者可浏览完整的自订词汇清单
+- FR19: 系统可将词汇清单同时注入 Whisper API 与 AI 整理上下文
 
-### 歷史記錄與統計
+### 历史记录与统计
 
-- FR20: 系統在每次成功轉錄後自動記錄完整資料（原始文字、整理後文字、錄音時長、API 回應時長、字數、觸發模式、是否經 AI 整理）
-- FR21: 使用者可瀏覽歷史轉錄記錄列表
-- FR22: 使用者可搜尋歷史記錄（全文搜尋）
-- FR23: 使用者可複製歷史記錄中的文字
-- FR24: 使用者可在 Dashboard 查看統計指標（總口述時間、口述字數、平均口述速度、節省時間、使用次數、AI 整理使用率）
-- FR25: 使用者可在 Dashboard 查看最近轉錄摘要列表
+- FR20: 系统在每次成功转录后自动记录完整资料（原始文字、整理后文字、录音时长、API 回应时长、字数、触发模式、是否经 AI 整理）
+- FR21: 使用者可浏览历史转录记录列表
+- FR22: 使用者可搜寻历史记录（全文搜寻）
+- FR23: 使用者可复制历史记录中的文字
+- FR24: 使用者可在 Dashboard 查看统计指标（总口述时间、口述字数、平均口述速度、节省时间、使用次数、AI 整理使用率）
+- FR25: 使用者可在 Dashboard 查看最近转录摘要列表
 
-### 狀態回饋（HUD）
+### 状态回馈（HUD）
 
-- FR26: 系統在各階段透過 Notch-style HUD 顯示目前狀態（idle → recording → transcribing → enhancing → success/error → idle），error 狀態提供一鍵重送按鈕
-- FR27: 系統在 success 狀態短暫顯示後自動收起 HUD
-- FR28: 系統在 API 請求失敗時透過 HUD 顯示清晰的錯誤訊息，並提供重送按鈕（限一次）供使用者重新送出同一段錄音
-- FR29: 系統在 Groq API 逾時時直接貼上原始轉錄文字跳過 AI 整理
+- FR26: 系统在各阶段透过 Notch-style HUD 显示目前状态（idle → recording → transcribing → enhancing → success/error → idle），error 状态提供一键重送按钮
+- FR27: 系统在 success 状态短暂显示后自动收起 HUD
+- FR28: 系统在 API 请求失败时透过 HUD 显示清晰的错误讯息，并提供重送按钮（限一次）供使用者重新送出同一段录音
+- FR29: 系统在 Groq API 逾时时直接贴上原始转录文字跳过 AI 整理
 
-### 應用程式管理
+### 应用程式管理
 
-- FR30: 使用者可在設定頁面配置快捷鍵（預設觸發鍵選擇、自訂組合鍵（0~N 個 modifier + 1 個普通鍵）、觸發模式）
-- FR31: 使用者可在設定頁面輸入/修改 Groq API Key
-- FR32: 系統常駐 System Tray，使用者可從 Tray 開啟主視窗
-- FR33: 系統支援開機自啟動，使用者可在設定中關閉
-- FR34: 系統支援自動更新，啟動時檢查並背景下載更新
-- FR35: 系統在 macOS 首次啟動時引導使用者授權 Accessibility 權限
-- FR36: 系統在首次錄音時觸發麥克風權限請求
+- FR30: 使用者可在设定页面配置快捷键（预设触发键选择、自订组合键（0~N 个 modifier + 1 个普通键）、触发模式）
+- FR31: 使用者可在设定页面输入/修改 Groq API Key
+- FR32: 系统常驻 System Tray，使用者可从 Tray 开启主视窗
+- FR33: 系统支援开机自启动，使用者可在设定中关闭
+- FR34: 系统支援自动更新，启动时检查并背景下载更新
+- FR35: 系统在 macOS 首次启动时引导使用者授权 Accessibility 权限
+- FR36: 系统在首次录音时触发麦克风权限请求
 
-### 錄音檔管理
+### 录音档管理
 
-- FR37: 系統在每次錄音結束後將 WAV 檔案永久儲存至本地磁碟（{APP_DATA}/recordings/），使用者可在歷史記錄中播放錄音
-- FR38: 系統自動偵測 Whisper 幻覺文字（四層偵測：語速異常、靜音偵測、背景噪音偵測（RMS 能量 + NSP 聯合判斷）、已知幻覺詞精確比對），判定為幻覺時不貼上並自動學習至幻覺詞庫
-- FR39: 使用者可在獨立的幻覺詞庫頁面管理幻覺詞（瀏覽、新增、刪除），側邊欄提供導航入口；設定頁面提供錄音檔自動清理策略（手動刪除全部 + 自動清理天數）
+- FR37: 系统在每次录音结束后将 WAV 档案永久储存至本地磁碟（{APP_DATA}/recordings/），使用者可在历史记录中播放录音
+- FR38: 系统自动侦测 Whisper 幻觉文字（四层侦测：语速异常、静音侦测、背景噪音侦测（RMS 能量 + NSP 联合判断）、已知幻觉词精确比对），判定为幻觉时不贴上并自动学习至幻觉词库
+- FR39: 使用者可在独立的幻觉词库页面管理幻觉词（浏览、新增、删除），侧边栏提供导航入口；设定页面提供录音档自动清理策略（手动删除全部 + 自动清理天数）
 
 ## Non-Functional Requirements
 
 ### Performance
 
-| 指標 | 目標值 | 備註 |
+| 指标 | 目标值 | 备注 |
 |------|--------|------|
-| 端到端延遲（含 AI 整理） | < 3 秒 | 從放開按鍵到文字出現在游標位置 |
-| 端到端延遲（跳過 AI） | < 1.5 秒 | 短文直接貼上場景 |
-| Groq API timeout | 5 秒 | 超時 fallback 至原始轉錄文字 |
-| 常駐記憶體佔用 | < 100 MB | idle 狀態下 |
-| HUD 狀態轉換 | < 100 ms | 動畫流暢，無視覺延遲 |
-| App 啟動時間 | < 3 秒 | 從開機自啟動到 System Tray 就緒 |
-| SQLite 查詢回應 | < 200 ms | 歷史搜尋、Dashboard 統計計算 |
+| 端到端延迟（含 AI 整理） | < 3 秒 | 从放开按键到文字出现在游标位置 |
+| 端到端延迟（跳过 AI） | < 1.5 秒 | 短文直接贴上场景 |
+| Groq API timeout | 5 秒 | 超时 fallback 至原始转录文字 |
+| 常驻记忆体占用 | < 100 MB | idle 状态下 |
+| HUD 状态转换 | < 100 ms | 动画流畅，无视觉延迟 |
+| App 启动时间 | < 3 秒 | 从开机自启动到 System Tray 就绪 |
+| SQLite 查询回应 | < 200 ms | 历史搜寻、Dashboard 统计计算 |
 
 ### Security
 
-| 需求 | 說明 |
+| 需求 | 说明 |
 |------|------|
-| API Key 儲存 | 使用作業系統原生安全儲存（macOS Keychain / Windows Credential Manager）或加密存放，不得明文儲存 |
-| 轉錄資料 | 歷史記錄僅存於本地 SQLite，不上傳至任何第三方服務 |
-| API 通訊 | 所有 Groq API 請求透過 HTTPS |
-| 敏感資料傳輸 | 剪貼簿內容作為 AI 上下文注入時，僅傳送至使用者自行配置的 Groq API |
+| API Key 储存 | 使用作业系统原生安全储存（macOS Keychain / Windows Credential Manager）或加密存放，不得明文储存 |
+| 转录资料 | 历史记录仅存于本地 SQLite，不上传至任何第三方服务 |
+| API 通讯 | 所有 Groq API 请求透过 HTTPS |
+| 敏感资料传输 | 剪贴簿内容作为 AI 上下文注入时，仅传送至使用者自行配置的 Groq API |
 
 ### Integration
 
-| 整合對象 | 可靠性需求 | 降級策略 |
+| 整合对象 | 可靠性需求 | 降级策略 |
 |----------|----------|---------|
-| Groq Whisper API | 依賴網路，無離線替代 | 失敗時 HUD 顯示錯誤並提供一鍵重送按鈕（從暫存錄音重送，限一次） |
-| Groq LLM API | 依賴網路，有 timeout 降級 | 5 秒逾時則跳過 AI 整理，直接貼上原始轉錄 |
-| 作業系統剪貼簿 | 系統層級，高可靠 | 無降級，失敗視為系統錯誤 |
-| 作業系統鍵盤模擬 | 系統層級，需權限 | macOS 需 Accessibility 授權，未授權時引導 |
+| Groq Whisper API | 依赖网路，无离线替代 | 失败时 HUD 显示错误并提供一键重送按钮（从暂存录音重送，限一次） |
+| Groq LLM API | 依赖网路，有 timeout 降级 | 5 秒逾时则跳过 AI 整理，直接贴上原始转录 |
+| 作业系统剪贴簿 | 系统层级，高可靠 | 无降级，失败视为系统错误 |
+| 作业系统键盘模拟 | 系统层级，需权限 | macOS 需 Accessibility 授权，未授权时引导 |
 
 ### Reliability
 
-| 指標 | 目標值 | 備註 |
+| 指标 | 目标值 | 备注 |
 |------|--------|------|
-| 系統可用率 | > 99%（排除網路問題） | App 本身不 crash、不凍結 |
-| 資料持久性 | 歷史記錄零遺失 | SQLite WAL 模式確保寫入安全 |
-| 錯誤恢復 | API 失敗不影響 App 穩定性 | 回到 idle 狀態，可立即重試 |
-| 自動更新 | 更新失敗不影響現有功能 | 背景下載，使用者確認後安裝 |
+| 系统可用率 | > 99%（排除网路问题） | App 本身不 crash、不冻结 |
+| 资料持久性 | 历史记录零遗失 | SQLite WAL 模式确保写入安全 |
+| 错误恢复 | API 失败不影响 App 稳定性 | 回到 idle 状态，可立即重试 |
+| 自动更新 | 更新失败不影响现有功能 | 背景下载，使用者确认后安装 |

@@ -78,7 +78,7 @@ export interface VocabularyLearnedPayload {
   termList: string[];
 }
 
-/** ASR 串流中間結果（HUD 即時字幕） */
+/** ASR 串流中间结果（HUD 即时字幕） */
 export interface TranscriptionPartialPayload {
   text: string;
 }

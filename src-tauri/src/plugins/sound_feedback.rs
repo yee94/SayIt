@@ -76,28 +76,26 @@ mod windows_sound {
     static STOP_SOUND: &[u8] = include_bytes!("../../resources/sounds/stop.wav");
 
     pub fn play_start_sound() {
-        let ok =
-            unsafe { PlaySoundA(PCSTR(START_SOUND.as_ptr()), None, SND_MEMORY | SND_ASYNC) };
+        let ok = unsafe { PlaySoundA(PCSTR(START_SOUND.as_ptr()), None, SND_MEMORY | SND_ASYNC) };
         if !ok.as_bool() {
             eprintln!("[sound-feedback] PlaySoundA(start) failed");
         }
     }
 
     pub fn play_stop_sound() {
-        let ok =
-            unsafe { PlaySoundA(PCSTR(STOP_SOUND.as_ptr()), None, SND_MEMORY | SND_ASYNC) };
+        let ok = unsafe { PlaySoundA(PCSTR(STOP_SOUND.as_ptr()), None, SND_MEMORY | SND_ASYNC) };
         if !ok.as_bool() {
             eprintln!("[sound-feedback] PlaySoundA(stop) failed");
         }
     }
 
     pub fn play_learned_sound() {
-        // Windows 暫時復用 start sound，之後可換專用音效
+        // Windows 暂时复用 start sound，之后可换专用音效
         play_start_sound();
     }
 
     pub fn play_error_sound() {
-        // Windows 暫時復用 stop sound，之後可換專用音效
+        // Windows 暂时复用 stop sound，之后可换专用音效
         play_stop_sound();
     }
 }
@@ -194,7 +192,7 @@ mod tests {
 
     #[test]
     fn test_play_start_sound_callable() {
-        // 驗證函式可呼叫且不 panic（實際音效播放依賴系統，CI 上為 no-op 或靜默失敗）
+        // 验证函式可呼叫且不 panic（实际音效播放依赖系统，CI 上为 no-op 或静默失败）
         platform_play_start_sound();
     }
 

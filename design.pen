@@ -212,7 +212,7 @@
                       "id": "aGQlu",
                       "name": "dashSubtitle",
                       "fill": "$--muted-foreground",
-                      "content": "歡迎回來，以下是今日的語音轉文字統計",
+                      "content": "欢迎回来，以下是今日的语音转文本统计",
                       "fontFamily": "Inter",
                       "fontSize": 14,
                       "fontWeight": "normal"
@@ -263,7 +263,7 @@
                                   "id": "qXeOi",
                                   "name": "label1",
                                   "fill": "$--muted-foreground",
-                                  "content": "總口述時間",
+                                  "content": "总口述时间",
                                   "fontFamily": "$--font-primary",
                                   "fontSize": 13,
                                   "fontWeight": "500"
@@ -285,7 +285,7 @@
                               "id": "0r7Kh",
                               "name": "desc1",
                               "fill": "$--muted-foreground",
-                              "content": "累計所有口述錄音時長",
+                              "content": "累计所有口述录音时长",
                               "fontFamily": "$--font-primary",
                               "fontSize": 12,
                               "fontWeight": "normal"
@@ -321,7 +321,7 @@
                                   "id": "co3yJ",
                                   "name": "label2",
                                   "fill": "$--muted-foreground",
-                                  "content": "口述字數",
+                                  "content": "口述字数",
                                   "fontFamily": "$--font-primary",
                                   "fontSize": 13,
                                   "fontWeight": "500"
@@ -343,7 +343,7 @@
                               "id": "WBhyN",
                               "name": "desc2",
                               "fill": "$--muted-foreground",
-                              "content": "所有轉錄產生的總字數",
+                              "content": "所有转录产生的总字数",
                               "fontFamily": "$--font-primary",
                               "fontSize": 12,
                               "fontWeight": "normal"
@@ -379,7 +379,7 @@
                                   "id": "l7pRQ",
                                   "name": "label3",
                                   "fill": "$--muted-foreground",
-                                  "content": "節省時間",
+                                  "content": "节省时间",
                                   "fontFamily": "$--font-primary",
                                   "fontSize": 13,
                                   "fontWeight": "500"
@@ -391,7 +391,7 @@
                               "id": "UtSXB",
                               "name": "val3",
                               "fill": "$--foreground",
-                              "content": "1 時 23 分",
+                              "content": "1 时 23 分",
                               "fontFamily": "$--font-primary",
                               "fontSize": 32,
                               "fontWeight": "700"
@@ -401,7 +401,7 @@
                               "id": "9dJUg",
                               "name": "desc3",
                               "fill": "$--muted-foreground",
-                              "content": "相比手動打字節省的時間",
+                              "content": "相比手动打字节省的时间",
                               "fontFamily": "$--font-primary",
                               "fontSize": 12,
                               "fontWeight": "normal"
@@ -446,7 +446,7 @@
                                   "id": "2PSnn",
                                   "name": "label4",
                                   "fill": "$--muted-foreground",
-                                  "content": "總使用次數",
+                                  "content": "总使用次数",
                                   "fontFamily": "$--font-primary",
                                   "fontSize": 13,
                                   "fontWeight": "500"
@@ -468,7 +468,7 @@
                               "id": "jtSkD",
                               "name": "desc4",
                               "fill": "$--muted-foreground",
-                              "content": "啟動口述轉錄的總次數",
+                              "content": "启动口述转录的总次数",
                               "fontFamily": "$--font-primary",
                               "fontSize": 12,
                               "fontWeight": "normal"
@@ -504,7 +504,7 @@
                                   "id": "YDHiA",
                                   "name": "label1",
                                   "fill": "$--muted-foreground",
-                                  "content": "平均每次字數",
+                                  "content": "平均每次字数",
                                   "fontFamily": "$--font-primary",
                                   "fontSize": 13,
                                   "fontWeight": "500"
@@ -526,7 +526,7 @@
                               "id": "2hgFA",
                               "name": "desc1",
                               "fill": "$--muted-foreground",
-                              "content": "每次口述平均產生的字數",
+                              "content": "每次口述平均产生的字数",
                               "fontFamily": "$--font-primary",
                               "fontSize": 12,
                               "fontWeight": "normal"
@@ -562,7 +562,7 @@
                                   "id": "zALtS",
                                   "name": "label1",
                                   "fill": "$--muted-foreground",
-                                  "content": "API 費用上限",
+                                  "content": "API 费用上限",
                                   "fontFamily": "$--font-primary",
                                   "fontSize": 13,
                                   "fontWeight": "500"
@@ -584,7 +584,7 @@
                               "id": "rsd1F",
                               "name": "desc1",
                               "fill": "$--muted-foreground",
-                              "content": "實際費用不超過此金額",
+                              "content": "实际费用不超过此金额",
                               "fontFamily": "$--font-primary",
                               "fontSize": 12,
                               "fontWeight": "normal"
@@ -632,7 +632,7 @@
                               "id": "pMHRh",
                               "name": "chartTitle",
                               "fill": "$--foreground",
-                              "content": "每日使用趨勢",
+                              "content": "每日使用趋势",
                               "fontFamily": "$--font-primary",
                               "fontSize": 16,
                               "fontWeight": "600"
@@ -829,7 +829,7 @@
                               "id": "9YeEM",
                               "name": "legText1",
                               "fill": "$--muted-foreground",
-                              "content": "使用次數",
+                              "content": "使用次数",
                               "fontFamily": "$--font-primary",
                               "fontSize": 12,
                               "fontWeight": "normal"
@@ -871,7 +871,7 @@
                           "id": "fVoE3",
                           "name": "rtTitle",
                           "fill": "$--foreground",
-                          "content": "最近轉錄",
+                          "content": "最近转录",
                           "fontFamily": "$--font-primary",
                           "fontSize": 16,
                           "fontWeight": "600"
@@ -959,7 +959,7 @@
                           "fill": "$--muted-foreground",
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
-                          "content": "今天討論了 Q2 的產品路線圖，包含新功能優先級排序與時程安排...",
+                          "content": "今天讨论了 Q2 的产品路线图，包含新功能优先级排序与时间安排...",
                           "fontFamily": "$--font-primary",
                           "fontSize": 13,
                           "fontWeight": "normal"
@@ -1012,7 +1012,7 @@
                           "fill": "$--muted-foreground",
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
-                          "content": "感謝您的來信，關於報價的部分我們已經內部討論完成...",
+                          "content": "感谢您的来信，关于报价的部分我们已经内部讨论完成...",
                           "fontFamily": "$--font-primary",
                           "fontSize": 13,
                           "fontWeight": "normal"
@@ -1090,7 +1090,7 @@
                           "fill": "$--muted-foreground",
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
-                          "content": "Groq Whisper API 的整合需要注意速率限制和錯誤處理機制...",
+                          "content": "Groq Whisper API 的集成需要注意速率限制和错误处理机制...",
                           "fontFamily": "$--font-primary",
                           "fontSize": 13,
                           "fontWeight": "normal"
@@ -1278,7 +1278,7 @@
                   "id": "D2DTP",
                   "name": "hTitle",
                   "fill": "$--foreground",
-                  "content": "歷史記錄",
+                  "content": "历史记录",
                   "fontFamily": "$--font-primary",
                   "fontSize": 16,
                   "fontWeight": "600"
@@ -1314,7 +1314,7 @@
                           "id": "1ksCK",
                           "name": "histTitle",
                           "fill": "$--foreground",
-                          "content": "歷史記錄",
+                          "content": "历史记录",
                           "fontFamily": "Inter",
                           "fontSize": 20,
                           "fontWeight": "600"
@@ -1324,7 +1324,7 @@
                           "id": "ZlWGV",
                           "name": "histSubtitle",
                           "fill": "$--muted-foreground",
-                          "content": "瀏覽與搜尋轉錄歷史",
+                          "content": "浏览与搜索转录历史",
                           "fontFamily": "Inter",
                           "fontSize": 14,
                           "fontWeight": "normal"
@@ -1366,7 +1366,7 @@
                           "id": "uZeif",
                           "name": "searchPlaceholder",
                           "fill": "$--muted-foreground",
-                          "content": "搜尋轉錄記錄...",
+                          "content": "搜索转录记录...",
                           "fontFamily": "Inter",
                           "fontSize": 14,
                           "fontWeight": "normal"
@@ -1509,7 +1509,7 @@
                           "fill": "$--muted-foreground",
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
-                          "content": "今天討論了 Q2 的產品路線圖，包含新功能優先級排序與時程安排...",
+                          "content": "今天讨论了 Q2 的产品路线图，包含新功能优先级排序与时间安排...",
                           "fontFamily": "$--font-primary",
                           "fontSize": 14,
                           "fontWeight": "normal"
@@ -1610,7 +1610,7 @@
                           "fill": "$--muted-foreground",
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
-                          "content": "感謝您的來信，關於報價的部分我們已經內部討論完成...",
+                          "content": "感谢您的来信，关于报价的部分我们已经内部讨论完成...",
                           "fontFamily": "$--font-primary",
                           "fontSize": 14,
                           "fontWeight": "normal"
@@ -1729,7 +1729,7 @@
                           "fill": "$--muted-foreground",
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
-                          "content": "Groq Whisper API 的整合需要注意速率限制和錯誤處理機制...",
+                          "content": "Groq Whisper API 的集成需要注意速率限制和错误处理机制...",
                           "fontFamily": "$--font-primary",
                           "fontSize": 14,
                           "fontWeight": "normal"
@@ -1796,7 +1796,7 @@
                                       "id": "DENNg",
                                       "name": "failBadgeT",
                                       "fill": "$--destructive",
-                                      "content": "辨識失敗",
+                                      "content": "识别失败",
                                       "fontFamily": "$--font-primary",
                                       "fontSize": 11,
                                       "fontWeight": "600"
@@ -1843,7 +1843,7 @@
                           "fill": "$--muted-foreground",
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
-                          "content": "未偵測到語音 — 點擊播放可回聽錄音",
+                          "content": "未检测到语音 — 点击播放可回放录音",
                           "fontFamily": "$--font-primary",
                           "fontSize": 14,
                           "fontWeight": "normal",
@@ -1961,7 +1961,7 @@
                           "fill": "$--foreground",
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
-                          "content": "週報語音草稿的完整內容會顯示在這裡。展開後使用者可以看到完整的轉錄文字，包含所有段落和標點符號。AI 整理後的文字會更加通順易讀，適合直接複製使用。",
+                          "content": "周报语音草稿的完整内容会显示在这里。展开后用户可以看到完整的转录文本，包含所有段落和标点符号。AI 整理后的文本会更加通顺易读，适合直接复制使用。",
                           "lineHeight": 1.6,
                           "fontFamily": "$--font-primary",
                           "fontSize": 14,
@@ -2047,7 +2047,7 @@
                                   "id": "BjEav",
                                   "name": "copyText",
                                   "fill": "$--foreground",
-                                  "content": "複製",
+                                  "content": "复制",
                                   "fontFamily": "$--font-primary",
                                   "fontSize": 13,
                                   "fontWeight": "normal"
@@ -2086,7 +2086,7 @@
                                   "id": "t4qEN",
                                   "name": "delText",
                                   "fill": "$--destructive",
-                                  "content": "刪除",
+                                  "content": "删除",
                                   "fontFamily": "$--font-primary",
                                   "fontSize": 13,
                                   "fontWeight": "normal"
@@ -2277,7 +2277,7 @@
                   "id": "iCzF4",
                   "name": "dTitle",
                   "fill": "$--foreground",
-                  "content": "自訂字典",
+                  "content": "自定义字典",
                   "fontFamily": "$--font-primary",
                   "fontSize": 16,
                   "fontWeight": "600"
@@ -2313,7 +2313,7 @@
                           "id": "jiCp9",
                           "name": "dictTitle",
                           "fill": "$--foreground",
-                          "content": "自訂字典",
+                          "content": "自定义字典",
                           "fontFamily": "Inter",
                           "fontSize": 20,
                           "fontWeight": "600"
@@ -2323,7 +2323,7 @@
                           "id": "Mua5C",
                           "name": "dictSubtitle",
                           "fill": "$--muted-foreground",
-                          "content": "管理自訂詞彙以提升轉錄精準度",
+                          "content": "管理自定义词汇以提升转录准确率",
                           "fontFamily": "Inter",
                           "fontSize": 14,
                           "fontWeight": "normal"
@@ -2345,7 +2345,7 @@
                               "id": "ZMcxV",
                               "name": "badgeT",
                               "fill": "$--muted-foreground",
-                              "content": "3 詞彙",
+                              "content": "3 个词汇",
                               "fontFamily": "$--font-primary",
                               "fontSize": 12,
                               "fontWeight": "500"
@@ -2393,7 +2393,7 @@
                               "id": "TlpT1",
                               "name": "typelessImportText",
                               "fill": "$--foreground",
-                              "content": "一鍵匯入 Typeless",
+                              "content": "一键导入 Typeless",
                               "fontFamily": "$--font-primary",
                               "fontSize": 13,
                               "fontWeight": "500"
@@ -2422,7 +2422,7 @@
                               "id": "kQObZ",
                               "name": "inputPlaceholder",
                               "fill": "$--muted-foreground",
-                              "content": "輸入新詞彙...",
+                              "content": "输入新词汇...",
                               "fontFamily": "$--font-primary",
                               "fontSize": 13,
                               "fontWeight": "normal"
@@ -2457,7 +2457,7 @@
                               "id": "Eddfy",
                               "name": "addText",
                               "fill": "$--primary-foreground",
-                              "content": "新增",
+                              "content": "添加",
                               "fontFamily": "$--font-primary",
                               "fontSize": 13,
                               "fontWeight": "500"
@@ -2498,7 +2498,7 @@
                           "id": "CI4Xw",
                           "name": "aiSectionTitle",
                           "fill": "$--foreground",
-                          "content": "AI 推薦",
+                          "content": "AI 推荐",
                           "fontFamily": "$--font-primary",
                           "fontSize": 14,
                           "fontWeight": "600"
@@ -2568,7 +2568,7 @@
                               "fill": "$--muted-foreground",
                               "textGrowth": "fixed-width",
                               "width": "fill_container",
-                              "content": "詞彙",
+                              "content": "词汇",
                               "fontFamily": "$--font-primary",
                               "fontSize": 13,
                               "fontWeight": "500"
@@ -2580,7 +2580,7 @@
                               "fill": "$--muted-foreground",
                               "textGrowth": "fixed-width",
                               "width": 80,
-                              "content": "權重",
+                              "content": "权重",
                               "fontFamily": "$--font-primary",
                               "fontSize": 13,
                               "fontWeight": "500"
@@ -2821,7 +2821,7 @@
                           "id": "4xJpG",
                           "name": "manTitle",
                           "fill": "$--foreground",
-                          "content": "手動新增",
+                          "content": "手动添加",
                           "fontFamily": "$--font-primary",
                           "fontSize": 14,
                           "fontWeight": "600"
@@ -2868,7 +2868,7 @@
                               "fill": "$--muted-foreground",
                               "textGrowth": "fixed-width",
                               "width": "fill_container",
-                              "content": "詞彙",
+                              "content": "词汇",
                               "fontFamily": "$--font-primary",
                               "fontSize": 13,
                               "fontWeight": "500"
@@ -2880,7 +2880,7 @@
                               "fill": "$--muted-foreground",
                               "textGrowth": "fixed-width",
                               "width": 80,
-                              "content": "權重",
+                              "content": "权重",
                               "fontFamily": "$--font-primary",
                               "fontSize": 13,
                               "fontWeight": "500"
@@ -3269,7 +3269,7 @@
                   "id": "gPLdC",
                   "name": "sTitle",
                   "fill": "$--foreground",
-                  "content": "設定",
+                  "content": "设置",
                   "fontFamily": "$--font-primary",
                   "fontSize": 16,
                   "fontWeight": "600"
@@ -3298,7 +3298,7 @@
                       "id": "3curV",
                       "name": "settTitle",
                       "fill": "$--foreground",
-                      "content": "設定",
+                      "content": "设置",
                       "fontFamily": "Inter",
                       "fontSize": 20,
                       "fontWeight": "600"
@@ -3308,7 +3308,7 @@
                       "id": "SuaE7",
                       "name": "settSubtitle",
                       "fill": "$--muted-foreground",
-                      "content": "快捷鍵、API Key 與應用程式偏好",
+                      "content": "快捷键、API Key 与应用偏好设置",
                       "fontFamily": "Inter",
                       "fontSize": 14,
                       "fontWeight": "normal"
@@ -3351,7 +3351,7 @@
                           "id": "rysBb",
                           "name": "hkTitle",
                           "fill": "$--foreground",
-                          "content": "快捷鍵設定",
+                          "content": "快捷键设置",
                           "fontFamily": "$--font-primary",
                           "fontSize": 16,
                           "fontWeight": "600"
@@ -3380,7 +3380,7 @@
                               "id": "c6ERO",
                               "name": "trigLabel",
                               "fill": "$--foreground",
-                              "content": "觸發鍵",
+                              "content": "触发键",
                               "fontFamily": "$--font-primary",
                               "fontSize": 14,
                               "fontWeight": "500"
@@ -3440,7 +3440,7 @@
                               "id": "9Q2Hd",
                               "name": "modeLabel",
                               "fill": "$--foreground",
-                              "content": "觸發模式",
+                              "content": "触发模式",
                               "fontFamily": "$--font-primary",
                               "fontSize": 14,
                               "fontWeight": "500"
@@ -3527,7 +3527,7 @@
                           "fill": "$--muted-foreground",
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
-                          "content": "Hold 模式：按住觸發鍵開始錄音，放開結束。Toggle 模式：按一下開始，再按一下結束。",
+                          "content": "Hold 模式：按住触发键开始录音，放开结束。Toggle 模式：按一下开始，再按一下结束。",
                           "lineHeight": 1.5,
                           "fontFamily": "$--font-primary",
                           "fontSize": 13,
@@ -3546,7 +3546,7 @@
                               "id": "DBuE9",
                               "name": "comboLabel",
                               "fill": "$--foreground",
-                              "content": "自訂組合鍵",
+                              "content": "自定义组合键",
                               "fontFamily": "$--font-primary",
                               "fontSize": 14,
                               "fontWeight": "500"
@@ -3656,7 +3656,7 @@
                                       "id": "G4Kdd",
                                       "name": "comboRecBtnT",
                                       "fill": "$--foreground",
-                                      "content": "重新錄製",
+                                      "content": "重新录制",
                                       "fontFamily": "$--font-primary",
                                       "fontSize": 13,
                                       "fontWeight": "normal"
@@ -3674,7 +3674,7 @@
                 {
                   "type": "frame",
                   "id": "IcMvK",
-                  "name": "API Key Card",
+                  "name": "Credential Card Pattern - ASR and LLM",
                   "width": "fill_container",
                   "fill": "$--card",
                   "cornerRadius": 12,
@@ -3716,7 +3716,7 @@
                               "id": "CM3ng",
                               "name": "apiCardTitle",
                               "fill": "$--foreground",
-                              "content": "Groq API Key",
+                              "content": "凭据按钮样式",
                               "fontFamily": "Inter",
                               "fontSize": 16,
                               "fontWeight": "600"
@@ -3737,7 +3737,7 @@
                                   "id": "vEphQ",
                                   "name": "statusText",
                                   "fill": "#22c55e",
-                                  "content": "已設定",
+                                  "content": "统一样式",
                                   "fontFamily": "Inter",
                                   "fontSize": 11,
                                   "fontWeight": "600"
@@ -3751,7 +3751,7 @@
                           "id": "nM647",
                           "name": "apiLink",
                           "fill": "$--muted-foreground",
-                          "content": "前往 Groq Console →",
+                          "content": "ASR / LLM",
                           "fontFamily": "Inter",
                           "fontSize": 13,
                           "fontWeight": "normal"
@@ -3774,7 +3774,7 @@
                           "fill": "$--muted-foreground",
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
-                          "content": "輸入你的 Groq API Key 以啟用語音轉文字功能。API Key 以 gsk_ 開頭。",
+                          "content": "ASR 与 LLM 凭据区域共用相同的显示、保存按钮样式与尺寸。",
                           "lineHeight": 1.5,
                           "fontFamily": "Inter",
                           "fontSize": 13,
@@ -3793,7 +3793,7 @@
                               "id": "izHla",
                               "name": "apiInput",
                               "width": "fill_container",
-                              "height": 40,
+                              "height": 36,
                               "fill": "$--background",
                               "cornerRadius": 8,
                               "stroke": {
@@ -3813,20 +3813,37 @@
                                   "id": "MefcB",
                                   "name": "apiInputText",
                                   "fill": "$--muted-foreground",
-                                  "content": "gsk_••••••••••••••••••••",
+                                  "content": "••••••••••••••••••••",
                                   "fontFamily": "JetBrains Mono",
                                   "fontSize": 13,
                                   "fontWeight": "normal"
-                                },
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "kQ7mP",
+                              "name": "showCredentialBtn",
+                              "width": 80,
+                              "height": 36,
+                              "cornerRadius": 8,
+                              "stroke": {
+                                "align": "inside",
+                                "thickness": 1,
+                                "fill": "$--border"
+                              },
+                              "justifyContent": "center",
+                              "alignItems": "center",
+                              "children": [
                                 {
-                                  "type": "icon_font",
-                                  "id": "0u2zG",
-                                  "name": "eyeIcon",
-                                  "width": 16,
-                                  "height": 16,
-                                  "iconFontName": "eye-off",
-                                  "iconFontFamily": "lucide",
-                                  "fill": "$--muted-foreground"
+                                  "type": "text",
+                                  "id": "aH4sN",
+                                  "name": "showCredentialText",
+                                  "fill": "$--foreground",
+                                  "content": "显示",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 14,
+                                  "fontWeight": "500"
                                 }
                               ]
                             },
@@ -3834,7 +3851,8 @@
                               "type": "frame",
                               "id": "yNcpG",
                               "name": "saveBtn",
-                              "height": 40,
+                              "width": 80,
+                              "height": 36,
                               "fill": "$--primary",
                               "cornerRadius": 8,
                               "padding": [
@@ -3849,7 +3867,7 @@
                                   "id": "V3Zsf",
                                   "name": "saveBtnText",
                                   "fill": "$--primary-foreground",
-                                  "content": "儲存",
+                                  "content": "保存",
                                   "fontFamily": "Inter",
                                   "fontSize": 14,
                                   "fontWeight": "500"
@@ -3863,13 +3881,14 @@
                           "id": "EeQwS",
                           "name": "apiActions",
                           "width": "fill_container",
-                          "justifyContent": "end",
+                          "gap": 8,
+                          "justifyContent": "start",
                           "children": [
                             {
                               "type": "frame",
                               "id": "62yr8",
                               "name": "deleteBtn",
-                              "height": 36,
+                              "height": 32,
                               "cornerRadius": 8,
                               "stroke": {
                                 "align": "inside",
@@ -3898,7 +3917,37 @@
                                   "id": "Alifw",
                                   "name": "deleteBtnText",
                                   "fill": "$--destructive",
-                                  "content": "刪除 API Key",
+                                  "content": "删除凭据",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 13,
+                                  "fontWeight": "500"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "vR8cL",
+                              "name": "testConnectionBtn",
+                              "height": 32,
+                              "cornerRadius": 8,
+                              "stroke": {
+                                "align": "inside",
+                                "thickness": 1,
+                                "fill": "$--border"
+                              },
+                              "padding": [
+                                0,
+                                12
+                              ],
+                              "justifyContent": "center",
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "mT2xK",
+                                  "name": "testConnectionText",
+                                  "fill": "$--foreground",
+                                  "content": "测试连接",
                                   "fontFamily": "Inter",
                                   "fontSize": 13,
                                   "fontWeight": "500"
@@ -3970,7 +4019,7 @@
                           "fill": "$--muted-foreground",
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
-                          "content": "自訂 AI 整理轉錄文字時使用的 Prompt。修改後會影響所有新的轉錄結果。",
+                          "content": "自定义 AI 整理转录文本时使用的 Prompt。修改后会影响所有新的转录结果。",
                           "lineHeight": 1.5,
                           "fontFamily": "$--font-primary",
                           "fontSize": 13,
@@ -3999,7 +4048,7 @@
                               "fill": "$--foreground",
                               "textGrowth": "fixed-width",
                               "width": "fill_container",
-                              "content": "請將以下語音轉錄文字整理成通順的書面文字。\n保留原意，修正錯字與標點，\n適當分段。",
+                              "content": "请将以下语音转录文本整理成通顺的书面文本。\n保留原意，修正错字与标点，\n适当分段。",
                               "lineHeight": 1.6,
                               "fontFamily": "$--font-mono",
                               "fontSize": 13,
@@ -4033,7 +4082,7 @@
                                   "id": "vFcmM",
                                   "name": "aiSaveText",
                                   "fill": "$--primary-foreground",
-                                  "content": "儲存",
+                                  "content": "保存",
                                   "fontFamily": "$--font-primary",
                                   "fontSize": 13,
                                   "fontWeight": "500"
@@ -4062,7 +4111,7 @@
                                   "id": "adquW",
                                   "name": "aiResetText",
                                   "fill": "$--muted-foreground",
-                                  "content": "重置為預設",
+                                  "content": "重置为默认",
                                   "fontFamily": "$--font-primary",
                                   "fontSize": 13,
                                   "fontWeight": "normal"
@@ -4111,7 +4160,7 @@
                           "id": "UZ6TD",
                           "name": "modelTitle",
                           "fill": "$--foreground",
-                          "content": "模型選擇",
+                          "content": "模型选择",
                           "fontFamily": "$--font-primary",
                           "fontSize": 16,
                           "fontWeight": "600"
@@ -4134,7 +4183,7 @@
                           "fill": "$--muted-foreground",
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
-                          "content": "選擇語音辨識和文字整理使用的 AI 模型。不同模型在速度、品質和成本上有所差異。",
+                          "content": "选择语音识别和文本整理使用的 AI 模型。不同模型在速度、质量和成本上有所差异。",
                           "lineHeight": 1.5,
                           "fontFamily": "$--font-primary",
                           "fontSize": 13,
@@ -4202,7 +4251,7 @@
                                       "id": "AuDYC",
                                       "name": "whisperBadgeT",
                                       "fill": "$--success",
-                                      "content": "預設",
+                                      "content": "默认",
                                       "fontFamily": "$--font-primary",
                                       "fontSize": 10,
                                       "fontWeight": "600"
@@ -4236,7 +4285,7 @@
                               "id": "OP1W4",
                               "name": "llmLabel",
                               "fill": "$--foreground",
-                              "content": "文字整理模型",
+                              "content": "文本整理模型",
                               "fontFamily": "$--font-primary",
                               "fontSize": 14,
                               "fontWeight": "500"
@@ -4346,7 +4395,7 @@
                           "id": "Vy7nE",
                           "name": "threshTitle",
                           "fill": "$--foreground",
-                          "content": "短文字門檻",
+                          "content": "短文本阈值",
                           "fontFamily": "$--font-primary",
                           "fontSize": 16,
                           "fontWeight": "600"
@@ -4369,7 +4418,7 @@
                           "fill": "$--muted-foreground",
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
-                          "content": "轉錄字數低於門檻時跳過 AI 整理，直接輸出原始文字。關閉此選項則所有轉錄都經過 AI 整理。",
+                          "content": "转录字数低于阈值时跳过 AI 整理，直接输出原始文本。关闭此选项则所有转录都经过 AI 整理。",
                           "lineHeight": 1.5,
                           "fontFamily": "$--font-primary",
                           "fontSize": 13,
@@ -4388,7 +4437,7 @@
                               "id": "8h55i",
                               "name": "threshLabel",
                               "fill": "$--foreground",
-                              "content": "啟用短文字門檻",
+                              "content": "启用短文本阈值",
                               "fontFamily": "$--font-primary",
                               "fontSize": 14,
                               "fontWeight": "500"
@@ -4430,7 +4479,7 @@
                               "id": "8vrhh",
                               "name": "threshCharLabel",
                               "fill": "$--foreground",
-                              "content": "門檻字數",
+                              "content": "阈值字数",
                               "fontFamily": "$--font-primary",
                               "fontSize": 14,
                               "fontWeight": "500"
@@ -4511,7 +4560,7 @@
                           "id": "1OoCF",
                           "name": "dlTitle",
                           "fill": "$--foreground",
-                          "content": "智慧字典學習",
+                          "content": "智能字典学习",
                           "fontFamily": "$--font-primary",
                           "fontSize": 16,
                           "fontWeight": "600"
@@ -4557,7 +4606,7 @@
                           "fill": "$--muted-foreground",
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
-                          "content": "每次語音輸入後，系統偵測你的修正並透過 AI 分析，自動將專有名詞和術語加入字典。字典越豐富，辨識越準確。",
+                          "content": "每次语音输入后，系统检测你的修正并通过 AI 分析，自动将专有名词和术语加入字典。字典越丰富，识别越准确。",
                           "lineHeight": 1.5,
                           "fontFamily": "$--font-primary",
                           "fontSize": 13,
@@ -4583,7 +4632,7 @@
                                   "id": "ZXIH6",
                                   "name": "dlToggleLabel",
                                   "fill": "$--foreground",
-                                  "content": "啟用智慧學習",
+                                  "content": "启用智能学习",
                                   "fontFamily": "$--font-primary",
                                   "fontSize": 14,
                                   "fontWeight": "500"
@@ -4593,7 +4642,7 @@
                                   "id": "iWKOB",
                                   "name": "dlToggleDesc",
                                   "fill": "$--muted-foreground",
-                                  "content": "貼上後自動偵測修正並學習新詞彙",
+                                  "content": "粘贴后自动检测修正并学习新词汇",
                                   "fontFamily": "$--font-primary",
                                   "fontSize": 13,
                                   "fontWeight": "normal"
@@ -4691,7 +4740,7 @@
                           "fill": "$--muted-foreground",
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
-                          "content": "修正內容僅送至你設定的 Groq API 進行分析，不會儲存或傳送至其他服務。",
+                          "content": "修正内容仅送至你设置的 Groq API 进行分析，不会保存或传送至其他服务。",
                           "lineHeight": 1.5,
                           "fontFamily": "$--font-primary",
                           "fontSize": 12,
@@ -4737,7 +4786,7 @@
                           "id": "NsJHd",
                           "name": "appTitle",
                           "fill": "$--foreground",
-                          "content": "應用程式",
+                          "content": "应用程序",
                           "fontFamily": "$--font-primary",
                           "fontSize": 16,
                           "fontWeight": "600"
@@ -4766,7 +4815,7 @@
                               "id": "Xpunh",
                               "name": "localeLabel",
                               "fill": "$--foreground",
-                              "content": "介面語言",
+                              "content": "界面语言",
                               "fontFamily": "$--font-primary",
                               "fontSize": 14,
                               "fontWeight": "500"
@@ -4794,7 +4843,7 @@
                                   "id": "W8klY",
                                   "name": "localeVal",
                                   "fill": "$--foreground",
-                                  "content": "繁體中文",
+                                  "content": "简体中文",
                                   "fontFamily": "$--font-primary",
                                   "fontSize": 13,
                                   "fontWeight": "normal"
@@ -4833,7 +4882,7 @@
                                   "id": "Vjyjd",
                                   "name": "transLocaleLabel",
                                   "fill": "$--foreground",
-                                  "content": "轉錄語言",
+                                  "content": "转录语言",
                                   "fontFamily": "$--font-primary",
                                   "fontSize": 14,
                                   "fontWeight": "500"
@@ -4843,7 +4892,7 @@
                                   "id": "tD2O3",
                                   "name": "transLocaleDesc",
                                   "fill": "$--muted-foreground",
-                                  "content": "Whisper 辨識使用的語言，可與介面語言不同",
+                                  "content": "Whisper 识别使用的语言，可与界面语言不同",
                                   "fontFamily": "$--font-primary",
                                   "fontSize": 13,
                                   "fontWeight": "normal"
@@ -4873,7 +4922,7 @@
                                   "id": "ZzyZg",
                                   "name": "transLocaleVal",
                                   "fill": "$--foreground",
-                                  "content": "自動偵測",
+                                  "content": "自动检测",
                                   "fontFamily": "$--font-primary",
                                   "fontSize": 13,
                                   "fontWeight": "normal"
@@ -4920,7 +4969,7 @@
                                   "id": "N5TUA",
                                   "name": "muteLabel",
                                   "fill": "$--foreground",
-                                  "content": "錄音時自動靜音",
+                                  "content": "录音时自动静音",
                                   "fontFamily": "$--font-primary",
                                   "fontSize": 14,
                                   "fontWeight": "500"
@@ -4930,7 +4979,7 @@
                                   "id": "Zia8L",
                                   "name": "muteDesc",
                                   "fill": "$--muted-foreground",
-                                  "content": "錄音期間自動靜音系統喇叭，避免系統音效被錄入",
+                                  "content": "录音期间自动静音系统扬声器，避免系统音效被录入",
                                   "fontFamily": "$--font-primary",
                                   "fontSize": 13,
                                   "fontWeight": "normal"
@@ -4989,7 +5038,7 @@
                                   "id": "Q0Arc",
                                   "name": "toggleLabel",
                                   "fill": "$--foreground",
-                                  "content": "開機自動啟動",
+                                  "content": "开机自动启动",
                                   "fontFamily": "$--font-primary",
                                   "fontSize": 14,
                                   "fontWeight": "500"
@@ -4999,7 +5048,7 @@
                                   "id": "WiKsp",
                                   "name": "toggleDesc",
                                   "fill": "$--muted-foreground",
-                                  "content": "登入系統後自動啟動 SayIt",
+                                  "content": "登录系统后自动启动 SayIt",
                                   "fontFamily": "$--font-primary",
                                   "fontSize": 13,
                                   "fontWeight": "normal"
@@ -5070,7 +5119,7 @@
                           "id": "wMdXN",
                           "name": "recTitle",
                           "fill": "$--foreground",
-                          "content": "錄音檔管理",
+                          "content": "录音文件管理",
                           "fontFamily": "$--font-primary",
                           "fontSize": 16,
                           "fontWeight": "600"
@@ -5106,7 +5155,7 @@
                                   "id": "kkPdb",
                                   "name": "recAutoLabel",
                                   "fill": "$--foreground",
-                                  "content": "自動清理錄音檔",
+                                  "content": "自动清理录音文件",
                                   "fontFamily": "$--font-primary",
                                   "fontSize": 14,
                                   "fontWeight": "500"
@@ -5116,7 +5165,7 @@
                                   "id": "GKJiY",
                                   "name": "recAutoDesc",
                                   "fill": "$--muted-foreground",
-                                  "content": "超過指定天數的錄音檔將自動刪除",
+                                  "content": "超过指定天数的录音文件将自动删除",
                                   "fontFamily": "$--font-primary",
                                   "fontSize": 13,
                                   "fontWeight": "normal"
@@ -5160,7 +5209,7 @@
                               "id": "HekbK",
                               "name": "recDaysLabel",
                               "fill": "$--foreground",
-                              "content": "保留天數",
+                              "content": "保留天数",
                               "fontFamily": "$--font-primary",
                               "fontSize": 14,
                               "fontWeight": "500"
@@ -5227,7 +5276,7 @@
                                   "id": "1SdlE",
                                   "name": "recDelLabel",
                                   "fill": "$--foreground",
-                                  "content": "刪除所有錄音檔",
+                                  "content": "删除所有录音文件",
                                   "fontFamily": "$--font-primary",
                                   "fontSize": 14,
                                   "fontWeight": "500"
@@ -5237,7 +5286,7 @@
                                   "id": "bBvGB",
                                   "name": "recDelDesc",
                                   "fill": "$--muted-foreground",
-                                  "content": "此操作無法復原",
+                                  "content": "此操作无法复原",
                                   "fontFamily": "$--font-primary",
                                   "fontSize": 13,
                                   "fontWeight": "normal"
@@ -5267,7 +5316,7 @@
                                   "id": "BKQ2z",
                                   "name": "recDelBtnT",
                                   "fill": "$--destructive",
-                                  "content": "刪除全部",
+                                  "content": "删除全部",
                                   "fontFamily": "$--font-primary",
                                   "fontSize": 13,
                                   "fontWeight": "500"
@@ -5338,7 +5387,7 @@
               "id": "8Ytch",
               "name": "modalTitle",
               "fill": "$--foreground",
-              "content": "需要輔助使用權限",
+              "content": "需要辅助功能权限",
               "fontFamily": "Inter",
               "fontSize": 20,
               "fontWeight": "700"
@@ -5350,7 +5399,7 @@
               "fill": "$--muted-foreground",
               "textGrowth": "fixed-width",
               "width": "fill_container",
-              "content": "SayIt 需要「輔助使用」權限來監聽全域快捷鍵。請依照以下步驟啟用：",
+              "content": "SayIt 需要「辅助功能」权限来监听全局快捷键。请按照以下步骤启用：",
               "lineHeight": 1.6,
               "fontFamily": "Inter",
               "fontSize": 14,
@@ -5404,7 +5453,7 @@
                       "id": "BXaBO",
                       "name": "step1Text",
                       "fill": "$--foreground",
-                      "content": "點擊下方按鈕開啟系統設定",
+                      "content": "点击下方按钮打开系统设置",
                       "lineHeight": 1.5,
                       "fontFamily": "Inter",
                       "fontSize": 14,
@@ -5446,7 +5495,7 @@
                       "id": "NrMv8",
                       "name": "step2Text",
                       "fill": "$--foreground",
-                      "content": "在清單中找到 SayIt 並勾選",
+                      "content": "在列表中找到 SayIt 并勾选",
                       "lineHeight": 1.5,
                       "fontFamily": "Inter",
                       "fontSize": 14,
@@ -5488,7 +5537,7 @@
                       "id": "bqCgv",
                       "name": "step3Text",
                       "fill": "$--foreground",
-                      "content": "回到 SayIt 後重新啟動程式",
+                      "content": "回到 SayIt 后重新启动应用",
                       "lineHeight": 1.5,
                       "fontFamily": "Inter",
                       "fontSize": 14,
@@ -5533,7 +5582,7 @@
                       "id": "2Qw7b",
                       "name": "openSettingsText",
                       "fill": "$--primary-foreground",
-                      "content": "開啟系統設定",
+                      "content": "打开系统设置",
                       "fontFamily": "Inter",
                       "fontSize": 14,
                       "fontWeight": "600"
@@ -5555,7 +5604,7 @@
                       "id": "yFUK6",
                       "name": "laterText",
                       "fill": "$--muted-foreground",
-                      "content": "稍後設定",
+                      "content": "稍后设置",
                       "fontFamily": "Inter",
                       "fontSize": 14,
                       "fontWeight": "500"
@@ -5665,7 +5714,7 @@
               "id": "PrHTg",
               "name": "navLabel",
               "fill": "$--muted-foreground",
-              "content": "導航",
+              "content": "导航",
               "fontFamily": "$--font-primary",
               "fontSize": 11,
               "fontWeight": "500"
@@ -5704,7 +5753,7 @@
                   "y": 11
                 },
                 "WCEn2": {
-                  "content": "歷史記錄",
+                  "content": "历史记录",
                   "x": 40,
                   "y": 10
                 }
@@ -5724,7 +5773,7 @@
                   "y": 11
                 },
                 "WCEn2": {
-                  "content": "自訂字典",
+                  "content": "自定义字典",
                   "x": 40,
                   "y": 10
                 }
@@ -5744,7 +5793,7 @@
                   "y": 11
                 },
                 "WCEn2": {
-                  "content": "幻覺詞庫",
+                  "content": "幻觉词库",
                   "x": 40,
                   "y": 10
                 }
@@ -5764,7 +5813,7 @@
                   "y": 11
                 },
                 "WCEn2": {
-                  "content": "設定",
+                  "content": "设置",
                   "x": 40,
                   "y": 10
                 }
@@ -5814,7 +5863,7 @@
                   "id": "NML06",
                   "name": "footerUpdate",
                   "fill": "$--muted-foreground",
-                  "content": "檢查更新",
+                  "content": "检查更新",
                   "fontFamily": "$--font-primary",
                   "fontSize": 12,
                   "fontWeight": "500"
@@ -6000,7 +6049,7 @@
                   "id": "PDU9O",
                   "name": "sec1Title",
                   "fill": "#fafafa",
-                  "content": "Startup — 直接開啟 Dashboard",
+                  "content": "Startup — 直接打开 Dashboard",
                   "fontFamily": "Inter",
                   "fontSize": 16,
                   "fontWeight": "600"
@@ -6014,7 +6063,7 @@
               "fill": "#888888",
               "textGrowth": "fixed-width",
               "width": "fill_container",
-              "content": "啟動時不顯示 HUD overlay。直接 show main-window（Dashboard），overlay 視窗隱藏。使用者看到設定畫面即完成啟動。",
+              "content": "启动时不显示 HUD overlay。直接 show main-window（Dashboard），overlay 窗口隐藏。用户看到设置界面即完成启动。",
               "lineHeight": 1.5,
               "fontFamily": "Inter",
               "fontSize": 13,
@@ -6056,7 +6105,7 @@
                       "id": "wcJVX",
                       "name": "label1",
                       "fill": "#666666",
-                      "content": "App 啟動",
+                      "content": "App 启动",
                       "fontFamily": "JetBrains Mono",
                       "fontSize": 10,
                       "fontWeight": "normal"
@@ -6096,7 +6145,7 @@
                       "id": "uTI15",
                       "name": "label2",
                       "fill": "#666666",
-                      "content": "main-window 顯示",
+                      "content": "main-window 显示",
                       "fontFamily": "JetBrains Mono",
                       "fontSize": 10,
                       "fontWeight": "normal"
@@ -6136,7 +6185,7 @@
                       "id": "jk9UX",
                       "name": "label3",
                       "fill": "#666666",
-                      "content": "overlay 隱藏",
+                      "content": "overlay 隐藏",
                       "fontFamily": "JetBrains Mono",
                       "fontSize": 10,
                       "fontWeight": "normal"
@@ -6198,7 +6247,7 @@
                   "id": "Z3oPy",
                   "name": "sec2Title",
                   "fill": "#fafafa",
-                  "content": "Recording — 即時音訊波形 + JetBrains Mono 計時器",
+                  "content": "Recording — 实时音频波形 + JetBrains Mono 计时器",
                   "fontFamily": "Inter",
                   "fontSize": 16,
                   "fontWeight": "600"
@@ -6212,7 +6261,7 @@
               "fill": "#888888",
               "textGrowth": "fixed-width",
               "width": "fill_container",
-              "content": "Notch 350×42，左側 6 根波形條隨 AnalyserNode 振幅即時跳動（高度 4~28px），排列為中間高兩側低的山丘形（bin 順序 [9,4,1,2,6,12]），每根 bar 純粹反映對應頻率 bin 能量。右側 JetBrains Mono 字體顯示 m:ss 計時。中間 40px camera gap 留空。所有活動狀態寬高一致，無尺寸過渡。",
+              "content": "Notch 350×42，左侧 6 根波形条随 AnalyserNode 振幅实时跳动（高度 4~28px），排列为中间高两侧低的山丘形（bin 顺序 [9,4,1,2,6,12]），每根 bar 纯粹反映对应频率 bin 能量。右侧 JetBrains Mono 字体显示 m:ss 计时。中间 40px camera gap 留空。所有活动状态宽高一致，无尺寸过渡。",
               "lineHeight": 1.5,
               "fontFamily": "Inter",
               "fontSize": 13,
@@ -6380,7 +6429,7 @@
                   "id": "vjOUK",
                   "name": "sec3Title",
                   "fill": "#fafafa",
-                  "content": "Transition — 波形凝固為圓點 (~300ms)",
+                  "content": "Transition — 波形凝固为圆点 (~300ms)",
                   "fontFamily": "Inter",
                   "fontSize": 16,
                   "fontWeight": "600"
@@ -6394,7 +6443,7 @@
               "fill": "#888888",
               "textGrowth": "fixed-width",
               "width": "fill_container",
-              "content": "波形條逐一收束為 6px 圓點。每根條 transition-delay 間隔 50ms（0/50/100/150/200/250ms），造成波浪收束效果。持續約 300ms 後自動進入 transcribing。",
+              "content": "波形条逐一收束为 6px 圆点。每根条 transition-delay 间隔 50ms（0/50/100/150/200/250ms），造成波浪收束效果。持续约 300ms 后自动进入 transcribing。",
               "lineHeight": 1.5,
               "fontFamily": "Inter",
               "fontSize": 13,
@@ -6502,7 +6551,7 @@
                       "id": "eG7kZ",
                       "name": "s3l1",
                       "fill": "#666666",
-                      "content": "波形跳動",
+                      "content": "波形跳动",
                       "fontFamily": "JetBrains Mono",
                       "fontSize": 10,
                       "fontWeight": "normal"
@@ -6608,7 +6657,7 @@
                       "id": "yEQIZ",
                       "name": "s3l2",
                       "fill": "#666666",
-                      "content": "凝固收縮",
+                      "content": "凝固收缩",
                       "fontFamily": "JetBrains Mono",
                       "fontSize": 10,
                       "fontWeight": "normal"
@@ -6690,7 +6739,7 @@
                       "id": "A3oBN",
                       "name": "s3l3",
                       "fill": "#666666",
-                      "content": "變成圓點",
+                      "content": "变成圆点",
                       "fontFamily": "JetBrains Mono",
                       "fontSize": 10,
                       "fontWeight": "normal"
@@ -6752,7 +6801,7 @@
                   "id": "AR5EB",
                   "name": "sec4Title",
                   "fill": "#fafafa",
-                  "content": "Transcribing — 滑動視窗圓點脈衝",
+                  "content": "Transcribing — 滑动窗口圆点脉冲",
                   "fontFamily": "Inter",
                   "fontSize": 16,
                   "fontWeight": "600"
@@ -6766,7 +6815,7 @@
               "fill": "#888888",
               "textGrowth": "fixed-width",
               "width": "fill_container",
-              "content": "5 個圓點（第 6 個隱藏）預設空心（transparent 背景 + 1.5px 白色半透明邊框）。滑動視窗模式循環：每個 dot 用 dotSlide keyframe（background: transparent↔white + border-color 切換），animation-delay 間隔 0.3s（0/0.3/0.6/0.9/1.2s），週期 1.5s。亮起時填滿變實心白，形成掃描波浪效果。",
+              "content": "5 个圆点（第 6 个隐藏）默认空心（transparent 背景 + 1.5px 白色半透明边框）。滑动窗口模式循环：每个 dot 用 dotSlide keyframe（background: transparent↔white + border-color 切换），animation-delay 间隔 0.3s（0/0.3/0.6/0.9/1.2s），周期 1.5s。亮起时填满变实心白，形成扫描波浪效果。",
               "lineHeight": 1.5,
               "fontFamily": "Inter",
               "fontSize": 13,
@@ -6858,7 +6907,7 @@
                   "y": 66,
                   "name": "s4note",
                   "fill": "#555555",
-                  "content": "○ ○ ● ● ● → ● ○ ○ ● ● → ● ● ○ ○ ● → loop（○=空心 ●=實心）",
+                  "content": "○ ○ ● ● ● → ● ○ ○ ● ● → ● ● ○ ○ ● → loop（○=空心 ●=实心）",
                   "fontFamily": "JetBrains Mono",
                   "fontSize": 10,
                   "fontWeight": "normal"
@@ -6918,7 +6967,7 @@
                   "id": "ZRebw",
                   "name": "sec5Title",
                   "fill": "#fafafa",
-                  "content": "Success — 圓點匯聚 → SVG ✓ → 綠色邊緣光暈 → 消失",
+                  "content": "Success — 圆点汇聚 → SVG ✓ → 绿色边缘光晕 → 消失",
                   "fontFamily": "Inter",
                   "fontSize": 16,
                   "fontWeight": "600"
@@ -6932,7 +6981,7 @@
               "fill": "#888888",
               "textGrowth": "fixed-width",
               "width": "fill_container",
-              "content": "6 個圓點加 .waveform-converge class，各自 translateX 向中心匯聚並 scale(0) 消失（0.35s）。同時 SVG checkmark（#22c55e, stroke-dashoffset 動畫 0.3s, delay 0.35s）畫出。notch-wrapper 邊緣散出綠色 drop-shadow 光暈（successGlow 0.8s 漸隱）。notch 背景保持純黑不變色。貼上前 hideHud 不經過 idle，避免 DOM 閃爍。展示 1s 後收合。",
+              "content": "6 个圆点加 .waveform-converge class，各自 translateX 向中心汇聚并 scale(0) 消失（0.35s）。同时 SVG checkmark（#22c55e, stroke-dashoffset 动画 0.3s, delay 0.35s）画出。notch-wrapper 边缘散出绿色 drop-shadow 光晕（successGlow 0.8s 渐隐）。notch 背景保持纯黑不变色。粘贴前 hideHud 不经过 idle，避免 DOM 闪烁。展示 1s 后收起。",
               "lineHeight": 1.5,
               "fontFamily": "Inter",
               "fontSize": 13,
@@ -7016,7 +7065,7 @@
                       "id": "cPFf9",
                       "name": "s5l1",
                       "fill": "#666666",
-                      "content": "圓點",
+                      "content": "圆点",
                       "fontFamily": "JetBrains Mono",
                       "fontSize": 10,
                       "fontWeight": "normal"
@@ -7082,7 +7131,7 @@
                       "id": "od7vX",
                       "name": "s5l2",
                       "fill": "#666666",
-                      "content": "匯聚",
+                      "content": "汇聚",
                       "fontFamily": "JetBrains Mono",
                       "fontSize": 10,
                       "fontWeight": "normal"
@@ -7133,7 +7182,7 @@
                       "id": "1vQ7D",
                       "name": "s5l3",
                       "fill": "#666666",
-                      "content": "✓ 畫出",
+                      "content": "✓ 画出",
                       "fontFamily": "JetBrains Mono",
                       "fontSize": 10,
                       "fontWeight": "normal"
@@ -7179,7 +7228,7 @@
                       "id": "GYkBy",
                       "name": "s5l4",
                       "fill": "#666666",
-                      "content": "邊緣綠光",
+                      "content": "边缘绿光",
                       "fontFamily": "JetBrains Mono",
                       "fontSize": 10,
                       "fontWeight": "normal"
@@ -7219,7 +7268,7 @@
                       "id": "K79VR",
                       "name": "s5l5",
                       "fill": "#666666",
-                      "content": "收縮消失",
+                      "content": "收缩消失",
                       "fontFamily": "JetBrains Mono",
                       "fontSize": 10,
                       "fontWeight": "normal"
@@ -7281,7 +7330,7 @@
                   "id": "QNuhU",
                   "name": "sec6Title",
                   "fill": "#fafafa",
-                  "content": "Error — 圓點散開 → 抖動 → ↻ 可點擊",
+                  "content": "Error — 圆点散开 → 抖动 → ↻ 可点击",
                   "fontFamily": "Inter",
                   "fontSize": 16,
                   "fontWeight": "600"
@@ -7295,7 +7344,7 @@
               "fill": "#888888",
               "textGrowth": "fixed-width",
               "width": "fill_container",
-              "content": "6 個圓點加 .waveform-scatter class（#f97316），各自 translateX 向外散開。notch 左右抖動 3 次（±4px, 0.4s）。notch 背景保持純黑不變色（無底色 flash）。右側 ↻ retry icon 可點擊（@click.stop emit retry），觸發開啟 main-window。error 狀態下 setIgnoreCursorEvents(false) 允許點擊。停留 2s 後自動收合。",
+              "content": "6 个圆点加 .waveform-scatter class（#f97316），各自 translateX 向外散开。notch 左右抖动 3 次（±4px, 0.4s）。notch 背景保持纯黑不变色（无底色 flash）。右侧 ↻ retry icon 可点击（@click.stop emit retry），触发打开 main-window。error 状态下 setIgnoreCursorEvents(false) 允许点击。停留 2s 后自动收起。",
               "lineHeight": 1.5,
               "fontFamily": "Inter",
               "fontSize": 13,
@@ -7379,7 +7428,7 @@
                       "id": "YoxFf",
                       "name": "s6l1",
                       "fill": "#666666",
-                      "content": "停止脈動",
+                      "content": "停止脉动",
                       "fontFamily": "JetBrains Mono",
                       "fontSize": 10,
                       "fontWeight": "normal"
@@ -7461,7 +7510,7 @@
                       "id": "rNa23",
                       "name": "s6l2",
                       "fill": "#666666",
-                      "content": "散開變橘",
+                      "content": "散开变橘",
                       "fontFamily": "JetBrains Mono",
                       "fontSize": 10,
                       "fontWeight": "normal"
@@ -7536,7 +7585,7 @@
                       "id": "58c1t",
                       "name": "s6l3",
                       "fill": "#666666",
-                      "content": "左右抖動 x3",
+                      "content": "左右抖动 x3",
                       "fontFamily": "JetBrains Mono",
                       "fontSize": 10,
                       "fontWeight": "normal"
@@ -7575,7 +7624,7 @@
                       "id": "iMt5a",
                       "name": "s6retryIcon",
                       "fill": "#666666",
-                      "content": "↻ 重試（純黑底）",
+                      "content": "↻ 重试（纯黑底）",
                       "fontFamily": "JetBrains Mono",
                       "fontSize": 10,
                       "fontWeight": "normal"
@@ -7637,7 +7686,7 @@
                   "id": "h4KQm",
                   "name": "learnedTitle",
                   "fill": "#fafafa",
-                  "content": "Learned — 書本圖示 + 學習詞彙通知",
+                  "content": "Learned — 书本图标 + 学习词汇通知",
                   "fontFamily": "Inter",
                   "fontSize": 16,
                   "fontWeight": "600"
@@ -7651,7 +7700,7 @@
               "fill": "#888888",
               "textGrowth": "fixed-width",
               "width": "fill_container",
-              "content": "貼上後偵測到使用者修正，AI 分析出新詞彙並加入字典時觸發。Notch 擴展顯示藍色書本圖示 + 「已學習」標籤 + 詞彙名稱。播放 learned 音效。停留約 2s 後自動收合回 idle。此狀態不影響主流程，僅為通知性質。",
+              "content": "粘贴后检测到用户修正，AI 分析出新词汇并加入字典时触发。Notch 扩展显示蓝色书本图标 + 「已学习」标签 + 词汇名称。播放 learned 音效。停留约 2s 后自动收起回 idle。此状态不影响主流程，仅为通知性质。",
               "lineHeight": 1.5,
               "fontFamily": "Inter",
               "fontSize": 13,
@@ -7735,7 +7784,7 @@
                       "id": "B7i2j",
                       "name": "step1label",
                       "fill": "#666666",
-                      "content": "停止脈動",
+                      "content": "停止脉动",
                       "fontFamily": "JetBrains Mono",
                       "fontSize": 10,
                       "fontWeight": "normal"
@@ -7786,7 +7835,7 @@
                       "id": "b0hHt",
                       "name": "step2label",
                       "fill": "#666666",
-                      "content": "書本圖示",
+                      "content": "书本图标",
                       "fontFamily": "JetBrains Mono",
                       "fontSize": 10,
                       "fontWeight": "normal"
@@ -7878,7 +7927,7 @@
                               "id": "sjTZR",
                               "name": "s7label",
                               "fill": "#93c5fd",
-                              "content": "已學習",
+                              "content": "已学习",
                               "fontFamily": "Inter",
                               "fontSize": 9,
                               "fontWeight": "600"
@@ -7915,7 +7964,7 @@
                       "id": "hoQ7H",
                       "name": "step3label",
                       "fill": "#666666",
-                      "content": "展開通知",
+                      "content": "展开通知",
                       "fontFamily": "JetBrains Mono",
                       "fontSize": 10,
                       "fontWeight": "normal"
@@ -7966,7 +8015,7 @@
                       "id": "HHpID",
                       "name": "step4label",
                       "fill": "#666666",
-                      "content": "2s 後收合",
+                      "content": "2s 后收起",
                       "fontFamily": "JetBrains Mono",
                       "fontSize": 10,
                       "fontWeight": "normal"
@@ -8063,7 +8112,7 @@
               "y": 11
             },
             "Vme56/WCEn2": {
-              "content": "歷史記錄",
+              "content": "历史记录",
               "x": 40,
               "y": 10
             },
@@ -8077,7 +8126,7 @@
               "y": 11
             },
             "YXukb/WCEn2": {
-              "content": "自訂字典",
+              "content": "自定义字典",
               "x": 40,
               "y": 10
             },
@@ -8104,7 +8153,7 @@
               "y": 11
             },
             "vTYBG/WCEn2": {
-              "content": "設定",
+              "content": "设置",
               "x": 40,
               "y": 10
             },
@@ -8174,7 +8223,7 @@
                   "id": "iSeZE",
                   "name": "halluPageTitle",
                   "fill": "$--foreground",
-                  "content": "幻覺詞庫",
+                  "content": "幻觉词库",
                   "fontFamily": "$--font-primary",
                   "fontSize": 16,
                   "fontWeight": "600"
@@ -8210,7 +8259,7 @@
                           "id": "QzaAD",
                           "name": "halluTitle2",
                           "fill": "$--foreground",
-                          "content": "幻覺詞庫",
+                          "content": "幻觉词库",
                           "fontFamily": "$--font-primary",
                           "fontSize": 20,
                           "fontWeight": "600"
@@ -8220,7 +8269,7 @@
                           "id": "VdlL6",
                           "name": "halluSubtitle",
                           "fill": "$--muted-foreground",
-                          "content": "管理 Whisper 幻覺詞，系統會自動學習並攔截常見的幻覺文字",
+                          "content": "管理 Whisper 幻觉词，系统会自动学习并拦截常见的幻觉文本",
                           "fontFamily": "$--font-primary",
                           "fontSize": 14,
                           "fontWeight": "normal"
@@ -8242,7 +8291,7 @@
                               "id": "gur0w",
                               "name": "halluCountText",
                               "fill": "$--muted-foreground",
-                              "content": "3 個詞彙",
+                              "content": "3 个词汇",
                               "fontFamily": "$--font-primary",
                               "fontSize": 12,
                               "fontWeight": "500"
@@ -8282,7 +8331,7 @@
                               "id": "8aiAW",
                               "name": "halluInputPh",
                               "fill": "$--muted-foreground",
-                              "content": "輸入幻覺詞...",
+                              "content": "输入幻觉词...",
                               "fontFamily": "$--font-primary",
                               "fontSize": 13,
                               "fontWeight": "normal"
@@ -8319,7 +8368,7 @@
                               "id": "WGEkB",
                               "name": "halluAddText",
                               "fill": "$--primary-foreground",
-                              "content": "新增",
+                              "content": "添加",
                               "fontFamily": "$--font-primary",
                               "fontSize": 13,
                               "fontWeight": "500"
@@ -8370,7 +8419,7 @@
                           "fill": "$--muted-foreground",
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
-                          "content": "詞彙",
+                          "content": "词汇",
                           "fontFamily": "$--font-primary",
                           "fontSize": 13,
                           "fontWeight": "500"
@@ -8382,7 +8431,7 @@
                           "fill": "$--muted-foreground",
                           "textGrowth": "fixed-width",
                           "width": 100,
-                          "content": "來源",
+                          "content": "来源",
                           "fontFamily": "$--font-primary",
                           "fontSize": 13,
                           "fontWeight": "500"
@@ -8433,7 +8482,7 @@
                           "fill": "$--foreground",
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
-                          "content": "謝謝收看",
+                          "content": "谢谢收看",
                           "fontFamily": "$--font-primary",
                           "fontSize": 13,
                           "fontWeight": "normal"
@@ -8460,7 +8509,7 @@
                                   "id": "XUHU9",
                                   "name": "hR1BadgeT",
                                   "fill": "$--warning",
-                                  "content": "內建",
+                                  "content": "内置",
                                   "fontFamily": "$--font-primary",
                                   "fontSize": 11,
                                   "fontWeight": "600"
@@ -8527,7 +8576,7 @@
                           "fill": "$--foreground",
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
-                          "content": "感謝聆聽",
+                          "content": "感谢聆听",
                           "fontFamily": "$--font-primary",
                           "fontSize": 13,
                           "fontWeight": "normal"
@@ -8554,7 +8603,7 @@
                                   "id": "Squsy",
                                   "name": "hR2BadgeT",
                                   "fill": "$--success",
-                                  "content": "自動",
+                                  "content": "自动",
                                   "fontFamily": "$--font-primary",
                                   "fontSize": 11,
                                   "fontWeight": "600"
@@ -8641,7 +8690,7 @@
                                   "id": "76GSm",
                                   "name": "hR3BadgeT",
                                   "fill": "#3b82f6",
-                                  "content": "手動",
+                                  "content": "手动",
                                   "fontFamily": "$--font-primary",
                                   "fontSize": 11,
                                   "fontWeight": "600"
@@ -8714,7 +8763,7 @@
           "id": "TlpST",
           "name": "stateSpecTitle",
           "fill": "$--foreground",
-          "content": "Typeless 匯入按鈕狀態",
+          "content": "Typeless 导入按钮状态",
           "fontFamily": "$--font-primary",
           "fontSize": 14,
           "fontWeight": "600"
@@ -8738,7 +8787,7 @@
                   "id": "TlpDL",
                   "name": "defaultLabel",
                   "fill": "$--muted-foreground",
-                  "content": "預設",
+                  "content": "默认",
                   "fontFamily": "$--font-primary",
                   "fontSize": 11,
                   "fontWeight": "500"
@@ -8775,7 +8824,7 @@
                       "id": "TlpDT",
                       "name": "defaultButtonText",
                       "fill": "$--foreground",
-                      "content": "一鍵匯入 Typeless",
+                      "content": "一键导入 Typeless",
                       "fontFamily": "$--font-primary",
                       "fontSize": 13,
                       "fontWeight": "500"
@@ -8796,7 +8845,7 @@
                   "id": "TlpLL",
                   "name": "loadingLabel",
                   "fill": "$--muted-foreground",
-                  "content": "載入中 · disabled",
+                  "content": "载入中 · disabled",
                   "fontFamily": "$--font-primary",
                   "fontSize": 11,
                   "fontWeight": "500"
@@ -8834,7 +8883,7 @@
                       "id": "TlpLT",
                       "name": "loadingButtonText",
                       "fill": "$--foreground",
-                      "content": "匯入中...",
+                      "content": "导入中...",
                       "fontFamily": "$--font-primary",
                       "fontSize": 13,
                       "fontWeight": "500"

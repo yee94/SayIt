@@ -16,7 +16,6 @@ import { enhanceText, buildSystemPrompt } from "../lib/enhancer";
 import { getEditModePromptForLocale } from "../i18n/prompts";
 import type { SupportedLocale } from "../i18n/languageConfig";
 import { analyzeCorrections } from "../lib/vocabularyAnalyzer";
-import { convertSimplifiedToTraditional } from "../lib/simplifiedToTraditional";
 import i18n from "../i18n";
 import { useVocabularyStore } from "./useVocabularyStore";
 import { useHistoryStore } from "./useHistoryStore";
@@ -72,12 +71,12 @@ const CANCELLED_DISPLAY_DURATION_MS = 1000;
 const EDIT_MODE_MAX_TOKENS = 4096;
 
 /**
- * 判斷轉錄結果是否為空（無內容可貼上）。
+ * 判断转录结果是否为空（无内容可粘贴）。
  *
- * 設計決策：只攔截「完全沒有文字」的情況。
- * Whisper 幻聽（如「谢谢大家」、重複片語）不攔截，直接貼上讓使用者自行判斷。
- * 理由：攔截 + 顯示「未偵測到語音」會讓使用者以為麥克風或系統有問題；
- * 直接貼上則讓使用者看到是模型的輸出品質問題，可自行 Cmd+Z 重來。
+ * 设计决策：只拦截「完全没有文字」的情况。
+ * Whisper 幻听（如「谢谢大家」、重复片语）不拦截，直接粘贴让使用者自行判断。
+ * 理由：拦截 + 显示「未检测到语音」会让使用者以为麦克风或系统有问题；
+ * 直接粘贴则让使用者看到是模型的输出品质问题，可自行 Cmd+Z 重来。
  */
 function isEmptyTranscription(rawText: string): boolean {
   return !rawText || !rawText.trim();
@@ -86,30 +85,12 @@ function t(key: string, params?: Record<string, unknown>): string {
   return i18n.global.t(key, params ?? {});
 }
 
-/**
- * 轉錄原文落地前的文字轉換。
- * 目前只做：轉譯語言解析為繁中（zh-TW）時，把 Whisper 的簡體輸出轉成繁體（#39）。
- * 「auto」模式回退到介面語言；其餘語言原樣返回。
- */
-function applyTranscriptTextTransforms(rawText: string): string {
-  if (!rawText) return rawText;
-  const settingsStore = useSettingsStore();
-  const transcriptionLocale = settingsStore.selectedTranscriptionLocale;
-  const effectiveLocale =
-    transcriptionLocale === "auto"
-      ? settingsStore.selectedLocale
-      : transcriptionLocale;
-  return effectiveLocale === "zh-TW"
-    ? convertSimplifiedToTraditional(rawText)
-    : rawText;
-}
-
 const MONITOR_POLL_INTERVAL_MS = 250;
 
 export const useVoiceFlowStore = defineStore("voice-flow", () => {
   const status = ref<HudStatus>("idle");
   const message = ref("");
-  /** ASR 串流中間文本（HUD 留海下方即時字幕） */
+  /** ASR 串流中间文本（HUD 留海下方即时字幕） */
   const liveTranscript = ref("");
   const isRecording = ref<boolean>(false);
   const recordingElapsedSeconds = ref<number>(0);
@@ -133,19 +114,19 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
   let abortController: AbortController | null = null;
   const editSourceText = ref<string | null>(null);
   const isEditMode = computed<boolean>(() => editSourceText.value !== null);
-  // AX 不可見 App（read_selection_state 回 unavailable）的剪貼簿後備旗標：
-  // 錄音停止、按鍵放開後才執行 read_selected_text
+  // AX 不可见 App（read_selection_state 回 unavailable）的剪贴簿后备旗标：
+  // 录音停止、按键放开后才执行 read_selected_text
   let pendingClipboardSelectionCheck = false;
   let pendingSelectionCapture: Promise<void> | null = null;
-  // 錄音世代編號：AX 判定（最長 600ms）與剪貼簿後備（250ms 計時器）都是
-  // 非同步回呼，可能在「下一輪錄音已開始」後才落地——寫入前必須比對世代，
-  // 過期回呼直接失效（含 ESC 取消 / 雙擊切換後立刻重錄的情境）
+  // 录音世代编号：AX 判定（最长 600ms）与剪贴簿后备（250ms 计时器）都是
+  // 非同步回呼，可能在「下一轮录音已开始」后才落地——写入前必须比对世代，
+  // 过期回呼直接失效（含 ESC 取消 / 双击切换后立刻重录的情境）
   let recordingEpoch = 0;
-  // 本世代的 AX 判定是否已有結論：停止錄音時若 AX 還沒回覆，
-  // 保守走剪貼簿後備（等同舊行為），避免慢速 AX 讓編輯模式靜默消失
+  // 本世代的 AX 判定是否已有结论：停止录音时若 AX 还没回覆，
+  // 保守走剪贴簿后备（等同旧行为），避免慢速 AX 让编辑模式静默消失
   let selectionProbeSettledEpoch = -1;
-  // 等按鍵完全放開的緩衝：toggle 模式的「停止」由第二次按下觸發，
-  // 該瞬間按鍵仍壓著，立刻模擬 Cmd+C 會重演 #25 的字元污染
+  // 等按键完全放开的缓冲：toggle 模式的「停止」由第二次按下触发，
+  // 该瞬间按键仍压着，立刻模拟 Cmd+C 会重演 #25 的字元污染
   const CLIPBOARD_FALLBACK_KEY_RELEASE_DELAY_MS = 250;
   const isRetryAttempt = ref<boolean>(false);
   const canRetry = computed<boolean>(
@@ -233,7 +214,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         );
       }
     } catch {
-      // 螢幕監控重定位失敗為低優先級，不 log 避免洗版
+      // 萤幕监控重定位失败为低优先级，不 log 避免洗版
     } finally {
       isRepositioning = false;
     }
@@ -374,7 +355,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
   function setLiveTranscript(text: string) {
     const trimmed = text.trim();
     if (!trimmed) return;
-    // 錄音 / 轉寫 / 重送期間才更新，避免過期 partial 污染其他狀態
+    // 录音 / 转写 / 重送期间才更新，避免过期 partial 污染其他状态
     if (
       status.value !== "recording" &&
       status.value !== "transcribing" &&
@@ -391,7 +372,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     clearCollapseHideTimer();
     status.value = nextStatus;
     message.value = nextMessage;
-    // 結束流程時清空字幕；錄音 / 轉寫 / 潤飾 / 編輯期間保留（錄音中邊說邊出）
+    // 结束流程时清空字幕；录音 / 转写 / 润饰 / 编辑期间保留（录音中边说边出）
     if (
       nextStatus === "idle" ||
       nextStatus === "error" ||
@@ -573,10 +554,10 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         const settingsStore = useSettingsStore();
         if (!settingsStore.isSmartDictionaryEnabled) return;
 
-        // 清除前一次的 listener，避免重複累積
+        // 清除前一次的 listener，避免重复累积
         cleanupCorrectionMonitorListener();
 
-        // 啟動修正監控
+        // 启动修正监控
         await invoke("start_correction_monitor");
 
         // Phase 2 snapshot polling
@@ -593,12 +574,12 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
                 latestSnapshot = text;
               }
             } catch {
-              // AX 讀取失敗靜默處理
+              // AX 读取失败静默处理
             }
           })();
         }, SNAPSHOT_POLL_INTERVAL_MS);
 
-        // 一次性監聽 correction-monitor:result
+        // 一次性监听 correction-monitor:result
         correctionMonitorUnlisten =
           await listenToEvent<CorrectionMonitorResultPayload>(
             CORRECTION_MONITOR_RESULT,
@@ -624,8 +605,8 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
                   let fieldText: string | null = null;
 
                   if (result.enterPressed) {
-                    // Enter 觸發：先嘗試即時讀取（IME 確認後文字可能已更新）
-                    // 讀不到（如 LINE 按 Enter 送出後已清空）才 fallback 到 snapshot
+                    // Enter 触发：先尝试即时读取（IME 确认后文字可能已更新）
+                    // 读不到（如 LINE 按 Enter 送出后已清空）才 fallback 到 snapshot
                     try {
                       const freshText = await invoke<string | null>(
                         "read_focused_text_field",
@@ -639,7 +620,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
                       fieldText = latestSnapshot;
                     }
                   } else {
-                    // Idle timeout 或硬上限：做最後一次讀取
+                    // Idle timeout 或硬上限：做最后一次读取
                     try {
                       fieldText = await invoke<string | null>(
                         "read_focused_text_field",
@@ -656,8 +637,8 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
                     );
                     return;
                   }
-                  // fieldText 為游標附近的「excerpt」（非整欄文字），故需雙向比對：
-                  // 整欄仍含 pasted（短輸入）→ includes；或 excerpt 是 pasted 的子字串（長輸入未改）→ 反向 includes。
+                  // fieldText 为游标附近的「excerpt」（非整栏文字），故需双向比对：
+                  // 整栏仍含 pasted（短输入）→ includes；或 excerpt 是 pasted 的子字串（长输入未改）→ 反向 includes。
                   const trimmedField = fieldText.trim();
                   if (
                     fieldText.includes(pastedText) ||
@@ -669,8 +650,8 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
                     return;
                   }
 
-                  // 相似度檢查：以 excerpt 為基準（excerpt 多數字元應來自 pasted 區域）。
-                  // 若 excerpt 與 pasted 幾乎無關（AX/UIA 讀到錯的欄位），跳過。
+                  // 相似度检查：以 excerpt 为基准（excerpt 多数字元应来自 pasted 区域）。
+                  // 若 excerpt 与 pasted 几乎无关（AX/UIA 读到错的栏位），跳过。
                   const overlapCharCount = [...trimmedField].filter((ch) =>
                     pastedText.includes(ch),
                   ).length;
@@ -713,7 +694,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
 
                   for (const term of analysisResult.suggestedTermList) {
                     if (vocabularyStore.isDuplicateTerm(term)) {
-                      // 已存在的詞 weight +1
+                      // 已存在的词 weight +1
                       const existingEntry = vocabularyStore.termList.find(
                         (e) =>
                           e.term.trim().toLowerCase() ===
@@ -734,7 +715,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
                     }
                   }
 
-                  // 記錄 API 用量
+                  // 记录 API 用量
                   if (analysisResult.usage) {
                     const historyStore = useHistoryStore();
                     void historyStore
@@ -762,7 +743,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
                       );
                   }
 
-                  // 通知 HUD 新學習的詞（只包含新增的，不包含已存在的）
+                  // 通知 HUD 新学习的词（只包含新增的，不包含已存在的）
                   if (newTermList.length > 0) {
                     writeInfoLog(
                       `useVoiceFlowStore: emitting VOCABULARY_LEARNED: ${newTermList.join(", ")}`,
@@ -775,7 +756,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
                         "useVoiceFlowStore: VOCABULARY_LEARNED emitted successfully",
                       );
 
-                      // HUD 視窗在 idle 後已被 hideHud() 隱藏，需重新顯示才看得到通知
+                      // HUD 视窗在 idle 后已被 hideHud() 隐藏，需重新显示才看得到通知
                       clearLearnedHideTimer();
                       const appWindow = getAppWindow();
                       await appWindow.show();
@@ -838,19 +819,19 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       isRecording.value = false;
       transitionTo("success", params.successMessage);
       startQualityMonitorAfterPaste();
-      // api_usage FK 依賴 transcriptions — 必須等 transcription 寫入後才存 usage
-      // retry 路徑使用 updateTranscriptionOnRetrySuccess，不走 INSERT
+      // api_usage FK 依赖 transcriptions — 必须等 transcription 写入后才存 usage
+      // retry 路径使用 updateTranscriptionOnRetrySuccess，不走 INSERT
       if (!params.skipRecordSaving) {
         void saveTranscriptionRecord(params.record).then(() => {
           saveApiUsageRecordList(params.record, params.chatUsage);
         });
       }
 
-      // 權重更新（fire-and-forget）
+      // 权重更新（fire-and-forget）
       const finalText = params.record.processedText ?? params.record.rawText;
       updateVocabularyWeightsAfterPaste(finalText);
 
-      // 修正偵測（fire-and-forget，需 LLM API key）
+      // 修正侦测（fire-and-forget，需 LLM API key）
       const llmApiKey = settingsStore.getLlmApiKey();
       if (llmApiKey) {
         startCorrectionDetectionFlow(params.text, params.record.id, llmApiKey);
@@ -967,7 +948,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
 
   function applyDoubleTapModeSwitch() {
     isRecording.value = false;
-    // 世代 +1：這輪錄音被雙擊靜默取消，途中的選取偵測回呼全部失效
+    // 世代 +1：这轮录音被双击静默取消，途中的选取侦测回呼全部失效
     recordingEpoch += 1;
     pendingClipboardSelectionCheck = false;
     pendingSelectionCapture = null;
@@ -1026,7 +1007,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     abortController?.abort();
     editSourceText.value = null;
 
-    // 無條件重置 isRecording，避免永久鎖死
+    // 无条件重置 isRecording，避免永久锁死
     isRecording.value = false;
 
     if (currentStatus === "recording") {
@@ -1034,7 +1015,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       void invoke("stop_recording").catch(() => {});
       stopElapsedTimer();
     } else {
-      // 轉寫中途 ESC：也關掉 live session
+      // 转写中途 ESC：也关掉 live session
       void invoke("cancel_live_asr").catch(() => {});
     }
 
@@ -1048,18 +1029,18 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     clearModeSwitchLabelTimer();
     modeSwitchLabel.value = "";
 
-    // 完整清理所有進行中的資源
+    // 完整清理所有进行中的资源
     clearDelayedMuteTimer();
     stopMonitorPolling();
     stopCorrectionSnapshotPolling();
     cleanupCorrectionMonitorListener();
     void restoreSystemAudio();
-    // 世代 +1：讓仍在途的 AX 判定 / 剪貼簿後備回呼全部過期失效
+    // 世代 +1：让仍在途的 AX 判定 / 剪贴簿后备回呼全部过期失效
     recordingEpoch += 1;
     pendingClipboardSelectionCheck = false;
     pendingSelectionCapture = null;
 
-    // 重置 toggle 模式狀態
+    // 重置 toggle 模式状态
     void invoke("reset_hotkey_state").catch(() => {});
 
     transitionTo("cancelled", t("voiceFlow.cancelled"));
@@ -1074,7 +1055,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     lastWasModified.value = null;
     clearLiveTranscript();
 
-    // 重置重送狀態（新錄音開始時清除上次失敗的重送資訊）
+    // 重置重送状态（新录音开始时清除上次失败的重送资讯）
     lastFailedTranscriptionId.value = null;
     lastFailedAudioFilePath.value = null;
     lastFailedRecordingDurationMs.value = 0;
@@ -1082,11 +1063,11 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     lastFailedRmsEnergyLevel.value = 0;
     isRetryAttempt.value = false;
 
-    // 捕獲當前前景視窗（Windows: HUD show 前記住目標，貼上前恢復焦點）
+    // 捕获当前前景视窗（Windows: HUD show 前记住目标，贴上前恢复焦点）
     void invoke("capture_target_window").catch(() => {});
 
-    // 偵測選取文字（非阻塞）：AX 被動查詢，零按鍵模擬（#24/#25）。
-    // AX 不可見的 App 標記剪貼簿後備，延後到錄音停止、按鍵放開後執行
+    // 侦测选取文字（非阻塞）：AX 被动查询，零按键模拟（#24/#25）。
+    // AX 不可见的 App 标记剪贴簿后备，延后到录音停止、按键放开后执行
     editSourceText.value = null;
     pendingClipboardSelectionCheck = false;
     pendingSelectionCapture = null;
@@ -1094,7 +1075,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     const probeEpoch = recordingEpoch;
     invoke<{ kind: string; text: string | null }>("read_selection_state")
       .then((state) => {
-        // 過期回呼（下一輪錄音已開始）直接失效，防止跨錄音狀態污染
+        // 过期回呼（下一轮录音已开始）直接失效，防止跨录音状态污染
         if (probeEpoch !== recordingEpoch || !state) return;
         selectionProbeSettledEpoch = probeEpoch;
         if (state.kind === "selection" && state.text && state.text.trim().length > 0) {
@@ -1103,7 +1084,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
             `useVoiceFlowStore: edit mode activated (ax), selectedText length=${state.text.length}`,
           );
         } else if (state.kind === "noSelection") {
-          // AX 的明確否定是權威答案：若慢速後備已誤寫（整行複製），以此為準清掉
+          // AX 的明确否定是权威答案：若慢速后备已误写（整行复制），以此为准清掉
           editSourceText.value = null;
         } else if (state.kind === "unavailable") {
           pendingClipboardSelectionCheck = true;
@@ -1125,7 +1106,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       transitionTo("recording", t("voiceFlow.recording"));
       writeInfoLog("useVoiceFlowStore: recording started");
 
-      // 邊說邊出：錄音開始後立刻掛上 live ASR（失敗不阻斷錄音）
+      // 边说边出：录音开始后立刻挂上 live ASR（失败不阻断录音）
       void startLiveAsrIfPossible();
     } catch (error) {
       const errorMessage = getMicrophoneErrorMessage(error);
@@ -1138,7 +1119,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     }
   }
 
-  /** 非阻塞啟動 live ASR；缺憑證 / 掛載失敗只 log，錄音繼續 */
+  /** 非阻塞启动 live ASR；缺凭证 / 挂载失败只 log，录音继续 */
   async function startLiveAsrIfPossible() {
     try {
       const settingsStore = useSettingsStore();
@@ -1203,10 +1184,10 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     playSoundIfEnabled("play_stop_sound");
     stopElapsedTimer();
 
-    // AX 不可見 App 的剪貼簿後備：延遲等按鍵完全放開後才模擬 Cmd+C。
-    // 包成 Promise：轉錄若比後備先完成，編輯模式判定前要能 await 它。
-    // AX 到停止時還沒回覆（慢速 App）也保守走後備——等同舊行為，
-    // 避免編輯模式在這種時序下靜默消失
+    // AX 不可见 App 的剪贴簿后备：延迟等按键完全放开后才模拟 Cmd+C。
+    // 包成 Promise：转录若比后备先完成，编辑模式判定前要能 await 它。
+    // AX 到停止时还没回覆（慢速 App）也保守走后备——等同旧行为，
+    // 避免编辑模式在这种时序下静默消失
     if (
       pendingClipboardSelectionCheck ||
       selectionProbeSettledEpoch !== recordingEpoch
@@ -1235,9 +1216,9 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       });
     }
 
-    // 生成 transcriptionId 貫穿整個流程
+    // 生成 transcriptionId 贯穿整个流程
     const transcriptionId = crypto.randomUUID();
-    // 提升到 try 外層，讓 catch 也能存取（AC2: API 錯誤時仍寫入 failed 記錄）
+    // 提升到 try 外层，让 catch 也能存取（AC2: API 错误时仍写入 failed 记录）
     let audioFilePath: string | null = null;
     let recordingDurationMs = 0;
     let peakEnergyLevel = 0;
@@ -1250,7 +1231,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       peakEnergyLevel = stopResult.peakEnergyLevel;
       rmsEnergyLevel = stopResult.rmsEnergyLevel;
 
-      // 錄音檔儲存（不阻斷主流程）
+      // 录音档储存（不阻断主流程）
       try {
         audioFilePath = await invoke<string>("save_recording_file", {
           id: transcriptionId,
@@ -1269,7 +1250,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       const MINIMUM_RECORDING_DURATION_MS = 300;
       if (recordingDurationMs < MINIMUM_RECORDING_DURATION_MS) {
         void invoke("cancel_live_asr").catch(() => {});
-        // 錄音太短 → 寫入 failed 記錄，保留錄音檔
+        // 录音太短 → 写入 failed 记录，保留录音档
         const failedRecord = buildTranscriptionRecord({
           id: transcriptionId,
           rawText: "",
@@ -1314,13 +1295,10 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       const whisperTermList = await vocabularyStore.getTopTermListByWeight(50);
       const hasVocabulary = whisperTermList.length > 0;
 
-      // 優先收斂 live ASR（錄音中已流式推送）；失敗再 fallback 整段 WAV
+      // 优先收敛 live ASR（录音中已流式推送）；失败再 fallback 整段 WAV
       let result: TranscriptionResult;
       try {
         result = await invoke<TranscriptionResult>("finish_live_asr");
-        if (isEmptyTranscription(result.rawText)) {
-          throw new Error("Live ASR returned empty transcript");
-        }
         writeInfoLog(
           `useVoiceFlowStore: finish_live_asr ok (len=${result.rawText?.length ?? 0})`,
         );
@@ -1328,38 +1306,22 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         writeInfoLog(
           `useVoiceFlowStore: finish_live_asr fallback to transcribe_audio: ${extractErrorMessage(liveErr)}`,
         );
-        try {
-          result = await invoke<TranscriptionResult>("transcribe_audio", {
-            appId,
-            accessKey,
-            vocabularyTermList: hasVocabulary ? whisperTermList : null,
-            language: settingsStore.getWhisperLanguageCode(),
-          });
-        } catch (bufferError) {
-          if (!audioFilePath) throw bufferError;
-          writeInfoLog(
-            `useVoiceFlowStore: transcribe_audio fallback to saved WAV: ${extractErrorMessage(bufferError)}`,
-          );
-          result = await invoke<TranscriptionResult>("retranscribe_from_file", {
-            filePath: audioFilePath,
-            appId,
-            accessKey,
-            vocabularyTermList: hasVocabulary ? whisperTermList : null,
-            language: settingsStore.getWhisperLanguageCode(),
-          });
-        }
+        result = await invoke<TranscriptionResult>("transcribe_audio", {
+          appId,
+          accessKey,
+          vocabularyTermList: hasVocabulary ? whisperTermList : null,
+          language: settingsStore.getWhisperLanguageCode(),
+        });
       }
       if (isAborted.value) return;
 
-      // #39：轉譯語言為繁中時，把 Whisper 的簡體輸出轉成繁體（落地前一次到位）
-      result.rawText = applyTranscriptTextTransforms(result.rawText);
-      // 最終結果寫入字幕（partial 可能略短；繁簡轉換後再刷一次）
+      // 最终结果写入字幕（partial 可能略短，再刷一次）
       setLiveTranscript(result.rawText);
 
-      writeInfoLog(`轉錄原文: "${result.rawText}"`);
+      writeInfoLog(`转录原文: "${result.rawText}"`);
 
       if (isEmptyTranscription(result.rawText)) {
-        // 空轉錄 → 寫入 failed 記錄，保留錄音檔
+        // 空转录 → 写入 failed 记录，保留录音档
         const failedRecord = buildTranscriptionRecord({
           id: transcriptionId,
           rawText: result.rawText || "",
@@ -1373,7 +1335,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         });
         void saveTranscriptionRecord(failedRecord);
 
-        // 設定重送狀態（空轉錄：主要重送目標）
+        // 设定重送状态（空转录：主要重送目标）
         if (audioFilePath) {
           lastFailedTranscriptionId.value = transcriptionId;
           lastFailedAudioFilePath.value = audioFilePath;
@@ -1389,7 +1351,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         return;
       }
 
-      // ── 幻覺偵測（純物理信號：語速異常 + 無人聲）──
+      // ── 幻觉侦测（纯物理信号：语速异常 + 无人声）──
       writeInfoLog(
         `useVoiceFlowStore: hallucination detection input: peakEnergy=${peakEnergyLevel.toFixed(4)}, rmsEnergy=${rmsEnergyLevel.toFixed(4)}, nsp=${result.noSpeechProbability.toFixed(3)}, rawText="${result.rawText}", durationMs=${Math.round(recordingDurationMs)}`,
       );
@@ -1407,7 +1369,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       );
 
       if (hallucinationDetectionResult.isHallucination) {
-        // 寫入 failed 記錄
+        // 写入 failed 记录
         const failedRecord = buildTranscriptionRecord({
           id: transcriptionId,
           rawText: result.rawText,
@@ -1421,7 +1383,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         });
         void saveTranscriptionRecord(failedRecord);
 
-        // 設定重送狀態
+        // 设定重送状态
         if (audioFilePath) {
           lastFailedTranscriptionId.value = transcriptionId;
           lastFailedAudioFilePath.value = audioFilePath;
@@ -1437,13 +1399,13 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         return;
       }
 
-      // 剪貼簿後備可能還在等按鍵放開（轉錄比後備快時）：判定模式前先等它完成
+      // 剪贴簿后备可能还在等按键放开（转录比后备快时）：判定模式前先等它完成
       if (pendingSelectionCapture) {
         await pendingSelectionCapture;
         pendingSelectionCapture = null;
       }
 
-      // 編輯模式：語音是指令，選取文字是待處理內容
+      // 编辑模式：语音是指令，选取文字是待处理内容
       if (isEditMode.value && editSourceText.value) {
         await handleEditModeFlow({
           voiceInstruction: result.rawText,
@@ -1488,7 +1450,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
           );
           if (isAborted.value) return;
 
-          // 增強後長度爆炸偵測（含重試機制）
+          // 增强后长度爆炸侦测（含重试机制）
           let retryCount = 0;
           while (
             retryCount < MAX_ENHANCEMENT_RETRY_COUNT &&
@@ -1509,7 +1471,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
             if (isAborted.value) return;
           }
 
-          // 重試後仍異常（長度爆炸）或語意飄走（#43）→ fallback 到 rawText
+          // 重试后仍异常（长度爆炸）或语意飘走（#43）→ fallback 到 rawText
           const finalAnomaly = detectEnhancementAnomaly({
             rawText: result.rawText,
             enhancedText: enhanceResult.text,
@@ -1617,7 +1579,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       }
     } catch (error) {
       if (isAborted.value) return;
-      // AC2: API 錯誤時仍寫入 failed 記錄（如果有 audioFilePath）
+      // AC2: API 错误时仍写入 failed 记录（如果有 audioFilePath）
       if (audioFilePath) {
         const failedRecord = buildTranscriptionRecord({
           id: transcriptionId,
@@ -1632,7 +1594,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         });
         void saveTranscriptionRecord(failedRecord);
 
-        // 設定重送狀態（API 錯誤：暫時性問題，重送有意義）
+        // 设定重送状态（API 错误：暂时性问题，重送有意义）
         lastFailedTranscriptionId.value = transcriptionId;
         lastFailedAudioFilePath.value = audioFilePath;
         lastFailedRecordingDurationMs.value = recordingDurationMs;
@@ -1719,7 +1681,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       );
       captureError(editError, { source: "voice-flow", step: "edit-mode" });
 
-      // 編輯失敗不貼上任何東西（避免語音指令覆蓋選取文字）
+      // 编辑失败不贴上任何东西（避免语音指令覆盖选取文字）
       failRecordingFlow(
         t("voiceFlow.editFailed"),
         `useVoiceFlowStore: edit mode LLM call failed`,
@@ -1780,14 +1742,12 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       );
       if (isAborted.value) return;
 
-      // #39：同主路徑，重送轉錄後也套用簡→繁
-      result.rawText = applyTranscriptTextTransforms(result.rawText);
       setLiveTranscript(result.rawText);
 
-      writeInfoLog(`重送轉錄原文: "${result.rawText}"`);
+      writeInfoLog(`重送转录原文: "${result.rawText}"`);
 
       if (isEmptyTranscription(result.rawText)) {
-        // 重送也失敗 → 不再提供重送
+        // 重送也失败 → 不再提供重送
         transitionTo("error", t("voiceFlow.retryFailed"));
         playSoundIfEnabled("play_error_sound");
         lastFailedAudioFilePath.value = null;
@@ -1795,7 +1755,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         return;
       }
 
-      // ── 重送也需幻覺偵測（使用原始錄音的 energy levels）──
+      // ── 重送也需幻觉侦测（使用原始录音的 energy levels）──
       const retryHallucinationResult = detectHallucination({
         rawText: result.rawText,
         recordingDurationMs,
@@ -1815,7 +1775,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         return;
       }
 
-      // 重送成功 → 進入 AI 整理 → 貼上流程
+      // 重送成功 → 进入 AI 整理 → 贴上流程
       if (
         !settingsStore.isEnhancementThresholdEnabled ||
         result.rawText.length >= settingsStore.enhancementThresholdCharCount
@@ -1842,7 +1802,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
           });
           if (isAborted.value) return;
 
-          // 重送路徑同樣套用守衛（長度爆炸 / 語意飄走 #43）→ fallback 到 rawText
+          // 重送路径同样套用守卫（长度爆炸 / 语意飘走 #43）→ fallback 到 rawText
           const resendAnomaly = detectEnhancementAnomaly({
             rawText: result.rawText,
             enhancedText: enhanceResult.text,
@@ -1885,7 +1845,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
             skipRecordSaving: true,
           });
 
-          // 更新 DB status（UPDATE 而非 INSERT）→ 完成後記錄 API 用量（FK 依賴）
+          // 更新 DB status（UPDATE 而非 INSERT）→ 完成后记录 API 用量（FK 依赖）
           const historyStore = useHistoryStore();
           void historyStore
             .updateTranscriptionOnRetrySuccess({
@@ -2004,14 +1964,14 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
           );
       }
 
-      // 重送成功 → 重置所有重送狀態
+      // 重送成功 → 重置所有重送状态
       lastFailedTranscriptionId.value = null;
       lastFailedAudioFilePath.value = null;
       lastFailedRecordingDurationMs.value = 0;
       isRetryAttempt.value = false;
     } catch (error) {
       if (isAborted.value) return;
-      // 重送也失敗（API 錯誤等）→ 不再提供重送
+      // 重送也失败（API 错误等）→ 不再提供重送
       transitionTo("error", t("voiceFlow.retryFailed"));
       playSoundIfEnabled("play_error_sound");
       lastFailedAudioFilePath.value = null;

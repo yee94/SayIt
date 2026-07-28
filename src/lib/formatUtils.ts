@@ -32,7 +32,7 @@ export function getDisplayText(record: TranscriptionRecord): string {
   return record.processedText ?? record.rawText;
 }
 
-/** 格式化毫秒為人類可讀的長時間格式（如「3 小時 12 分鐘」） */
+/** 格式化毫秒为人类可读的长时间格式（如「3 小时 12 分钟」） */
 export function formatDurationFromMs(ms: number): string {
   const totalMinutes = Math.round(ms / 60000);
   if (totalMinutes < 60) return t("format.minutes", { count: totalMinutes });
@@ -43,7 +43,7 @@ export function formatDurationFromMs(ms: number): string {
     : t("format.hours", { count: hours });
 }
 
-/** 格式化毫秒為短時間格式（如「1:30」或「45 秒」） */
+/** 格式化毫秒为短时间格式（如「1:30」或「45 秒」） */
 export function formatDuration(ms: number): string {
   const seconds = Math.round(ms / 1000);
   if (seconds < 60) return t("format.seconds", { count: seconds });
@@ -52,7 +52,7 @@ export function formatDuration(ms: number): string {
   return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
 }
 
-/** 格式化毫秒為精確時間格式（如「1.2 秒」或「350 ms」） */
+/** 格式化毫秒为精确时间格式（如「1.2 秒」或「350 ms」） */
 export function formatDurationMs(ms: number): string {
   if (ms < 1000) return t("format.milliseconds", { count: Math.round(ms) });
   return t("format.seconds", { count: (ms / 1000).toFixed(1) });

@@ -1,7 +1,7 @@
 import type { DailyUsageTrend } from "../types/transcription";
 
-// 與 DAILY_USAGE_TREND_SQL 的 DATE(..., 'localtime') 對齊：用本地時間組 YYYY-MM-DD，
-// 不可用 toISOString()（UTC 會差一天，造成補零時對不到實際使用日）。
+// 与 DAILY_USAGE_TREND_SQL 的 DATE(..., 'localtime') 对齐：用本地时间组 YYYY-MM-DD，
+// 不可用 toISOString()（UTC 会差一天，造成补零时对不到实际使用日）。
 function toLocalDateKey(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -10,13 +10,13 @@ function toLocalDateKey(date: Date): string {
 }
 
 /**
- * 將「只含有使用記錄日期」的趨勢資料補零成連續區間。
+ * 将「只含有使用记录日期」的趋势资料补零成连续区间。
  *
- * 回傳一個長度為 `days` 的升冪序列（從 days-1 天前到 endDate 當天），
- * 缺席的日期以 count=0 / totalChars=0 補上，確保趨勢圖 X 軸固定顯示完整區間，
- * 避免資料稀疏時出現重複日期標籤與誤導性的斜線內插。
+ * 回传一个长度为 `days` 的升幂序列（从 days-1 天前到 endDate 当天），
+ * 缺席的日期以 count=0 / totalChars=0 补上，确保趋势图 X 轴固定显示完整区间，
+ * 避免资料稀疏时出现重复日期标签与误导性的斜线内插。
  *
- * 完全沒有任何使用記錄時回傳空陣列，讓圖表維持「尚無使用記錄」空狀態。
+ * 完全没有任何使用记录时回传空阵列，让图表维持「尚无使用记录」空状态。
  */
 export function buildDailyUsageSeries(
   rows: DailyUsageTrend[],

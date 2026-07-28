@@ -17,7 +17,7 @@ import { useSettingsStore } from "./stores/useSettingsStore";
 import i18n from "./i18n";
 import "./style.css";
 
-// 停用 WebView 預設右鍵選單（Back / Reload），讓 app 行為更接近原生
+// 停用 WebView 预设右键选单（Back / Reload），让 app 行为更接近原生
 document.addEventListener("contextmenu", (e) => e.preventDefault());
 
 async function bootstrap() {
@@ -37,10 +37,10 @@ async function bootstrap() {
 
   app.use(pinia).use(i18n).use(router);
 
-  // DB 必須在 mount 之前初始化，否則 View 的 onMounted 會因 getDatabase() 拋錯而全部失敗
+  // DB 必须在 mount 之前初始化，否则 View 的 onMounted 会因 getDatabase() 抛错而全部失败
   try {
     await initializeDatabase();
-    // migration 完成：先註冊 ping 回應再廣播，通知 HUD 可安全存取連線池
+    // migration 完成：先注册 ping 回应再广播，通知 HUD 可安全存取连线池
     await listenToEvent(DATABASE_READY_PING, () => {
       void emitEvent(DATABASE_READY);
     });
@@ -73,7 +73,7 @@ async function bootstrap() {
     console.log("[main-window] API Key missing, redirected to settings");
   }
 
-  // 錄音檔自動清理（背景執行，不阻斷啟動）
+  // 录音档自动清理（背景执行，不阻断启动）
   if (settingsStore.isRecordingAutoCleanupEnabled) {
     queueMicrotask(() => {
       void (async () => {
@@ -104,7 +104,7 @@ async function bootstrap() {
     });
   }
 
-  // 更新檢查由 MainApp.vue onMounted 的 autoCheckAndDownload() 處理
+  // 更新检查由 MainApp.vue onMounted 的 autoCheckAndDownload() 处理
   console.log("[main-window] Dashboard initialized");
 }
 

@@ -1,4 +1,4 @@
-# Story 1.5: HUD 狀態顯示與權限引導
+# Story 1.5: HUD 状态显示与权限引导
 
 Status: done
 
@@ -7,116 +7,116 @@ Status: done
 ## Story
 
 As a 使用者,
-I want 在語音輸入過程中看到清晰的狀態回饋，並在首次使用時順利完成權限設定,
-So that 我隨時知道系統在做什麼，且不會因權限問題卡住。
+I want 在语音输入过程中看到清晰的状态回馈，并在首次使用时顺利完成权限设定,
+So that 我随时知道系统在做什么，且不会因权限问题卡住。
 
 ## Acceptance Criteria
 
-1. **錄音狀態 HUD 顯示** — 使用者觸發錄音，useVoiceFlowStore 狀態為 `'recording'`。NotchHud.vue 顯示錄音狀態（紅點脈衝動畫 + 「錄音中...」文字）。HUD 從 idle 展開至錄音狀態的動畫 < 100ms。
+1. **录音状态 HUD 显示** — 使用者触发录音，useVoiceFlowStore 状态为 `'recording'`。NotchHud.vue 显示录音状态（红点脉冲动画 + 「录音中...」文字）。HUD 从 idle 展开至录音状态的动画 < 100ms。
 
-2. **轉錄狀態 HUD 顯示** — 錄音結束開始轉錄，useVoiceFlowStore 狀態為 `'transcribing'`。NotchHud.vue 顯示轉錄狀態（loading spinner + 「轉錄中...」文字）。狀態轉換動畫流暢。
+2. **转录状态 HUD 显示** — 录音结束开始转录，useVoiceFlowStore 状态为 `'transcribing'`。NotchHud.vue 显示转录状态（loading spinner + 「转录中...」文字）。状态转换动画流畅。
 
-3. **成功狀態自動收起** — 轉錄完成，useVoiceFlowStore 狀態為 `'success'`。NotchHud.vue 顯示「已貼上 ✓」。約 0.8~1.2 秒後自動收起回 idle。收起動畫流暢。
+3. **成功状态自动收起** — 转录完成，useVoiceFlowStore 状态为 `'success'`。NotchHud.vue 显示「已贴上 ✓」。约 0.8~1.2 秒后自动收起回 idle。收起动画流畅。
 
-4. **錯誤狀態顯示與自動收起** — API 請求失敗，useVoiceFlowStore 狀態為 `'error'`。NotchHud.vue 顯示人類可讀的錯誤訊息（如「網路連線中斷」「API 請求失敗」）。約 2~3 秒後自動收起回 idle。
+4. **错误状态显示与自动收起** — API 请求失败，useVoiceFlowStore 状态为 `'error'`。NotchHud.vue 显示人类可读的错误讯息（如「网路连线中断」「API 请求失败」）。约 2~3 秒后自动收起回 idle。
 
-5. **macOS Accessibility 權限引導** — macOS 平台首次啟動 App 偵測到尚未取得 Accessibility 權限時，自動開啟 Main Window 顯示引導畫面說明為何需要此權限，提供按鈕開啟系統偏好設定的 Accessibility 面板。使用者授權後可正常使用熱鍵。
+5. **macOS Accessibility 权限引导** — macOS 平台首次启动 App 侦测到尚未取得 Accessibility 权限时，自动开启 Main Window 显示引导画面说明为何需要此权限，提供按钮开启系统偏好设定的 Accessibility 面板。使用者授权后可正常使用热键。
 
-6. **麥克風權限請求與錯誤處理** — 任何平台首次觸發錄音時，系統呼叫 `getUserMedia()` 請求麥克風權限。使用者允許後開始錄音。使用者拒絕後 HUD 顯示錯誤訊息提示需要麥克風權限。
+6. **麦克风权限请求与错误处理** — 任何平台首次触发录音时，系统呼叫 `getUserMedia()` 请求麦克风权限。使用者允许后开始录音。使用者拒绝后 HUD 显示错误讯息提示需要麦克风权限。
 
 ## Tasks / Subtasks
 
-- [x] Task 1: NotchHud.vue 中文化 — 僅修改 template（store 已送中文 message）(AC: #1, #2, #3, #4)
-  - [x] 1.1 **僅改 template**：將 recording 狀態中的硬編碼 `<span>Recording...</span>` 改為 `<span>{{ message }}</span>`（store 已透過 `transitionTo("recording", "錄音中...")` 傳入中文）
-  - [x] 1.2 **僅改 template**：將 transcribing 狀態中的硬編碼 `<span>Transcribing...</span>` 改為 `<span>{{ message }}</span>`（store 已傳入「轉錄中...」）
-  - [x] 1.3 **僅改 template**：將 success 狀態中的硬編碼 `<span>Pasted!</span>` 改為 `<span>{{ message }}</span>`（store 已傳入「已貼上 ✓」）
-  - [x] 1.4 error 狀態已使用 `{{ message }}` — 確認不需變更。**注意：** error 的 message 放在 `notch-right`，與其他狀態文字放在 `notch-left` 不一致，本 Story 不處理此 layout 差異
-  - [x] 1.5 保留各狀態的圖示與動畫（紅點脈衝、spinner、✓ 符號、⚠ 符號）不變
-  - [x] 1.6 驗證 HUD 狀態轉換動畫效能 — 確認 `transition: width 0.35s, height 0.35s` 加上 `animation: notchEnter 0.25s` 的視覺表現流暢
-  - [x] 1.7 **不修改 useVoiceFlowStore** — store 已有中文常數 `RECORDING_MESSAGE`、`TRANSCRIBING_MESSAGE`、`PASTE_SUCCESS_MESSAGE`，且已透過 `transitionTo()` 傳入 `message.value`，App.vue 已透過 `:message="voiceFlowStore.message"` 傳遞至 NotchHud
+- [x] Task 1: NotchHud.vue 中文化 — 仅修改 template（store 已送中文 message）(AC: #1, #2, #3, #4)
+  - [x] 1.1 **仅改 template**：将 recording 状态中的硬编码 `<span>Recording...</span>` 改为 `<span>{{ message }}</span>`（store 已透过 `transitionTo("recording", "录音中...")` 传入中文）
+  - [x] 1.2 **仅改 template**：将 transcribing 状态中的硬编码 `<span>Transcribing...</span>` 改为 `<span>{{ message }}</span>`（store 已传入「转录中...」）
+  - [x] 1.3 **仅改 template**：将 success 状态中的硬编码 `<span>Pasted!</span>` 改为 `<span>{{ message }}</span>`（store 已传入「已贴上 ✓」）
+  - [x] 1.4 error 状态已使用 `{{ message }}` — 确认不需变更。**注意：** error 的 message 放在 `notch-right`，与其他状态文字放在 `notch-left` 不一致，本 Story 不处理此 layout 差异
+  - [x] 1.5 保留各状态的图示与动画（红点脉冲、spinner、✓ 符号、⚠ 符号）不变
+  - [x] 1.6 验证 HUD 状态转换动画效能 — 确认 `transition: width 0.35s, height 0.35s` 加上 `animation: notchEnter 0.25s` 的视觉表现流畅
+  - [x] 1.7 **不修改 useVoiceFlowStore** — store 已有中文常数 `RECORDING_MESSAGE`、`TRANSCRIBING_MESSAGE`、`PASTE_SUCCESS_MESSAGE`，且已透过 `transitionTo()` 传入 `message.value`，App.vue 已透过 `:message="voiceFlowStore.message"` 传递至 NotchHud
 
-- [x] Task 2: 新增 Accessibility 權限檢查 Tauri Command (AC: #5)
-  - [x] 2.1 在 `src-tauri/src/plugins/hotkey_listener.rs` 新增公開函式 `check_accessibility_permission_command`：
-    - `#[tauri::command]` 標記
-    - macOS：呼叫現有的 `check_accessibility_permission()` 返回 `bool`
-    - Windows：直接返回 `true`（Windows 不需 Accessibility 權限）
-  - [x] 2.2 在 `src-tauri/src/plugins/hotkey_listener.rs` 新增公開函式 `open_accessibility_settings`：
-    - `#[tauri::command]` 標記
-    - macOS：執行 `std::process::Command::new("open").arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")`
+- [x] Task 2: 新增 Accessibility 权限检查 Tauri Command (AC: #5)
+  - [x] 2.1 在 `src-tauri/src/plugins/hotkey_listener.rs` 新增公开函式 `check_accessibility_permission_command`：
+    - `#[tauri::command]` 标记
+    - macOS：呼叫现有的 `check_accessibility_permission()` 返回 `bool`
+    - Windows：直接返回 `true`（Windows 不需 Accessibility 权限）
+  - [x] 2.2 在 `src-tauri/src/plugins/hotkey_listener.rs` 新增公开函式 `open_accessibility_settings`：
+    - `#[tauri::command]` 标记
+    - macOS：执行 `std::process::Command::new("open").arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")`
     - Windows：no-op（返回 Ok）
-  - [x] 2.3 在 `src-tauri/src/lib.rs` 的 `invoke_handler` 註冊兩個新 command
-  - [x] 2.4 確保 `plugins/mod.rs` 正確 export 新函式
+  - [x] 2.3 在 `src-tauri/src/lib.rs` 的 `invoke_handler` 注册两个新 command
+  - [x] 2.4 确保 `plugins/mod.rs` 正确 export 新函式
 
-- [x] Task 3: 新增 Accessibility 權限引導元件 (AC: #5)
+- [x] Task 3: 新增 Accessibility 权限引导元件 (AC: #5)
   - [x] 3.1 建立 `src/components/AccessibilityGuide.vue`：
-    - 全螢幕半透明 overlay 容器（Tailwind: `fixed inset-0 z-50 bg-black/50 flex items-center justify-center`）
+    - 全萤幕半透明 overlay 容器（Tailwind: `fixed inset-0 z-50 bg-black/50 flex items-center justify-center`）
     - 居中白色卡片，包含：
-      - 標題：「需要輔助使用權限」
-      - 說明文字：解釋 SayIt 需要 Accessibility 權限以監聽全域快捷鍵
-      - 步驟指引：1) 點擊下方按鈕 → 2) 在系統設定中勾選 SayIt → 3) 返回 App
-      - 主按鈕：「開啟系統設定」→ 呼叫 `invoke('open_accessibility_settings')`
-      - 副按鈕：「稍後設定」→ 關閉 overlay（但熱鍵功能不可用）
+      - 标题：「需要辅助使用权限」
+      - 说明文字：解释 SayIt 需要 Accessibility 权限以监听全域快捷键
+      - 步骤指引：1) 点击下方按钮 → 2) 在系统设定中勾选 SayIt → 3) 返回 App
+      - 主按钮：「开启系统设定」→ 呼叫 `invoke('open_accessibility_settings')`
+      - 副按钮：「稍后设定」→ 关闭 overlay（但热键功能不可用）
     - Props: `visible: boolean`
     - Emits: `close`
-  - [x] 3.2 此元件僅在 macOS 平台顯示（使用 `@tauri-apps/api/core` 的 `type()` 取得平台類型，`navigator.platform` 已 deprecated 不可使用）
+  - [x] 3.2 此元件仅在 macOS 平台显示（使用 `@tauri-apps/api/core` 的 `type()` 取得平台类型，`navigator.platform` 已 deprecated 不可使用）
 
-- [x] Task 4: 整合 Accessibility 權限檢查至 Main Window (AC: #5)
-  - [x] 4.1 **主要機制 — MainApp.vue 啟動時獨立檢查**：
-    - 在 `src/MainApp.vue` 的 `onMounted` 中，使用 `type()` from `@tauri-apps/api/core` 判斷平台為 macOS 時
-    - 呼叫 `invoke('check_accessibility_permission_command')` 檢查權限
-    - 若返回 `false`，設置本地 `ref<boolean>` 狀態 `showAccessibilityGuide = true`
-    - **不在 useVoiceFlowStore 新增任何權限狀態** — Main Window 自行管理，不跨視窗耦合
-  - [x] 4.2 在 `MainApp.vue` template 中掛載 AccessibilityGuide 元件：
+- [x] Task 4: 整合 Accessibility 权限检查至 Main Window (AC: #5)
+  - [x] 4.1 **主要机制 — MainApp.vue 启动时独立检查**：
+    - 在 `src/MainApp.vue` 的 `onMounted` 中，使用 `type()` from `@tauri-apps/api/core` 判断平台为 macOS 时
+    - 呼叫 `invoke('check_accessibility_permission_command')` 检查权限
+    - 若返回 `false`，设置本地 `ref<boolean>` 状态 `showAccessibilityGuide = true`
+    - **不在 useVoiceFlowStore 新增任何权限状态** — Main Window 自行管理，不跨视窗耦合
+  - [x] 4.2 在 `MainApp.vue` template 中挂载 AccessibilityGuide 元件：
     - `<AccessibilityGuide :visible="showAccessibilityGuide" @close="showAccessibilityGuide = false" />`
-    - 放在 template 最外層（overlay 覆蓋整個 Main Window）
-  - [x] 4.3 **Fallback 機制 — 修改 HOTKEY_ERROR listener 開啟 Main Window**：
-    - 在 `useVoiceFlowStore` 的 HOTKEY_ERROR listener 中，**新增** 檢查 `event.payload.error` 欄位
-    - 若 `event.payload.error === 'accessibility_permission'`，使用 `WebviewWindow.getByLabel('main-window')` 取得 Main Window 實例並呼叫 `.show()` + `.setFocus()`
-    - Main Window 開啟後會自行執行 4.1 的檢查邏輯 → 自動顯示引導
+    - 放在 template 最外层（overlay 覆盖整个 Main Window）
+  - [x] 4.3 **Fallback 机制 — 修改 HOTKEY_ERROR listener 开启 Main Window**：
+    - 在 `useVoiceFlowStore` 的 HOTKEY_ERROR listener 中，**新增** 检查 `event.payload.error` 栏位
+    - 若 `event.payload.error === 'accessibility_permission'`，使用 `WebviewWindow.getByLabel('main-window')` 取得 Main Window 实例并呼叫 `.show()` + `.setFocus()`
+    - Main Window 开启后会自行执行 4.1 的检查逻辑 → 自动显示引导
     - **注意 window label**：Main Window 的 label 是 `"main-window"`（非 `"main"`，`"main"` 是 HUD Window）
-  - [x] 4.4 使用者授權後的行為：
-    - AccessibilityGuide 的「開啟系統設定」按鈕 → `invoke('open_accessibility_settings')`
-    - 「稍後設定」按鈕 → 關閉 overlay（熱鍵功能不可用直到下次啟動 App 並授權）
-    - 熱鍵功能在下次 App 重啟後生效（CGEventTap 在 plugin init 時建立，需重啟才能重新建立）
+  - [x] 4.4 使用者授权后的行为：
+    - AccessibilityGuide 的「开启系统设定」按钮 → `invoke('open_accessibility_settings')`
+    - 「稍后设定」按钮 → 关闭 overlay（热键功能不可用直到下次启动 App 并授权）
+    - 热键功能在下次 App 重启后生效（CGEventTap 在 plugin init 时建立，需重启才能重新建立）
 
-- [x] Task 5: 麥克風權限錯誤訊息中文化 (AC: #6)
+- [x] Task 5: 麦克风权限错误讯息中文化 (AC: #6)
   - [x] 5.1 在 `src/lib/errorUtils.ts` 新增 `getMicrophoneErrorMessage(error: unknown): string` helper：
-    - 使用 `error instanceof DOMException` 判斷，依 `error.name` 區分：
-    - `NotAllowedError` → 「需要麥克風權限才能錄音」
-    - `NotFoundError` → 「未偵測到麥克風裝置」
-    - `NotReadableError` → 「麥克風被其他程式佔用」
-    - 其他 DOMException 或非 DOMException → 「麥克風初始化失敗」
-  - [x] 5.2 在 `useVoiceFlowStore.ts` 的 `handleStartRecording()` catch 區塊中：
-    - 將 `extractErrorMessage(error)` 替換為 `getMicrophoneErrorMessage(error)`
-    - 確保 `failRecordingFlow()` 傳入的是中文 user-facing 訊息
-    - log message 仍保留英文技術細節（給開發者看）
-  - [x] 5.3 驗證 HUD 正確顯示中文錯誤訊息
+    - 使用 `error instanceof DOMException` 判断，依 `error.name` 区分：
+    - `NotAllowedError` → 「需要麦克风权限才能录音」
+    - `NotFoundError` → 「未侦测到麦克风装置」
+    - `NotReadableError` → 「麦克风被其他程式占用」
+    - 其他 DOMException 或非 DOMException → 「麦克风初始化失败」
+  - [x] 5.2 在 `useVoiceFlowStore.ts` 的 `handleStartRecording()` catch 区块中：
+    - 将 `extractErrorMessage(error)` 替换为 `getMicrophoneErrorMessage(error)`
+    - 确保 `failRecordingFlow()` 传入的是中文 user-facing 讯息
+    - log message 仍保留英文技术细节（给开发者看）
+  - [x] 5.3 验证 HUD 正确显示中文错误讯息
 
-- [x] Task 6: 整合驗證 (AC: #1-6)
-  - [x] 6.1 `cargo check` 通過 — zero errors（既存 warnings 可接受：objc macro cfg, dead_code）
-  - [x] 6.2 `vue-tsc --noEmit` 通過
-  - [x] 6.3 `pnpm test` 現有測試通過（確認不 break 既有邏輯）
-  - [x] 6.4 手動測試：HUD 錄音狀態 — 紅點脈衝 + 「錄音中...」中文文字
-  - [x] 6.5 手動測試：HUD 轉錄狀態 — spinner + 「轉錄中...」中文文字
-  - [x] 6.6 手動測試：HUD 成功狀態 — 「已貼上 ✓」→ ~1 秒後自動收起
-  - [x] 6.7 手動測試：HUD 錯誤狀態 — 中文錯誤訊息 → ~2 秒後自動收起
-  - [x] 6.8 手動測試：macOS Accessibility 權限引導（deferred to build — 自動測試已覆蓋核心邏輯）
-  - [x] 6.9 手動測試：macOS Accessibility 按鈕開啟系統設定（deferred to build — 自動測試已覆蓋）
-  - [x] 6.10 手動測試：麥克風權限被拒錯誤訊息（deferred to build — 自動測試已覆蓋）
-  - [x] 6.11 手動測試：所有 HUD 動畫流暢、無閃爍
+- [x] Task 6: 整合验证 (AC: #1-6)
+  - [x] 6.1 `cargo check` 通过 — zero errors（既存 warnings 可接受：objc macro cfg, dead_code）
+  - [x] 6.2 `vue-tsc --noEmit` 通过
+  - [x] 6.3 `pnpm test` 现有测试通过（确认不 break 既有逻辑）
+  - [x] 6.4 手动测试：HUD 录音状态 — 红点脉冲 + 「录音中...」中文文字
+  - [x] 6.5 手动测试：HUD 转录状态 — spinner + 「转录中...」中文文字
+  - [x] 6.6 手动测试：HUD 成功状态 — 「已贴上 ✓」→ ~1 秒后自动收起
+  - [x] 6.7 手动测试：HUD 错误状态 — 中文错误讯息 → ~2 秒后自动收起
+  - [x] 6.8 手动测试：macOS Accessibility 权限引导（deferred to build — 自动测试已覆盖核心逻辑）
+  - [x] 6.9 手动测试：macOS Accessibility 按钮开启系统设定（deferred to build — 自动测试已覆盖）
+  - [x] 6.10 手动测试：麦克风权限被拒错误讯息（deferred to build — 自动测试已覆盖）
+  - [x] 6.11 手动测试：所有 HUD 动画流畅、无闪烁
 
 ## Dev Notes
 
-### 架構模式與約束
+### 架构模式与约束
 
-**Brownfield 專案** — 基於 Story 1.1-1.4 繼續擴展。本 Story 不新增核心邏輯，主要是 UI 完善與權限引導。
+**Brownfield 专案** — 基于 Story 1.1-1.4 继续扩展。本 Story 不新增核心逻辑，主要是 UI 完善与权限引导。
 
 **本 Story 的核心工作：**
-1. NotchHud.vue 中文化（**僅改 template** — store 已送中文 message，只需把硬編碼英文換成 `{{ message }}`）
-2. macOS Accessibility 權限引導（Tauri Command + Vue 引導元件，**在 Main Window 顯示，不動 HUD Window**）
-3. 麥克風權限錯誤處理中文化（新增 `getMicrophoneErrorMessage()` helper）
+1. NotchHud.vue 中文化（**仅改 template** — store 已送中文 message，只需把硬编码英文换成 `{{ message }}`）
+2. macOS Accessibility 权限引导（Tauri Command + Vue 引导元件，**在 Main Window 显示，不动 HUD Window**）
+3. 麦克风权限错误处理中文化（新增 `getMicrophoneErrorMessage()` helper）
 
-**依賴方向規則（嚴格遵守）：**
+**依赖方向规则（严格遵守）：**
 ```
 views/ → components/ + stores/ + composables/
 stores/ → lib/
@@ -127,62 +127,62 @@ composables/ → stores/ + lib/
 **禁止：**
 - ❌ views/ 直接呼叫 lib/
 - ❌ Store 中引入 Vue lifecycle hooks（onMounted 等）
-- ❌ 在元件中直接執行 SQL
+- ❌ 在元件中直接执行 SQL
 
-### NotchHud.vue 當前實作分析
+### NotchHud.vue 当前实作分析
 
-**目前 5 態視覺表現（已完成 Visual Redesign）：**
+**目前 5 态视觉表现（已完成 Visual Redesign）：**
 
-| 狀態 | 動畫 | 說明 |
+| 状态 | 动画 | 说明 |
 |------|------|------|
-| recording | 6 根 bar 山丘形排列（中間高兩側低），bin `[9,4,1,2,6,12]` 純反映頻率能量 | 右側 JetBrains Mono 計時器 |
-| transcribing | 5 個空心圓點（transparent bg + border），dotSlide 動畫依序亮起變實心白 | 掃描波浪效果 |
-| success | 圓點匯聚 + SVG ✓ 描繪 + 邊緣綠色 drop-shadow 光暈 | notch 背景保持純黑，無底色 flash |
-| error | 圓點散開 + notch 抖動（±4px） + 右側 ↻ retry | notch 背景保持純黑，無底色 flash |
-| idle | 隱藏（v-if） | — |
+| recording | 6 根 bar 山丘形排列（中间高两侧低），bin `[9,4,1,2,6,12]` 纯反映频率能量 | 右侧 JetBrains Mono 计时器 |
+| transcribing | 5 个空心圆点（transparent bg + border），dotSlide 动画依序亮起变实心白 | 扫描波浪效果 |
+| success | 圆点汇聚 + SVG ✓ 描绘 + 边缘绿色 drop-shadow 光晕 | notch 背景保持纯黑，无底色 flash |
+| error | 圆点散开 + notch 抖动（±4px） + 右侧 ↻ retry | notch 背景保持纯黑，无底色 flash |
+| idle | 隐藏（v-if） | — |
 
-**修改策略：** Visual Redesign 後，HUD 不再顯示文字，僅用視覺動畫表達狀態。Store 的 `message` prop 保留供錯誤訊息使用。
+**修改策略：** Visual Redesign 后，HUD 不再显示文字，仅用视觉动画表达状态。Store 的 `message` prop 保留供错误讯息使用。
 
-**動畫效能：**
-- 進入動畫：`notchEnter` 0.25s cubic-bezier（縮放+透明度）
-- 狀態轉換：width/height/clip-path 各 0.35s cubic-bezier transition
-- Notch 形狀：使用 `clip-path` + SVG path 繪製蘋果 Notch 外觀
-- 統一尺寸：350×42（collapsing 時縮小為 200×32）
-- 波形 bar：bin 順序 `[9,4,1,2,6,12]`（山丘形），純反映頻率能量，無整體音量底線
-- 轉錄圓點：空心→實心（background + border-color 切換），非 opacity
-- 底色 flash：已移除（greenFlash / orangeFlash），success 只保留邊緣 drop-shadow 綠光，error 只保留 shake
+**动画效能：**
+- 进入动画：`notchEnter` 0.25s cubic-bezier（缩放+透明度）
+- 状态转换：width/height/clip-path 各 0.35s cubic-bezier transition
+- Notch 形状：使用 `clip-path` + SVG path 绘制苹果 Notch 外观
+- 统一尺寸：350×42（collapsing 时缩小为 200×32）
+- 波形 bar：bin 顺序 `[9,4,1,2,6,12]`（山丘形），纯反映频率能量，无整体音量底线
+- 转录圆点：空心→实心（background + border-color 切换），非 opacity
+- 底色 flash：已移除（greenFlash / orangeFlash），success 只保留边缘 drop-shadow 绿光，error 只保留 shake
 
-**Auto-hide 計時（已在 store 實作，不需修改）：**
+**Auto-hide 计时（已在 store 实作，不需修改）：**
 ```typescript
 const SUCCESS_DISPLAY_DURATION_MS = 1000;  // 1 秒，符合 AC3「0.8~1.2 秒」
 const ERROR_DISPLAY_DURATION_MS = 2000;    // 2 秒，符合 AC4「2~3 秒」
 ```
 
-### Accessibility 權限現有 Rust 實作
+### Accessibility 权限现有 Rust 实作
 
-**hotkey_listener.rs 中已有的函式（非 Tauri Command，需封裝）：**
+**hotkey_listener.rs 中已有的函式（非 Tauri Command，需封装）：**
 
 ```rust
-// 檢查 Accessibility 權限（macOS only）
+// 检查 Accessibility 权限（macOS only）
 #[cfg(target_os = "macos")]
 fn check_accessibility_permission() -> bool {
     extern "C" { fn AXIsProcessTrusted() -> bool; }
     unsafe { AXIsProcessTrusted() }
 }
 
-// 觸發系統權限對話框（macOS only）
+// 触发系统权限对话框（macOS only）
 fn prompt_accessibility_permission() {
     // AXIsProcessTrustedWithOptions + AXTrustedCheckOptionPrompt
 }
 ```
 
-**plugin init 中的現有流程：**
+**plugin init 中的现有流程：**
 ```rust
-// App 啟動時自動檢查 + prompt
+// App 启动时自动检查 + prompt
 if !check_accessibility_permission() {
     prompt_accessibility_permission();
     std::thread::sleep(Duration::from_secs(1));
-    // 若仍無權限，start_event_tap 會失敗並 emit hotkey:error
+    // 若仍无权限，start_event_tap 会失败并 emit hotkey:error
 }
 ```
 
@@ -195,10 +195,10 @@ if !check_accessibility_permission() {
 ```
 
 **需新增的 Tauri Commands：**
-1. `check_accessibility_permission_command` — 封裝 `check_accessibility_permission()` 為 Tauri Command
+1. `check_accessibility_permission_command` — 封装 `check_accessibility_permission()` 为 Tauri Command
 2. `open_accessibility_settings` — macOS: `open x-apple.systempreferences:...`
 
-**Command 簽名規範（遵循現有模式）：**
+**Command 签名规范（遵循现有模式）：**
 ```rust
 #[tauri::command]
 pub fn check_accessibility_permission_command() -> bool {
@@ -221,73 +221,73 @@ pub fn open_accessibility_settings() -> Result<(), String> {
 }
 ```
 
-**注意：** Tauri Command 泛型 `<R: Runtime>` 在不需要 `AppHandle` 參數時可省略。但若需要 `AppHandle` 則必須加上。本專案現有 commands（`debug_log`、`update_hotkey_config`）均未使用 `<R: Runtime>` 泛型，新 commands 遵循現有模式。（project-context.md 的泛型必須規則與實際程式碼不一致，以實際程式碼為準。）
+**注意：** Tauri Command 泛型 `<R: Runtime>` 在不需要 `AppHandle` 参数时可省略。但若需要 `AppHandle` 则必须加上。本专案现有 commands（`debug_log`、`update_hotkey_config`）均未使用 `<R: Runtime>` 泛型，新 commands 遵循现有模式。（project-context.md 的泛型必须规则与实际程式码不一致，以实际程式码为准。）
 
-### Accessibility 引導架構設計（Code Review 修正版）
+### Accessibility 引导架构设计（Code Review 修正版）
 
-**決策：Main Window 獨立檢查 + HOTKEY_ERROR fallback**
+**决策：Main Window 独立检查 + HOTKEY_ERROR fallback**
 
-設計原則：
-- HUD Window（App.vue）**僅負責狀態顯示**，不做使用者互動（architecture.md 規範）
-- HUD 和 Main Window 的 Pinia store 是**獨立實例**，不共享狀態
-- 因此**不在 useVoiceFlowStore 新增任何權限狀態**，避免跨視窗耦合
+设计原则：
+- HUD Window（App.vue）**仅负责状态显示**，不做使用者互动（architecture.md 规范）
+- HUD 和 Main Window 的 Pinia store 是**独立实例**，不共享状态
+- 因此**不在 useVoiceFlowStore 新增任何权限状态**，避免跨视窗耦合
 
-**主要機制 — Main Window 自行檢查：**
+**主要机制 — Main Window 自行检查：**
 ```
-Main Window 啟動（手動開啟 / Tray 點擊 / HOTKEY_ERROR fallback 觸發）
+Main Window 启动（手动开启 / Tray 点击 / HOTKEY_ERROR fallback 触发）
   ↓
 MainApp.vue onMounted
   ├─ type() === 'macos' ?
   │   ├─ invoke('check_accessibility_permission_command')
-  │   │   ├─ true → 不顯示引導
-  │   │   └─ false → showAccessibilityGuide = true → 顯示 overlay
-  │   └─ 非 macOS → 跳過
-  └─ 繼續正常載入 Sidebar + RouterView
+  │   │   ├─ true → 不显示引导
+  │   │   └─ false → showAccessibilityGuide = true → 显示 overlay
+  │   └─ 非 macOS → 跳过
+  └─ 继续正常载入 Sidebar + RouterView
 ```
 
-**Fallback 機制 — HOTKEY_ERROR 觸發開啟 Main Window：**
+**Fallback 机制 — HOTKEY_ERROR 触发开启 Main Window：**
 ```
 HUD Window（App.vue）
   ↓
 useVoiceFlowStore HOTKEY_ERROR listener
   ├─ event.payload.error === 'accessibility_permission' ?
   │   ├─ YES → WebviewWindow.getByLabel('main-window').show() + setFocus()
-  │   │        （Main Window 開啟後自行執行上方檢查流程）
-  │   └─ NO → 照舊顯示 HUD error 訊息
-  └─ transitionTo('error', event.payload.message) // 照舊
+  │   │        （Main Window 开启后自行执行上方检查流程）
+  │   └─ NO → 照旧显示 HUD error 讯息
+  └─ transitionTo('error', event.payload.message) // 照旧
 ```
 
-**Window Labels 對照（避免混淆）：**
+**Window Labels 对照（避免混淆）：**
 | Label | 用途 | tauri.conf.json |
 |-------|------|----------------|
 | `"main"` | HUD Window（透明 overlay） | windows[0] |
 | `"main-window"` | Main Window（Dashboard） | windows[1] |
 
-**AccessibilityGuide.vue 元件規格：**
+**AccessibilityGuide.vue 元件规格：**
 ```
 <template>
   <div v-if="visible" class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center">
     <div class="bg-white rounded-2xl p-8 max-w-md mx-4 shadow-2xl">
-      <h2>需要輔助使用權限</h2>
-      <p>SayIt 需要「輔助使用」權限來監聽全域快捷鍵。</p>
-      <p>不授予此權限，快捷鍵功能將無法使用。</p>
+      <h2>需要辅助使用权限</h2>
+      <p>SayIt 需要「辅助使用」权限来监听全域快捷键。</p>
+      <p>不授予此权限，快捷键功能将无法使用。</p>
       <ol>
-        <li>點擊下方按鈕開啟系統設定</li>
-        <li>在列表中找到 SayIt 並勾選</li>
-        <li>返回此視窗</li>
+        <li>点击下方按钮开启系统设定</li>
+        <li>在列表中找到 SayIt 并勾选</li>
+        <li>返回此视窗</li>
       </ol>
-      <button @click="openSettings">開啟系統設定</button>
-      <button @click="$emit('close')">稍後設定</button>
+      <button @click="openSettings">开启系统设定</button>
+      <button @click="$emit('close')">稍后设定</button>
     </div>
   </div>
 </template>
 ```
 
-**使用者授權後限制：** 授權後需重啟 App 才能使用熱鍵（CGEventTap 在 plugin init 時建立，非動態重建）。
+**使用者授权后限制：** 授权后需重启 App 才能使用热键（CGEventTap 在 plugin init 时建立，非动态重建）。
 
-### 麥克風權限錯誤處理
+### 麦克风权限错误处理
 
-**現有 Store 錯誤處理（useVoiceFlowStore.ts handleStartRecording）：**
+**现有 Store 错误处理（useVoiceFlowStore.ts handleStartRecording）：**
 ```typescript
 try {
   await initializeMicrophone();
@@ -298,120 +298,120 @@ try {
 }
 ```
 
-**需改進：** 目前 `errorMessage` 直接使用 JavaScript 原生錯誤訊息（英文）。需要根據錯誤類型映射為中文：
+**需改进：** 目前 `errorMessage` 直接使用 JavaScript 原生错误讯息（英文）。需要根据错误类型映射为中文：
 
 ```typescript
 function getMicrophoneErrorMessage(error: unknown): string {
   if (error instanceof DOMException) {
     switch (error.name) {
       case "NotAllowedError":
-        return "需要麥克風權限才能錄音";
+        return "需要麦克风权限才能录音";
       case "NotFoundError":
-        return "未偵測到麥克風裝置";
+        return "未侦测到麦克风装置";
       case "NotReadableError":
-        return "麥克風被其他程式佔用";
+        return "麦克风被其他程式占用";
       default:
-        return "麥克風初始化失敗";
+        return "麦克风初始化失败";
     }
   }
-  return "麥克風初始化失敗";
+  return "麦克风初始化失败";
 }
 ```
 
-### 前一個 Story (1.4) 關鍵學習
+### 前一个 Story (1.4) 关键学习
 
-- **useVoiceFlowStore 是 HUD 核心引擎** — 所有狀態管理和 HUD 視窗控制都在此 store
-- **transitionTo() 已整合 showHud/hideHud** — 每次狀態變更自動管理 HUD 視窗
-- **Race condition 防護** — `isRecording` 作為流程鎖已建立
-- **錯誤處理模式已確立** — `err instanceof Error ? err.message : String(err)`
-- **getCurrentWindow() 改為 lazy 初始化** — Code Review 修復：`getAppWindow()` helper function
-- **showHud/hideHud 錯誤改為 `.catch(writeErrorLog)`** — 不再靜默吞掉錯誤
+- **useVoiceFlowStore 是 HUD 核心引擎** — 所有状态管理和 HUD 视窗控制都在此 store
+- **transitionTo() 已整合 showHud/hideHud** — 每次状态变更自动管理 HUD 视窗
+- **Race condition 防护** — `isRecording` 作为流程锁已建立
+- **错误处理模式已确立** — `err instanceof Error ? err.message : String(err)`
+- **getCurrentWindow() 改为 lazy 初始化** — Code Review 修复：`getAppWindow()` helper function
+- **showHud/hideHud 错误改为 `.catch(writeErrorLog)`** — 不再静默吞掉错误
 - **Pinia store 不可用 Vue lifecycle hooks** — 使用 `initialize()`/`cleanup()` 模式
-- **cargo check 有既存 warnings** — objc macro cfg, dead_code — 不影響功能
+- **cargo check 有既存 warnings** — objc macro cfg, dead_code — 不影响功能
 
-### Git 歷史分析
+### Git 历史分析
 
 **最近 commit 模式：**
-- `feat:` 功能實作（Story 1.1-1.4）
-- `fix:` code review 修復
+- `feat:` 功能实作（Story 1.1-1.4）
+- `fix:` code review 修复
 - Conventional Commits 格式
 
-**最近改動的關鍵檔案（與本 Story 直接相關）：**
-- `src/components/NotchHud.vue` — Story 1.1 建立，包含 Notch 形狀 + 5 態動畫
-- `src/stores/useVoiceFlowStore.ts` — Story 1.4 擴展為完整流程引擎
+**最近改动的关键档案（与本 Story 直接相关）：**
+- `src/components/NotchHud.vue` — Story 1.1 建立，包含 Notch 形状 + 5 态动画
+- `src/stores/useVoiceFlowStore.ts` — Story 1.4 扩展为完整流程引擎
 - `src/App.vue` — Story 1.4 改用 useVoiceFlowStore
-- `src-tauri/src/plugins/hotkey_listener.rs` — Story 1.2 建立 OS-native 熱鍵 + Accessibility 檢查
-- `src-tauri/src/lib.rs` — Story 1.3 擴展 Tray + commands
+- `src-tauri/src/plugins/hotkey_listener.rs` — Story 1.2 建立 OS-native 热键 + Accessibility 检查
+- `src-tauri/src/lib.rs` — Story 1.3 扩展 Tray + commands
 
-### 技術版本確認（2026-03-02）
+### 技术版本确认（2026-03-02）
 
-| 技術 | 版本 | 備註 |
+| 技术 | 版本 | 备注 |
 |------|------|------|
 | Tauri | v2.10.x | `invoke()`, `getCurrentWindow()`, `WebviewWindow` |
 | Vue 3 | 3.5.29 | Composition API, `<script setup>` |
-| Tailwind CSS | 4.2.1 | `@import "tailwindcss"` 語法 |
+| Tailwind CSS | 4.2.1 | `@import "tailwindcss"` 语法 |
 | Pinia | 3.x | `defineStore("voice-flow", () => { ... })` |
 | macOS Accessibility | AXIsProcessTrusted | Core Foundation API |
 | MediaRecorder | Web Standard | getUserMedia + NotAllowedError |
 
-### 不需要的 Cargo/NPM 依賴變更
+### 不需要的 Cargo/NPM 依赖变更
 
-本 Story **不需要安裝任何新依賴**。所有需要的技術已在 Story 1.1-1.4 安裝完畢。
+本 Story **不需要安装任何新依赖**。所有需要的技术已在 Story 1.1-1.4 安装完毕。
 
-### 現有檔案改動點
+### 现有档案改动点
 
-**修改檔案：**
+**修改档案：**
 ```
-src/components/NotchHud.vue             — 硬編碼英文文字改為 {{ message }}（僅改 template 3 處）
-src/stores/useVoiceFlowStore.ts         — HOTKEY_ERROR listener 新增 accessibility_permission 偵測 + 開啟 Main Window
-src/MainApp.vue                          — onMounted 新增 Accessibility 權限檢查 + AccessibilityGuide 掛載
+src/components/NotchHud.vue             — 硬编码英文文字改为 {{ message }}（仅改 template 3 处）
+src/stores/useVoiceFlowStore.ts         — HOTKEY_ERROR listener 新增 accessibility_permission 侦测 + 开启 Main Window
+src/MainApp.vue                          — onMounted 新增 Accessibility 权限检查 + AccessibilityGuide 挂载
 src/lib/errorUtils.ts                    — 新增 getMicrophoneErrorMessage() helper
 src-tauri/src/plugins/hotkey_listener.rs — 新增 check/open Tauri Commands（pub fn）
-src-tauri/src/lib.rs                     — invoke_handler 註冊兩個新 command
+src-tauri/src/lib.rs                     — invoke_handler 注册两个新 command
 ```
 
-**新增檔案：**
+**新增档案：**
 ```
-src/components/AccessibilityGuide.vue — macOS Accessibility 權限引導元件
+src/components/AccessibilityGuide.vue — macOS Accessibility 权限引导元件
 ```
 
-**不修改的檔案（明確排除）：**
-- `src/App.vue` — HUD Window 入口不變（權限引導在 Main Window 處理，不在 HUD）
-- `src/lib/recorder.ts` — 錄音 API 不變
-- `src/lib/transcriber.ts` — 轉錄 API 不變
-- `src-tauri/src/plugins/clipboard_paste.rs` — 貼上邏輯不變
-- `src-tauri/src/plugins/mod.rs` — 不需額外 export（新 commands 已是 pub fn）
-- `src/composables/useTauriEvents.ts` — 事件工具不變
-- `src/views/*.vue` — Main Window 頁面不變
-- `Cargo.toml` / `package.json` — 不需新增依賴
-- `capabilities/default.json` — 權限不變
+**不修改的档案（明确排除）：**
+- `src/App.vue` — HUD Window 入口不变（权限引导在 Main Window 处理，不在 HUD）
+- `src/lib/recorder.ts` — 录音 API 不变
+- `src/lib/transcriber.ts` — 转录 API 不变
+- `src-tauri/src/plugins/clipboard_paste.rs` — 贴上逻辑不变
+- `src-tauri/src/plugins/mod.rs` — 不需额外 export（新 commands 已是 pub fn）
+- `src/composables/useTauriEvents.ts` — 事件工具不变
+- `src/views/*.vue` — Main Window 页面不变
+- `Cargo.toml` / `package.json` — 不需新增依赖
+- `capabilities/default.json` — 权限不变
 
-### 安全規則提醒
+### 安全规则提醒
 
-- API Key 不在此 Story 涉及，但確保新增的 Tauri Commands 不暴露敏感資訊
-- `check_accessibility_permission_command` 只回傳 boolean，無安全風險
-- `open_accessibility_settings` 只開啟系統設定，無安全風險
+- API Key 不在此 Story 涉及，但确保新增的 Tauri Commands 不暴露敏感资讯
+- `check_accessibility_permission_command` 只回传 boolean，无安全风险
+- `open_accessibility_settings` 只开启系统设定，无安全风险
 
-### 效能注意事項
+### 效能注意事项
 
-- **HUD 動畫不阻塞主流程** — CSS transition + animation 由 GPU 處理
-- **HUD 狀態轉換目標 < 100ms** — 實際由 Tauri Events 驅動（< 10ms），視覺 transition 0.25-0.35s 是動畫時長而非延遲
-- **Accessibility 檢查** — `AXIsProcessTrusted()` 是同步系統呼叫，< 1ms
-- **權限引導不影響正常流程** — 僅在無權限時顯示，有權限時完全跳過
+- **HUD 动画不阻塞主流程** — CSS transition + animation 由 GPU 处理
+- **HUD 状态转换目标 < 100ms** — 实际由 Tauri Events 驱动（< 10ms），视觉 transition 0.25-0.35s 是动画时长而非延迟
+- **Accessibility 检查** — `AXIsProcessTrusted()` 是同步系统呼叫，< 1ms
+- **权限引导不影响正常流程** — 仅在无权限时显示，有权限时完全跳过
 
-### 跨 Story 注意事項
+### 跨 Story 注意事项
 
-- **Story 2.1** 會在 useVoiceFlowStore 中新增 `'enhancing'` 狀態流程，並在 NotchHud.vue 新增 `enhancing` 視覺表現。本 Story 不處理 `enhancing` 狀態的 HUD 顯示（HudStatus 型別已包含 `'enhancing'`，但 NotchHud.vue 目前無對應分支）
-- **Story 5.1** 會建立完整的快捷鍵設定介面。本 Story 只處理 Accessibility 權限引導，不做快捷鍵設定 UI
-- **本 Story 完成後**，Epic 1 的所有 Story (1.1-1.5) 完成，Epic 1 可標記為 `done`
+- **Story 2.1** 会在 useVoiceFlowStore 中新增 `'enhancing'` 状态流程，并在 NotchHud.vue 新增 `enhancing` 视觉表现。本 Story 不处理 `enhancing` 状态的 HUD 显示（HudStatus 型别已包含 `'enhancing'`，但 NotchHud.vue 目前无对应分支）
+- **Story 5.1** 会建立完整的快捷键设定介面。本 Story 只处理 Accessibility 权限引导，不做快捷键设定 UI
+- **本 Story 完成后**，Epic 1 的所有 Story (1.1-1.5) 完成，Epic 1 可标记为 `done`
 
 ### Project Structure Notes
 
-- 新增 `AccessibilityGuide.vue` 放在 `src/components/`（共用 UI 元件目錄）
-- 新增 Tauri Commands 放在 `hotkey_listener.rs`（同一 plugin 模組內，職責內聚），通過 `lib.rs` invoke_handler 註冊（遵循現有 `paste_text` 的模式）
-- NotchHud.vue 修改僅在 template — 符合「資料由 store 驅動，元件只負責顯示」的模式
-- AccessibilityGuide 整合在 `MainApp.vue`（非 App.vue）— 遵循「HUD 不做互動」的架構規則
-- `getMicrophoneErrorMessage()` 放在 `errorUtils.ts`（與現有 `extractErrorMessage` 同檔，職責內聚）
+- 新增 `AccessibilityGuide.vue` 放在 `src/components/`（共用 UI 元件目录）
+- 新增 Tauri Commands 放在 `hotkey_listener.rs`（同一 plugin 模组内，职责内聚），通过 `lib.rs` invoke_handler 注册（遵循现有 `paste_text` 的模式）
+- NotchHud.vue 修改仅在 template — 符合「资料由 store 驱动，元件只负责显示」的模式
+- AccessibilityGuide 整合在 `MainApp.vue`（非 App.vue）— 遵循「HUD 不做互动」的架构规则
+- `getMicrophoneErrorMessage()` 放在 `errorUtils.ts`（与现有 `extractErrorMessage` 同档，职责内聚）
 
 ### References
 
@@ -419,13 +419,13 @@ src/components/AccessibilityGuide.vue — macOS Accessibility 權限引導元件
 - [Source: _bmad-output/planning-artifacts/architecture.md#Frontend Architecture — NotchHud.vue]
 - [Source: _bmad-output/planning-artifacts/architecture.md#Implementation Patterns — Naming Patterns]
 - [Source: _bmad-output/planning-artifacts/architecture.md#Project Structure & Boundaries — Component Boundaries]
-- [Source: _bmad-output/planning-artifacts/prd.md#狀態回饋 HUD FR26-FR28, FR35-FR36]
-- [Source: _bmad-output/implementation-artifacts/1-4-voice-record-transcribe-paste.md — Dev Notes, 遷移策略]
+- [Source: _bmad-output/planning-artifacts/prd.md#状态回馈 HUD FR26-FR28, FR35-FR36]
+- [Source: _bmad-output/implementation-artifacts/1-4-voice-record-transcribe-paste.md — Dev Notes, 迁移策略]
 - [Source: _bmad-output/project-context.md — Critical Implementation Rules, Framework-Specific Rules]
-- [Source: Codebase — src/components/NotchHud.vue（中文化目標）]
-- [Source: Codebase — src/stores/useVoiceFlowStore.ts（權限狀態擴展）]
-- [Source: Codebase — src-tauri/src/plugins/hotkey_listener.rs（Accessibility 權限檢查）]
-- [Source: Codebase — src/lib/recorder.ts（麥克風權限流程）]
+- [Source: Codebase — src/components/NotchHud.vue（中文化目标）]
+- [Source: Codebase — src/stores/useVoiceFlowStore.ts（权限状态扩展）]
+- [Source: Codebase — src-tauri/src/plugins/hotkey_listener.rs（Accessibility 权限检查）]
+- [Source: Codebase — src/lib/recorder.ts（麦克风权限流程）]
 - [Source: Codebase — src/App.vue（HUD Window 入口）]
 
 ## Dev Agent Record
@@ -436,27 +436,27 @@ GPT-5 Codex (CLI)
 
 ### Debug Log References
 
-- 2026-03-02 13:28 紅燈測試：`pnpm test -- tests/component/NotchHud.test.ts tests/unit/error-utils.test.ts tests/unit/use-voice-flow-store.test.ts`（預期失敗）
-- 2026-03-02 13:29 綠燈測試：同指令通過，`Tests 58 passed`
-- 2026-03-02 13:29 `cd src-tauri && cargo check` 通過
-- 2026-03-02 13:29 `pnpm exec vue-tsc --noEmit` 通過
-- 2026-03-02 13:29 `pnpm test` 通過，`Tests 58 passed`
+- 2026-03-02 13:28 红灯测试：`pnpm test -- tests/component/NotchHud.test.ts tests/unit/error-utils.test.ts tests/unit/use-voice-flow-store.test.ts`（预期失败）
+- 2026-03-02 13:29 绿灯测试：同指令通过，`Tests 58 passed`
+- 2026-03-02 13:29 `cd src-tauri && cargo check` 通过
+- 2026-03-02 13:29 `pnpm exec vue-tsc --noEmit` 通过
+- 2026-03-02 13:29 `pnpm test` 通过，`Tests 58 passed`
 
 ### Completion Notes List
 
-- ✅ 完成 NotchHud template 中文化（recording/transcribing/success 皆改為 `{{ message }}`）
+- ✅ 完成 NotchHud template 中文化（recording/transcribing/success 皆改为 `{{ message }}`）
 - ✅ 完成 Rust Accessibility commands：`check_accessibility_permission_command`、`open_accessibility_settings`
-- ✅ 完成 Main Window 權限引導元件 `AccessibilityGuide.vue` 與 `MainApp.vue` 掛載流程
-- ✅ 完成 HOTKEY_ERROR fallback：偵測 `accessibility_permission` 後開啟並聚焦 `main-window`
-- ✅ 完成麥克風錯誤中文化 helper 並整合至 `handleStartRecording()`，保留英文技術 log
-- ✅ 新增/更新測試：NotchHud 文案、麥克風錯誤映射、accessibility fallback
-- ✅ 手動驗證通過（dev 模式）：Task 6.4 ~ 6.7, 6.11（HUD 狀態顯示、動畫流暢）
-- ⚠️ 待 build 後驗證：Task 6.8 ~ 6.10（macOS 權限引導流程，dev 模式下終端機已有權限無法觸發）
-- ✅ [Code Review] 新增 `getTranscriptionErrorMessage()` 完整中文化轉錄錯誤路徑（AC #4）
-- ✅ [Code Review] MainApp.vue 加 `navigator.userAgent` macOS 平台檢查，避免非 macOS 浪費 IPC
-- ✅ [Code Review] NotchHud.vue `v-if` → `v-else-if` 鏈
-- ✅ [Code Review] AccessibilityGuide.vue 加 `role="dialog"` `aria-modal` focus trap Escape 鍵
-- ✅ [Code Review] 補 `src/types/events.ts` 至 File List、新增 AccessibilityGuide 測試、補 DOMException default 測試
+- ✅ 完成 Main Window 权限引导元件 `AccessibilityGuide.vue` 与 `MainApp.vue` 挂载流程
+- ✅ 完成 HOTKEY_ERROR fallback：侦测 `accessibility_permission` 后开启并聚焦 `main-window`
+- ✅ 完成麦克风错误中文化 helper 并整合至 `handleStartRecording()`，保留英文技术 log
+- ✅ 新增/更新测试：NotchHud 文案、麦克风错误映射、accessibility fallback
+- ✅ 手动验证通过（dev 模式）：Task 6.4 ~ 6.7, 6.11（HUD 状态显示、动画流畅）
+- ⚠️ 待 build 后验证：Task 6.8 ~ 6.10（macOS 权限引导流程，dev 模式下终端机已有权限无法触发）
+- ✅ [Code Review] 新增 `getTranscriptionErrorMessage()` 完整中文化转录错误路径（AC #4）
+- ✅ [Code Review] MainApp.vue 加 `navigator.userAgent` macOS 平台检查，避免非 macOS 浪费 IPC
+- ✅ [Code Review] NotchHud.vue `v-if` → `v-else-if` 链
+- ✅ [Code Review] AccessibilityGuide.vue 加 `role="dialog"` `aria-modal` focus trap Escape 键
+- ✅ [Code Review] 补 `src/types/events.ts` 至 File List、新增 AccessibilityGuide 测试、补 DOMException default 测试
 - ✅ [Code Review] Tests 58 → 72 passed
 
 ### File List
@@ -478,6 +478,6 @@ GPT-5 Codex (CLI)
 
 ### Change Log
 
-- 2026-03-02: 完成 Story 1.5 程式實作與自動化驗證（Task 1~5、Task 6.1~6.3），狀態維持 `in-progress`，待執行手動驗證 6.4~6.11。
-- 2026-03-02: Code Review 修復 — 轉錄錯誤中文化（getTranscriptionErrorMessage）、MainApp 加 macOS 平台檢查、NotchHud v-else-if 鏈、AccessibilityGuide aria-modal + focus trap、補測試。Tests 72 passed。
-- 2026-03-03: 手動驗證通過（dev 模式）：HUD 錄音/轉錄/成功/錯誤狀態顯示正常、動畫流暢。權限引導（6.8~6.10）需 build 後測試（dev 模式下權限授予對象為終端機，非 App bundle）。
+- 2026-03-02: 完成 Story 1.5 程式实作与自动化验证（Task 1~5、Task 6.1~6.3），状态维持 `in-progress`，待执行手动验证 6.4~6.11。
+- 2026-03-02: Code Review 修复 — 转录错误中文化（getTranscriptionErrorMessage）、MainApp 加 macOS 平台检查、NotchHud v-else-if 链、AccessibilityGuide aria-modal + focus trap、补测试。Tests 72 passed。
+- 2026-03-03: 手动验证通过（dev 模式）：HUD 录音/转录/成功/错误状态显示正常、动画流畅。权限引导（6.8~6.10）需 build 后测试（dev 模式下权限授予对象为终端机，非 App bundle）。

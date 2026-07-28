@@ -1,5 +1,5 @@
-// objc 0.2 的 sel_impl 巨集展開後產生 #[cfg(feature = "cargo-clippy")]，
-// 新版 rustc 視為 unexpected_cfg；函式級 allow 對巨集展開後的 cfg 屬性不夠用，改用 crate 級
+// objc 0.2 的 sel_impl 巨集展开后产生 #[cfg(feature = "cargo-clippy")]，
+// 新版 rustc 视为 unexpected_cfg；函式级 allow 对巨集展开后的 cfg 属性不够用，改用 crate 级
 #![allow(unexpected_cfgs)]
 
 #[cfg(target_os = "macos")]
@@ -16,26 +16,26 @@ use tauri::{
     AppHandle, Manager, Runtime,
 };
 
-/// App 重啟旗標：由 `request_app_restart` command 設定，
-/// `RunEvent::Exit` handler 在 `_exit(0)` 前檢查並 spawn 新 process。
+/// App 重启旗标：由 `request_app_restart` command 设定，
+/// `RunEvent::Exit` handler 在 `_exit(0)` 前检查并 spawn 新 process。
 static RESTART_REQUESTED: AtomicBool = AtomicBool::new(false);
 
-/// 設定 macOS 視窗為瀏海覆蓋層級（與 BoringNotch 相同）
+/// 设定 macOS 视窗为浏海覆盖层级（与 BoringNotch 相同）
 #[cfg(target_os = "macos")]
 fn configure_macos_notch_window(window: &tauri::WebviewWindow) {
     match window.ns_window() {
         Ok(ns_ptr) => {
             let ns_win = ns_ptr as *mut objc::runtime::Object;
             unsafe {
-                // 視窗層級: NSMainMenuWindowLevel(24) + 3 = 27
+                // 视窗层级: NSMainMenuWindowLevel(24) + 3 = 27
                 let _: () = objc::msg_send![ns_win, setLevel: 27_i64];
 
-                // collectionBehavior: 出現在所有桌面、桌面切換時不移動
+                // collectionBehavior: 出现在所有桌面、桌面切换时不移动
                 // canJoinAllSpaces(1) | stationary(16) | ignoresCycle(64) | fullScreenAuxiliary(256)
                 let behavior: u64 = 1 | 16 | 64 | 256;
                 let _: () = objc::msg_send![ns_win, setCollectionBehavior: behavior];
 
-                // 防止視窗被拖動
+                // 防止视窗被拖动
                 let _: () = objc::msg_send![ns_win, setMovable: false];
             }
             println!("[macos] Notch window configured: level=27");
@@ -46,7 +46,7 @@ fn configure_macos_notch_window(window: &tauri::WebviewWindow) {
     }
 }
 
-/// 設定 Windows 視窗為工作列覆蓋層級（對應 macOS 的 setLevel:27）
+/// 设定 Windows 视窗为工作列覆盖层级（对应 macOS 的 setLevel:27）
 #[cfg(target_os = "windows")]
 fn configure_windows_topmost_window(window: &tauri::WebviewWindow) {
     use windows::Win32::UI::WindowsAndMessaging::{
@@ -57,14 +57,14 @@ fn configure_windows_topmost_window(window: &tauri::WebviewWindow) {
 
     match window.hwnd() {
         Ok(hwnd) => unsafe {
-            // 讀取現有 extended style，加入 TOOLWINDOW + NOACTIVATE
+            // 读取现有 extended style，加入 TOOLWINDOW + NOACTIVATE
             let ex_style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
             let new_ex_style = WINDOW_EX_STYLE(ex_style as u32)
-                | WS_EX_TOOLWINDOW    // 不出現在 Alt+Tab / taskbar，出現在所有虛擬桌面
-                | WS_EX_NOACTIVATE; // 點擊不搶焦點
+                | WS_EX_TOOLWINDOW    // 不出现在 Alt+Tab / taskbar，出现在所有虚拟桌面
+                | WS_EX_NOACTIVATE; // 点击不抢焦点
             SetWindowLongPtrW(hwnd, GWL_EXSTYLE, new_ex_style.0 as isize);
 
-            // HWND_TOPMOST: 視窗永遠在最上層（包括 taskbar 之上）
+            // HWND_TOPMOST: 视窗永远在最上层（包括 taskbar 之上）
             let _ = SetWindowPos(
                 hwnd,
                 Some(HWND_TOPMOST),
@@ -106,17 +106,15 @@ fn update_hotkey_config(
     trigger_mode: plugins::hotkey_listener::TriggerMode,
 ) -> Result<(), String> {
     let state = app.state::<plugins::hotkey_listener::HotkeyListenerState>();
-    println!(
-        "[hotkey-listener] Config updated: key={trigger_key:?}, mode={trigger_mode:?}"
-    );
+    println!("[hotkey-listener] Config updated: key={trigger_key:?}, mode={trigger_mode:?}");
     state.update_config(trigger_key, trigger_mode);
     Ok(())
 }
 
-/// HUD 視窗邏輯寬度（pixels），對應前端 CSS 470px
+/// HUD 视窗逻辑宽度（pixels），对应前端 CSS 470px
 const HUD_WINDOW_WIDTH_LOGICAL: f64 = 470.0;
 
-/// macOS: 取得滑鼠游標座標（logical points，原點在主螢幕左上角）
+/// macOS: 取得滑鼠游标座标（logical points，原点在主萤幕左上角）
 #[cfg(target_os = "macos")]
 fn get_cursor_position() -> (f64, f64) {
     #[repr(C)]
@@ -126,7 +124,7 @@ fn get_cursor_position() -> (f64, f64) {
         y: f64,
     }
 
-    // 不透明 C 型別
+    // 不透明 C 型别
     enum CGEventRef {}
     type CFTypeRef = *const std::ffi::c_void;
 
@@ -136,7 +134,7 @@ fn get_cursor_position() -> (f64, f64) {
         fn CFRelease(cf: CFTypeRef);
     }
 
-    /// Scope guard 確保 CGEvent 物件一定被 CFRelease，即使 panic 也不洩漏
+    /// Scope guard 确保 CGEvent 物件一定被 CFRelease，即使 panic 也不泄漏
     struct CgEventGuard(*const CGEventRef);
     impl Drop for CgEventGuard {
         fn drop(&mut self) {
@@ -160,7 +158,7 @@ fn get_cursor_position() -> (f64, f64) {
     }
 }
 
-/// Windows: 取得滑鼠游標座標（virtual screen 座標）
+/// Windows: 取得滑鼠游标座标（virtual screen 座标）
 #[cfg(target_os = "windows")]
 fn get_cursor_position() -> (f64, f64) {
     use windows::Win32::Foundation::POINT;
@@ -175,11 +173,11 @@ fn get_cursor_position() -> (f64, f64) {
     (point.x as f64, point.y as f64)
 }
 
-/// `get_hud_target_position` 回傳給前端的定位資訊（logical 座標）
+/// `get_hud_target_position` 回传给前端的定位资讯（logical 座标）
 ///
-/// 使用 logical 座標而非 physical，以繞過 tao `set_outer_position` 在
-/// cross-DPI 環境下使用錯誤 scale_factor 轉換的 bug：
-/// tao 用視窗「當前」螢幕的 sf 而非「目標」螢幕的 sf 來除。
+/// 使用 logical 座标而非 physical，以绕过 tao `set_outer_position` 在
+/// cross-DPI 环境下使用错误 scale_factor 转换的 bug：
+/// tao 用视窗「当前」萤幕的 sf 而非「目标」萤幕的 sf 来除。
 #[derive(serde::Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct HudTargetPosition {
@@ -188,29 +186,29 @@ pub struct HudTargetPosition {
     monitor_key: String,
 }
 
-/// 抽象化的螢幕資訊，用於 `find_monitor_for_cursor()` 純函式測試
+/// 抽象化的萤幕资讯，用于 `find_monitor_for_cursor()` 纯函式测试
 #[derive(Clone, Debug)]
 pub struct MonitorInfo {
-    /// 螢幕左上角 physical position x
+    /// 萤幕左上角 physical position x
     pub position_x: i32,
-    /// 螢幕左上角 physical position y
+    /// 萤幕左上角 physical position y
     pub position_y: i32,
-    /// 螢幕 physical width
+    /// 萤幕 physical width
     pub width: u32,
-    /// 螢幕 physical height
+    /// 萤幕 physical height
     pub height: u32,
     /// DPI scale factor
     pub scale_factor: f64,
 }
 
-/// 根據游標座標找到所在螢幕的 index
+/// 根据游标座标找到所在萤幕的 index
 ///
-/// macOS: 游標座標是 logical pixels (points)，需將 monitor physical position
-///        除以各自的 scale_factor 轉為 logical 後比對
-/// Windows: 游標座標與 monitor physical position 在同一座標系統，直接比對
+/// macOS: 游标座标是 logical pixels (points)，需将 monitor physical position
+///        除以各自的 scale_factor 转为 logical 后比对
+/// Windows: 游标座标与 monitor physical position 在同一座标系统，直接比对
 ///
-/// 若無螢幕精確匹配，fallback 到距離游標最近的螢幕（防禦 rounding 間隙）；
-/// 空陣列回傳 None
+/// 若无萤幕精确匹配，fallback 到距离游标最近的萤幕（防御 rounding 间隙）；
+/// 空阵列回传 None
 pub fn find_monitor_for_cursor(
     cursor_x: f64,
     cursor_y: f64,
@@ -246,7 +244,7 @@ pub fn find_monitor_for_cursor(
             return Some(i);
         }
 
-        // 計算游標到螢幕中心的距離（用於 fallback）
+        // 计算游标到萤幕中心的距离（用于 fallback）
         let center_x = (left + right) / 2.0;
         let center_y = (top + bottom) / 2.0;
         let dist_sq = (cursor_x - center_x).powi(2) + (cursor_y - center_y).powi(2);
@@ -255,13 +253,13 @@ pub fn find_monitor_for_cursor(
             closest_idx = i;
         }
     }
-    // fallback: 找距離游標最近的螢幕中心，而非固定 index 0
+    // fallback: 找距离游标最近的萤幕中心，而非固定 index 0
     Some(closest_idx)
 }
 
-/// 計算視窗水平置中位置（像素座標）
-/// 回傳 x 座標（已乘以 scale_factor），用於 PhysicalPosition
-/// 僅供 `setup()` 啟動時定位使用（同螢幕 sf 正確）
+/// 计算视窗水平置中位置（像素座标）
+/// 回传 x 座标（已乘以 scale_factor），用于 PhysicalPosition
+/// 仅供 `setup()` 启动时定位使用（同萤幕 sf 正确）
 pub fn calculate_centered_window_x(
     screen_width_physical: u32,
     scale_factor: f64,
@@ -272,8 +270,8 @@ pub fn calculate_centered_window_x(
     (x_logical * scale_factor) as i32
 }
 
-/// 計算視窗水平置中的 logical x 偏移量
-/// 供多螢幕定位使用，搭配 LogicalPosition 繞過 tao cross-DPI bug
+/// 计算视窗水平置中的 logical x 偏移量
+/// 供多萤幕定位使用，搭配 LogicalPosition 绕过 tao cross-DPI bug
 pub fn calculate_centered_window_x_logical(
     screen_width_physical: u32,
     scale_factor: f64,
@@ -283,17 +281,17 @@ pub fn calculate_centered_window_x_logical(
     (screen_width_logical - window_width_logical) / 2.0
 }
 
-/// 取得 HUD 應定位到的目標螢幕 logical 座標
+/// 取得 HUD 应定位到的目标萤幕 logical 座标
 ///
 /// 流程：
-/// 1. 取得游標座標（macOS: logical points / Windows: virtual screen）
-/// 2. 列舉所有螢幕
-/// 3. 找到游標所在螢幕
-/// 4. 計算該螢幕頂部水平置中的 logical 座標
-/// 5. 回傳 LogicalPosition + monitor key
+/// 1. 取得游标座标（macOS: logical points / Windows: virtual screen）
+/// 2. 列举所有萤幕
+/// 3. 找到游标所在萤幕
+/// 4. 计算该萤幕顶部水平置中的 logical 座标
+/// 5. 回传 LogicalPosition + monitor key
 ///
-/// 使用 logical 座標而非 physical，以繞過 tao `set_outer_position` 在
-/// cross-DPI 環境下用「當前螢幕 sf」而非「目標螢幕 sf」轉換的 bug。
+/// 使用 logical 座标而非 physical，以绕过 tao `set_outer_position` 在
+/// cross-DPI 环境下用「当前萤幕 sf」而非「目标萤幕 sf」转换的 bug。
 #[command]
 fn get_hud_target_position(app: tauri::AppHandle) -> Result<HudTargetPosition, String> {
     let (cursor_x, cursor_y) = get_cursor_position();
@@ -324,11 +322,11 @@ fn get_hud_target_position(app: tauri::AppHandle) -> Result<HudTargetPosition, S
     let matched_monitor = &monitor_infos[idx];
     let sf = matched_monitor.scale_factor;
 
-    // 還原螢幕的 logical origin（macOS: physical / sf = NSScreen points）
+    // 还原萤幕的 logical origin（macOS: physical / sf = NSScreen points）
     let monitor_logical_x = matched_monitor.position_x as f64 / sf;
     let monitor_logical_y = matched_monitor.position_y as f64 / sf;
 
-    // 計算 HUD 在目標螢幕上的 logical 置中偏移
+    // 计算 HUD 在目标萤幕上的 logical 置中偏移
     let centered_x_logical =
         calculate_centered_window_x_logical(matched_monitor.width, sf, HUD_WINDOW_WIDTH_LOGICAL);
 
@@ -459,7 +457,7 @@ pub fn run() {
             plugins::sound_feedback::play_learned_sound
         ])
         .setup(|app| {
-            // gh-56：啟動時套用「隱藏 Dock 圖示」設定（讀取失敗一律視為未啟用，不影響啟動）
+            // gh-56：启动时套用「隐藏 Dock 图示」设定（读取失败一律视为未启用，不影响启动）
             #[cfg(target_os = "macos")]
             {
                 use tauri_plugin_store::StoreExt;
@@ -474,17 +472,17 @@ pub fn run() {
                 }
             }
 
-            // 初始化 keyboard monitor 狀態
+            // 初始化 keyboard monitor 状态
             app.manage(plugins::keyboard_monitor::KeyboardMonitorState::new());
-            // 初始化 audio control 狀態
+            // 初始化 audio control 状态
             app.manage(plugins::audio_control::AudioControlState::new());
-            // 初始化 clipboard focus 狀態（Windows 貼上前恢復焦點）
+            // 初始化 clipboard focus 状态（Windows 贴上前恢复焦点）
             app.manage(plugins::clipboard_paste::FocusState::new());
-            // 初始化 audio recorder 狀態
+            // 初始化 audio recorder 状态
             app.manage(plugins::audio_recorder::AudioRecorderState::new());
-            // 初始化 audio preview 狀態（音量預覽）
+            // 初始化 audio preview 状态（音量预览）
             app.manage(plugins::audio_recorder::AudioPreviewState::new());
-            // 初始化 transcription 狀態（共用 HTTP client）
+            // 初始化 transcription 状态（共用 HTTP client）
             app.manage(plugins::transcription::TranscriptionState::new());
 
             let open_dashboard_item =
@@ -550,40 +548,52 @@ pub fn run() {
                 tauri::RunEvent::Exit => {
                     println!("[app] Exit: starting graceful shutdown...");
 
-                    // 1. 恢復系統音量（避免永久靜音）
-                    if let Some(state) = app_handle.try_state::<plugins::audio_control::AudioControlState>() {
+                    // 1. 恢复系统音量（避免永久静音）
+                    if let Some(state) =
+                        app_handle.try_state::<plugins::audio_control::AudioControlState>()
+                    {
                         state.shutdown();
                     }
-                    // 2. 停止音量預覽（在 cpal 錄音之前，避免兩者同時釋放裝置）
-                    if let Some(state) = app_handle.try_state::<plugins::audio_recorder::AudioPreviewState>() {
+                    // 2. 停止音量预览（在 cpal 录音之前，避免两者同时释放装置）
+                    if let Some(state) =
+                        app_handle.try_state::<plugins::audio_recorder::AudioPreviewState>()
+                    {
                         state.shutdown();
                     }
-                    // 3. 停止 cpal 錄音（join thread, drop AudioUnit）
-                    if let Some(state) = app_handle.try_state::<plugins::audio_recorder::AudioRecorderState>() {
+                    // 3. 停止 cpal 录音（join thread, drop AudioUnit）
+                    if let Some(state) =
+                        app_handle.try_state::<plugins::audio_recorder::AudioRecorderState>()
+                    {
                         state.shutdown();
                     }
                     // 3b. 取消 live ASR WebSocket
-                    if let Some(state) = app_handle.try_state::<plugins::transcription::TranscriptionState>() {
+                    if let Some(state) =
+                        app_handle.try_state::<plugins::transcription::TranscriptionState>()
+                    {
                         state.shutdown();
                     }
                     // 4. 取消 keyboard monitor CGEventTap
-                    if let Some(state) = app_handle.try_state::<plugins::keyboard_monitor::KeyboardMonitorState>() {
+                    if let Some(state) =
+                        app_handle.try_state::<plugins::keyboard_monitor::KeyboardMonitorState>()
+                    {
                         state.shutdown();
                     }
                     // 5. 停止 hotkey listener CGEventTap
-                    if let Some(state) = app_handle.try_state::<plugins::hotkey_listener::HotkeyListenerState>() {
+                    if let Some(state) =
+                        app_handle.try_state::<plugins::hotkey_listener::HotkeyListenerState>()
+                    {
                         state.shutdown();
                     }
                     // 6. 等待背景 thread 完成清理
                     std::thread::sleep(std::time::Duration::from_millis(200));
 
-                    // 7. Flush Sentry 事件佇列（確保 shutdown 前的事件送出）
+                    // 7. Flush Sentry 事件伫列（确保 shutdown 前的事件送出）
                     if let Some(client) = sentry::Hub::current().client() {
                         client.flush(Some(std::time::Duration::from_secs(2)));
                     }
 
-                    // 8. 如果是 restart 請求，在 _exit(0) 前自行 spawn 新 process
-                    //    （因為 _exit(0) 會截殺 Tauri 內建的 restart 邏輯）
+                    // 8. 如果是 restart 请求，在 _exit(0) 前自行 spawn 新 process
+                    //    （因为 _exit(0) 会截杀 Tauri 内建的 restart 逻辑）
                     if RESTART_REQUESTED.load(Ordering::SeqCst) {
                         match std::env::current_exe() {
                             Ok(exe_path) => {
@@ -613,12 +623,12 @@ mod tests {
     use super::*;
 
     // ============================================================
-    // calculate_centered_window_x 測試
+    // calculate_centered_window_x 测试
     // ============================================================
 
     #[test]
     fn test_centered_window_x_standard_1080p() {
-        // 1920px 螢幕、scale_factor=1.0、視窗寬 400px
+        // 1920px 萤幕、scale_factor=1.0、视窗宽 400px
         // 期望 x = (1920 - 400) / 2 = 760
         let x = calculate_centered_window_x(1920, 1.0, 400.0);
         assert_eq!(x, 760);
@@ -635,7 +645,7 @@ mod tests {
 
     #[test]
     fn test_centered_window_x_fractional_scale() {
-        // 150% 縮放: physical=2880, scale=1.5 → logical=1920
+        // 150% 缩放: physical=2880, scale=1.5 → logical=1920
         // x_logical = (1920 - 400) / 2 = 760
         // x_physical = 760 * 1.5 = 1140
         let x = calculate_centered_window_x(2880, 1.5, 400.0);
@@ -644,7 +654,7 @@ mod tests {
 
     #[test]
     fn test_centered_window_x_window_equals_screen() {
-        // 視窗與螢幕同寬時，x 應為 0
+        // 视窗与萤幕同宽时，x 应为 0
         let x = calculate_centered_window_x(400, 1.0, 400.0);
         assert_eq!(x, 0);
     }
@@ -659,7 +669,7 @@ mod tests {
     }
 
     // ============================================================
-    // find_monitor_for_cursor 測試
+    // find_monitor_for_cursor 测试
     // ============================================================
 
     fn make_monitor(px: i32, py: i32, w: u32, h: u32, sf: f64) -> MonitorInfo {
@@ -675,12 +685,12 @@ mod tests {
     #[test]
     fn test_find_monitor_single_monitor() {
         let monitors = vec![make_monitor(0, 0, 1920, 1080, 1.0)];
-        // 游標在螢幕中央
+        // 游标在萤幕中央
         assert_eq!(
             find_monitor_for_cursor(960.0, 540.0, &monitors, false),
             Some(0)
         );
-        // macOS 也一樣（scale 1.0）
+        // macOS 也一样（scale 1.0）
         assert_eq!(
             find_monitor_for_cursor(960.0, 540.0, &monitors, true),
             Some(0)
@@ -689,17 +699,17 @@ mod tests {
 
     #[test]
     fn test_find_monitor_dual_horizontal() {
-        // 雙螢幕水平排列: [0,0 1920x1080] [1920,0 1920x1080]
+        // 双萤幕水平排列: [0,0 1920x1080] [1920,0 1920x1080]
         let monitors = vec![
             make_monitor(0, 0, 1920, 1080, 1.0),
             make_monitor(1920, 0, 1920, 1080, 1.0),
         ];
-        // 游標在右螢幕
+        // 游标在右萤幕
         assert_eq!(
             find_monitor_for_cursor(2000.0, 500.0, &monitors, false),
             Some(1)
         );
-        // 游標在左螢幕
+        // 游标在左萤幕
         assert_eq!(
             find_monitor_for_cursor(100.0, 500.0, &monitors, false),
             Some(0)
@@ -708,17 +718,17 @@ mod tests {
 
     #[test]
     fn test_find_monitor_dual_vertical() {
-        // 副螢幕在上方（y 為負值）
+        // 副萤幕在上方（y 为负值）
         let monitors = vec![
-            make_monitor(0, 0, 1920, 1080, 1.0),     // 主螢幕
-            make_monitor(0, -1080, 1920, 1080, 1.0), // 上方副螢幕
+            make_monitor(0, 0, 1920, 1080, 1.0),     // 主萤幕
+            make_monitor(0, -1080, 1920, 1080, 1.0), // 上方副萤幕
         ];
-        // 游標在上方螢幕
+        // 游标在上方萤幕
         assert_eq!(
             find_monitor_for_cursor(960.0, -500.0, &monitors, false),
             Some(1)
         );
-        // 游標在主螢幕
+        // 游标在主萤幕
         assert_eq!(
             find_monitor_for_cursor(960.0, 500.0, &monitors, false),
             Some(0)
@@ -728,20 +738,20 @@ mod tests {
     #[test]
     fn test_find_monitor_dual_different_dpi_macos() {
         // macOS: Retina 2x (physical 2560x1600) + 外接 1080p 1x (physical 1920x1080)
-        // Tauri monitor position 為 physical pixels，游標座標為 logical points。
+        // Tauri monitor position 为 physical pixels，游标座标为 logical points。
         // Retina: physical (0,0) → logical (0,0), logical size 1280x800
         // 外接: physical (2560,0) → logical (2560,0), logical size 1920x1080
-        // logical 座標存在間隙 (1280~2560)，因兩螢幕 scale factor 不同
+        // logical 座标存在间隙 (1280~2560)，因两萤幕 scale factor 不同
         let monitors = vec![
-            make_monitor(0, 0, 2560, 1600, 2.0),    // Retina 主螢幕
+            make_monitor(0, 0, 2560, 1600, 2.0),    // Retina 主萤幕
             make_monitor(2560, 0, 1920, 1080, 1.0), // 外接 1080p
         ];
-        // 游標在 Retina 主螢幕（logical x=640, y=400）
+        // 游标在 Retina 主萤幕（logical x=640, y=400）
         assert_eq!(
             find_monitor_for_cursor(640.0, 400.0, &monitors, true),
             Some(0)
         );
-        // 游標在外接螢幕（logical x=3000, y=500）
+        // 游标在外接萤幕（logical x=3000, y=500）
         assert_eq!(
             find_monitor_for_cursor(3000.0, 500.0, &monitors, true),
             Some(1)
@@ -754,23 +764,23 @@ mod tests {
             make_monitor(0, 0, 1920, 1080, 1.0),
             make_monitor(1920, 0, 1920, 1080, 1.0),
         ];
-        // 游標恰好在右螢幕左邊界上（x=1920）
+        // 游标恰好在右萤幕左边界上（x=1920）
         assert_eq!(
             find_monitor_for_cursor(1920.0, 500.0, &monitors, false),
             Some(1)
         );
-        // 游標恰好在左螢幕左上角（x=0, y=0）
+        // 游标恰好在左萤幕左上角（x=0, y=0）
         assert_eq!(find_monitor_for_cursor(0.0, 0.0, &monitors, false), Some(0));
     }
 
     #[test]
     fn test_find_monitor_cursor_negative_coords() {
-        // 副螢幕在主螢幕左方（x 為負）
+        // 副萤幕在主萤幕左方（x 为负）
         let monitors = vec![
             make_monitor(0, 0, 1920, 1080, 1.0),
             make_monitor(-1920, 0, 1920, 1080, 1.0),
         ];
-        // 游標在左方副螢幕
+        // 游标在左方副萤幕
         assert_eq!(
             find_monitor_for_cursor(-500.0, 500.0, &monitors, false),
             Some(1)
@@ -779,7 +789,7 @@ mod tests {
 
     #[test]
     fn test_find_monitor_fallback() {
-        // 游標座標不在任何螢幕內 → fallback 到 index 0
+        // 游标座标不在任何萤幕内 → fallback 到 index 0
         let monitors = vec![make_monitor(0, 0, 1920, 1080, 1.0)];
         assert_eq!(
             find_monitor_for_cursor(5000.0, 5000.0, &monitors, false),
@@ -789,7 +799,7 @@ mod tests {
 
     #[test]
     fn test_find_monitor_empty_monitors() {
-        // 空螢幕列表 → None
+        // 空萤幕列表 → None
         let monitors: Vec<MonitorInfo> = vec![];
         assert_eq!(
             find_monitor_for_cursor(960.0, 540.0, &monitors, false),
@@ -798,12 +808,12 @@ mod tests {
     }
 
     // ============================================================
-    // portrait 螢幕 + mixed-DPI 測試
+    // portrait 萤幕 + mixed-DPI 测试
     // ============================================================
 
     #[test]
     fn test_find_monitor_three_screens_with_portrait_macos() {
-        // 三螢幕: 左(1x landscape) + 中(2x Retina) + 右(1x portrait)
+        // 三萤幕: 左(1x landscape) + 中(2x Retina) + 右(1x portrait)
         // macOS: Tauri physical position = NSScreen_origin * 各自 sf
         //
         // 中 Retina: NSScreen origin (0,0), sf=2.0 → physical (0,0), size 2880x1800
@@ -817,22 +827,22 @@ mod tests {
             make_monitor(0, 0, 2880, 1800, 2.0),     // 中 Retina
             make_monitor(1440, 0, 1080, 1920, 1.0),  // 右 portrait
         ];
-        // 游標在左螢幕
+        // 游标在左萤幕
         assert_eq!(
             find_monitor_for_cursor(-960.0, 540.0, &monitors, true),
             Some(0)
         );
-        // 游標在中間 Retina 螢幕
+        // 游标在中间 Retina 萤幕
         assert_eq!(
             find_monitor_for_cursor(720.0, 450.0, &monitors, true),
             Some(1)
         );
-        // 游標在右 portrait 螢幕（中央）
+        // 游标在右 portrait 萤幕（中央）
         assert_eq!(
             find_monitor_for_cursor(1980.0, 960.0, &monitors, true),
             Some(2)
         );
-        // 游標在右 portrait 螢幕下半部（超出 landscape 高度範圍）
+        // 游标在右 portrait 萤幕下半部（超出 landscape 高度范围）
         assert_eq!(
             find_monitor_for_cursor(1500.0, 1500.0, &monitors, true),
             Some(2)
@@ -841,27 +851,27 @@ mod tests {
 
     #[test]
     fn test_find_monitor_portrait_bottom_aligned_macos() {
-        // 中(2x Retina) + 右(1x portrait, 底部對齊)
+        // 中(2x Retina) + 右(1x portrait, 底部对齐)
         // 中 Retina: logical size 1440x900, origin (0,0)
         // 右 portrait: logical size 1080x1920
-        //   底部對齊時: portrait top 在中螢幕 top 上方
+        //   底部对齐时: portrait top 在中萤幕 top 上方
         //   NSScreen origin y = 900 - 1920 = -1020
         //   physical position = (1440 * 1.0, -1020 * 1.0) = (1440, -1020)
         let monitors = vec![
             make_monitor(0, 0, 2880, 1800, 2.0),        // 中 Retina
             make_monitor(1440, -1020, 1080, 1920, 1.0), // 右 portrait
         ];
-        // 游標在右 portrait 上半部（y 為負值）
+        // 游标在右 portrait 上半部（y 为负值）
         assert_eq!(
             find_monitor_for_cursor(1980.0, -500.0, &monitors, true),
             Some(1)
         );
-        // 游標在右 portrait 下半部
+        // 游标在右 portrait 下半部
         assert_eq!(
             find_monitor_for_cursor(1980.0, 800.0, &monitors, true),
             Some(1)
         );
-        // 游標在中 Retina
+        // 游标在中 Retina
         assert_eq!(
             find_monitor_for_cursor(720.0, 450.0, &monitors, true),
             Some(0)
@@ -870,17 +880,17 @@ mod tests {
 
     #[test]
     fn test_find_monitor_closest_fallback() {
-        // 游標落在兩螢幕間的 rounding 間隙 → fallback 到最近螢幕
+        // 游标落在两萤幕间的 rounding 间隙 → fallback 到最近萤幕
         let monitors = vec![
             make_monitor(0, 0, 1920, 1080, 1.0),
-            make_monitor(3840, 0, 1920, 1080, 1.0), // 隔了一段距離
+            make_monitor(3840, 0, 1920, 1080, 1.0), // 隔了一段距离
         ];
-        // 游標在兩螢幕之間但靠近右螢幕
+        // 游标在两萤幕之间但靠近右萤幕
         assert_eq!(
             find_monitor_for_cursor(3500.0, 540.0, &monitors, false),
             Some(1)
         );
-        // 游標在兩螢幕之間但靠近左螢幕
+        // 游标在两萤幕之间但靠近左萤幕
         assert_eq!(
             find_monitor_for_cursor(2000.0, 540.0, &monitors, false),
             Some(0)
@@ -888,12 +898,12 @@ mod tests {
     }
 
     // ============================================================
-    // calculate_centered_window_x_logical 測試
+    // calculate_centered_window_x_logical 测试
     // ============================================================
 
     #[test]
     fn test_centered_window_x_logical_portrait() {
-        // portrait 螢幕: physical width=1080, scale=1.0
+        // portrait 萤幕: physical width=1080, scale=1.0
         // logical width = 1080, 置中偏移 = (1080 - 400) / 2 = 340
         let x = calculate_centered_window_x_logical(1080, 1.0, 400.0);
         assert!((x - 340.0).abs() < 0.001);

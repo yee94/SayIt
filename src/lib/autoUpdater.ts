@@ -10,8 +10,8 @@ export interface UpdateCheckResult {
 let pendingUpdate: Update | null = null;
 
 /**
- * 檢查 App 更新（僅檢查，不下載）。
- * 找到更新時暫存 Update 物件供後續操作。
+ * 检查 App 更新（仅检查，不下载）。
+ * 找到更新时暂存 Update 物件供后续操作。
  */
 export async function checkForAppUpdate(): Promise<UpdateCheckResult> {
   try {
@@ -33,8 +33,8 @@ export async function checkForAppUpdate(): Promise<UpdateCheckResult> {
 }
 
 /**
- * 靜默下載暫存的更新（不安裝、不重啟）。
- * 用於自動更新流程：背景下載完成後再通知使用者。
+ * 静默下载暂存的更新（不安装、不重启）。
+ * 用于自动更新流程：背景下载完成后再通知使用者。
  */
 export async function downloadUpdate(): Promise<void> {
   if (!pendingUpdate) {
@@ -47,8 +47,8 @@ export async function downloadUpdate(): Promise<void> {
 }
 
 /**
- * 安裝已下載的更新並重啟 App。
- * 必須在 downloadUpdate() 完成後呼叫。
+ * 安装已下载的更新并重启 App。
+ * 必须在 downloadUpdate() 完成后呼叫。
  */
 export async function installAndRelaunch(): Promise<void> {
   if (!pendingUpdate) {
@@ -61,7 +61,7 @@ export async function installAndRelaunch(): Promise<void> {
 }
 
 /**
- * 一鍵下載、安裝並重啟（手動更新流程用）。
+ * 一键下载、安装并重启（手动更新流程用）。
  */
 export async function downloadInstallAndRelaunch(): Promise<void> {
   if (!pendingUpdate) {

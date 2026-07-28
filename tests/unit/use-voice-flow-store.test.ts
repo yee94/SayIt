@@ -153,7 +153,7 @@ vi.mock("../../src/lib/enhancer", () => {
 vi.mock("../../src/i18n", () => ({
   default: {
     global: {
-      locale: { value: "zh-TW" },
+      locale: { value: "zh-CN" },
       t: (key: string) => key,
     },
   },
@@ -239,7 +239,7 @@ import { useVoiceFlowStore } from "../../src/stores/useVoiceFlowStore";
 function triggerHotkeyEvent(eventName: string, payload: unknown = undefined) {
   const callback = listenerCallbackMap.get(eventName);
   if (!callback) {
-    throw new Error(`找不到事件監聽器: ${eventName}`);
+    throw new Error(`找不到事件监听器: ${eventName}`);
   }
   callback({ payload });
 }
@@ -283,6 +283,12 @@ function createMockInvokeHandler(options?: {
         );
       case "save_recording_file":
         return "/mock/recordings/test.wav";
+      case "start_live_asr":
+      case "cancel_live_asr":
+        return undefined;
+      // 单元测试默认不走 live ASR 成功路径，强制 fallback 到 batch transcribe_audio
+      case "finish_live_asr":
+        throw new Error("Live ASR not active in test");
       case "transcribe_audio":
         if (options?.transcribeError) throw options.transcribeError;
         if (options?.transcribeResult !== undefined) {
@@ -530,11 +536,11 @@ describe("useVoiceFlowStore", () => {
           deviceName: "",
         });
       });
-      // 錄音開始階段不可有任何按鍵模擬（#25：按鍵還壓著）
+      // 录音开始阶段不可有任何按键模拟（#25：按键还压着）
       expect(mockInvoke).not.toHaveBeenCalledWith("read_selected_text");
 
       triggerHotkeyEvent("hotkey:released");
-      // 後備有 250ms 等按鍵放開的延遲；轉錄先完成時模式判定必須等它
+      // 后备有 250ms 等按键放开的延迟；转录先完成时模式判定必须等它
       await vi.waitFor(
         () => {
           expect(mockEnhanceText).toHaveBeenCalledWith(
@@ -1205,7 +1211,7 @@ describe("useVoiceFlowStore", () => {
     });
 
     // ========================================================================
-    // Story 2.2: Prompt 自訂與上下文注入
+    // Story 2.2: Prompt 自订与上下文注入
     // ========================================================================
 
     it("[P0] AI 整理应传递 systemPrompt 参数", async () => {
@@ -1353,7 +1359,7 @@ describe("useVoiceFlowStore", () => {
   });
 
   // ==========================================================================
-  // 詞彙注入 Whisper (Story 3.2)
+  // 词汇注入 Whisper (Story 3.2)
   // ==========================================================================
 
   describe("词汇注入 Whisper", () => {
@@ -1486,7 +1492,7 @@ describe("useVoiceFlowStore", () => {
         expect(mockEnhanceText).toHaveBeenCalledTimes(1);
       });
 
-      // transcriber 收到詞彙
+      // transcriber 收到词汇
       expect(mockInvoke).toHaveBeenCalledWith("transcribe_audio", {
         appId: "test-app-id",
         accessKey: "test-access-key",
@@ -1494,7 +1500,7 @@ describe("useVoiceFlowStore", () => {
         language: "zh",
       });
 
-      // enhancer 也收到詞彙
+      // enhancer 也收到词汇
       expect(mockEnhanceText).toHaveBeenCalledWith(
         longText,
         "test-llm-key-123",
@@ -1508,7 +1514,7 @@ describe("useVoiceFlowStore", () => {
   });
 
   // ==========================================================================
-  // 貼上後品質監控 (Story 2.3)
+  // 贴上后品质监控 (Story 2.3)
   // ==========================================================================
 
   describe("贴上后品质监控", () => {
@@ -1638,11 +1644,11 @@ describe("useVoiceFlowStore", () => {
       const store = useVoiceFlowStore();
       await store.initialize();
 
-      // 先模擬收到品質監控結果
+      // 先模拟收到品质监控结果
       triggerHotkeyEvent("quality-monitor:result", { wasModified: true });
       expect(store.lastWasModified).toBe(true);
 
-      // 開始新一輪錄音
+      // 开始新一轮录音
       triggerHotkeyEvent("hotkey:pressed");
       await vi.waitFor(() => {
         expect(mockInvoke).toHaveBeenCalledWith("start_recording", {
@@ -1690,7 +1696,7 @@ describe("useVoiceFlowStore", () => {
   });
 
   // ==========================================================================
-  // 轉錄記錄自動儲存 (Story 4.1)
+  // 转录记录自动储存 (Story 4.1)
   // ==========================================================================
 
   describe("转录记录自动储存", () => {
@@ -1852,7 +1858,7 @@ describe("useVoiceFlowStore", () => {
         expect(store.status).toBe("error");
       });
 
-      // AC2: API 錯誤時仍寫入 failed 記錄（audioFilePath 非 null）
+      // AC2: API 错误时仍写入 failed 记录（audioFilePath 非 null）
       expect(mockAddTranscription).toHaveBeenCalledTimes(1);
       const record = mockAddTranscription.mock.calls[0][0];
       expect(record.status).toBe("failed");
@@ -1886,7 +1892,7 @@ describe("useVoiceFlowStore", () => {
         expect(store.status).toBe("error");
       });
 
-      // AC2: 空轉錄仍寫入 failed 記錄
+      // AC2: 空转录仍写入 failed 记录
       expect(mockAddTranscription).toHaveBeenCalledTimes(1);
       const record = mockAddTranscription.mock.calls[0][0];
       expect(record.status).toBe("failed");
@@ -1932,7 +1938,7 @@ describe("useVoiceFlowStore", () => {
   });
 
   // ==========================================================================
-  // API Usage 記錄 (saveApiUsageRecordList)
+  // API Usage 记录 (saveApiUsageRecordList)
   // ==========================================================================
 
   describe("API Usage 记录", () => {
@@ -2074,14 +2080,14 @@ describe("useVoiceFlowStore", () => {
   });
 
   // ==========================================================================
-  // 重送轉錄 (Story 4.5)
+  // 重送转录 (Story 4.5)
   // ==========================================================================
 
   describe("重送转录", () => {
     async function setupFailedTranscription(
       store: ReturnType<typeof useVoiceFlowStore>,
     ) {
-      // 模擬空轉錄結果觸發失敗
+      // 模拟空转录结果触发失败
       mockInvoke.mockImplementation(
         createMockInvokeHandler({
           transcribeResult: {
@@ -2121,7 +2127,7 @@ describe("useVoiceFlowStore", () => {
       await setupFailedTranscription(store);
       expect(store.canRetry).toBe(true);
 
-      // 重新設定 mock 讓重送成功
+      // 重新设定 mock 让重送成功
       mockInvoke.mockImplementation(
         createMockInvokeHandler({
           retranscribeResult: {
@@ -2153,7 +2159,7 @@ describe("useVoiceFlowStore", () => {
       expect(store.status).toBe("success");
       expect(store.canRetry).toBe(false);
 
-      // DB 應被 UPDATE
+      // DB 应被 UPDATE
       await vi.waitFor(() => {
         expect(mockUpdateTranscriptionOnRetrySuccess).toHaveBeenCalledTimes(1);
       });
@@ -2170,7 +2176,7 @@ describe("useVoiceFlowStore", () => {
       await setupFailedTranscription(store);
       expect(store.canRetry).toBe(true);
 
-      // 重送也回傳空白
+      // 重送也回传空白
       mockInvoke.mockImplementation(
         createMockInvokeHandler({
           retranscribeResult: {
@@ -2217,10 +2223,10 @@ describe("useVoiceFlowStore", () => {
       const store = useVoiceFlowStore();
       await store.initialize();
 
-      // idle 狀態
+      // idle 状态
       expect(store.canRetry).toBe(false);
 
-      // recording 狀態
+      // recording 状态
       store.transitionTo("recording");
       expect(store.canRetry).toBe(false);
     });
@@ -2232,16 +2238,16 @@ describe("useVoiceFlowStore", () => {
       await setupFailedTranscription(store);
       expect(store.canRetry).toBe(true);
 
-      // 重新設定 mock 讓新錄音正常
+      // 重新设定 mock 让新录音正常
       mockInvoke.mockImplementation(createMockInvokeHandler());
 
-      // 開始新錄音
+      // 开始新录音
       triggerHotkeyEvent("hotkey:pressed");
       await vi.waitFor(() => {
         expect(store.status).toBe("recording");
       });
 
-      // canRetry 應被重置
+      // canRetry 应被重置
       expect(store.canRetry).toBe(false);
     });
 
@@ -2277,7 +2283,7 @@ describe("useVoiceFlowStore", () => {
       await setupFailedTranscription(store);
       expect(store.canRetry).toBe(true);
 
-      // 重送也拋出錯誤
+      // 重送也抛出错误
       mockInvoke.mockImplementation(
         createMockInvokeHandler({
           retranscribeError: new Error("Groq API error (503)"),
@@ -2367,7 +2373,7 @@ describe("useVoiceFlowStore", () => {
         });
       });
 
-      // 選取偵測後備（250ms）拉長了貼上→success 的時序，改用 waitFor 斷言終態
+      // 选取侦测后备（250ms）拉长了贴上→success 的时序，改用 waitFor 断言终态
       await vi.waitFor(() => {
         expect(store.status).toBe("success");
       });

@@ -1,8 +1,8 @@
-// ── LLM（自訂 OpenAI-compatible）──────────────────────────
+// ── LLM（自订 OpenAI-compatible）──────────────────────────
 
 export const DEFAULT_LLM_MODEL_ID = "gpt-4o-mini";
 
-/** 相容舊 store 型別；現在只有自訂 endpoint 一種模式。 */
+/** 相容旧 store 型别；现在只有自订 endpoint 一种模式。 */
 export type LlmProviderId = "custom";
 export type LlmModelId = string;
 
@@ -13,7 +13,7 @@ export const DEFAULT_LLM_PROVIDER_ID: LlmProviderId = "custom";
 export const DOUBAO_ASR_MODEL_ID = "doubao-seedasr";
 export const DOUBAO_ASR_DISPLAY_NAME = "Doubao SeedASR";
 
-// 舊 Whisper 型別保留最小 stub，避免散落引用立刻炸；不再暴露可選模型。
+// 旧 Whisper 型别保留最小 stub，避免散落引用立刻炸；不再暴露可选模型。
 export type WhisperModelId = typeof DOUBAO_ASR_MODEL_ID;
 export const DEFAULT_WHISPER_MODEL_ID: WhisperModelId = DOUBAO_ASR_MODEL_ID;
 

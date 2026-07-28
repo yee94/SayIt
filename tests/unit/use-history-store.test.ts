@@ -23,7 +23,7 @@ function createTestRecord(
   return {
     id: "test-uuid-001",
     timestamp: 1700000000000,
-    rawText: "測試原始文字",
+    rawText: "测试原始文字",
     processedText: null,
     recordingDurationMs: 2500,
     transcriptionDurationMs: 320,
@@ -76,7 +76,7 @@ describe("useHistoryStore", () => {
   // ==========================================================================
 
   describe("addTranscription", () => {
-    it("[P0] 應執行 SQL INSERT 並將 boolean 轉為 INTEGER", async () => {
+    it("[P0] 应执行 SQL INSERT 并将 boolean 转为 INTEGER", async () => {
       const { useHistoryStore } = await import(
         "../../src/stores/useHistoryStore"
       );
@@ -111,7 +111,7 @@ describe("useHistoryStore", () => {
       ]);
     });
 
-    it("[P0] wasEnhanced=false 應轉為 0", async () => {
+    it("[P0] wasEnhanced=false 应转为 0", async () => {
       const { useHistoryStore } = await import(
         "../../src/stores/useHistoryStore"
       );
@@ -124,7 +124,7 @@ describe("useHistoryStore", () => {
       expect(params[9]).toBe(0);
     });
 
-    it("[P0] wasModified=true 應轉為 1", async () => {
+    it("[P0] wasModified=true 应转为 1", async () => {
       const { useHistoryStore } = await import(
         "../../src/stores/useHistoryStore"
       );
@@ -137,7 +137,7 @@ describe("useHistoryStore", () => {
       expect(params[10]).toBe(1);
     });
 
-    it("[P0] wasModified=false 應轉為 0", async () => {
+    it("[P0] wasModified=false 应转为 0", async () => {
       const { useHistoryStore } = await import(
         "../../src/stores/useHistoryStore"
       );
@@ -150,14 +150,14 @@ describe("useHistoryStore", () => {
       expect(params[10]).toBe(0);
     });
 
-    it("[P0] INSERT 成功後應發送 transcription:completed 事件至 main-window", async () => {
+    it("[P0] INSERT 成功后应发送 transcription:completed 事件至 main-window", async () => {
       const { useHistoryStore } = await import(
         "../../src/stores/useHistoryStore"
       );
       const store = useHistoryStore();
 
       const record = createTestRecord({
-        processedText: "整理後文字",
+        processedText: "整理后文字",
         wasEnhanced: true,
         enhancementDurationMs: 150,
       });
@@ -170,7 +170,7 @@ describe("useHistoryStore", () => {
         {
           id: record.id,
           rawText: record.rawText,
-          processedText: "整理後文字",
+          processedText: "整理后文字",
           recordingDurationMs: record.recordingDurationMs,
           transcriptionDurationMs: record.transcriptionDurationMs,
           enhancementDurationMs: 150,
@@ -180,7 +180,7 @@ describe("useHistoryStore", () => {
       );
     });
 
-    it("[P0] SQL INSERT 失敗應拋出錯誤", async () => {
+    it("[P0] SQL INSERT 失败应抛出错误", async () => {
       mockDbExecute.mockRejectedValueOnce(new Error("SQLITE_CONSTRAINT"));
 
       const { useHistoryStore } = await import(
@@ -200,13 +200,13 @@ describe("useHistoryStore", () => {
   // ==========================================================================
 
   describe("fetchTranscriptionList", () => {
-    it("[P0] 應從 SQLite 載入記錄並映射 snake_case → camelCase", async () => {
+    it("[P0] 应从 SQLite 载入记录并映射 snake_case → camelCase", async () => {
       mockDbSelect.mockResolvedValueOnce([
         {
           id: "uuid-1",
           timestamp: 1700000000000,
           raw_text: "原始文字",
-          processed_text: "整理後文字",
+          processed_text: "整理后文字",
           recording_duration_ms: 2500,
           transcription_duration_ms: 320,
           enhancement_duration_ms: 150,
@@ -229,7 +229,7 @@ describe("useHistoryStore", () => {
       const record = store.transcriptionList[0];
       expect(record.id).toBe("uuid-1");
       expect(record.rawText).toBe("原始文字");
-      expect(record.processedText).toBe("整理後文字");
+      expect(record.processedText).toBe("整理后文字");
       expect(record.recordingDurationMs).toBe(2500);
       expect(record.transcriptionDurationMs).toBe(320);
       expect(record.enhancementDurationMs).toBe(150);
@@ -240,7 +240,7 @@ describe("useHistoryStore", () => {
       expect(record.createdAt).toBe("2026-01-01 00:00:00");
     });
 
-    it("[P0] was_enhanced=0 應映射為 false", async () => {
+    it("[P0] was_enhanced=0 应映射为 false", async () => {
       mockDbSelect.mockResolvedValueOnce([
         {
           id: "uuid-2",
@@ -273,7 +273,7 @@ describe("useHistoryStore", () => {
       expect(record.triggerMode).toBe("toggle");
     });
 
-    it("[P0] SELECT SQL 應包含 ORDER BY timestamp DESC", async () => {
+    it("[P0] SELECT SQL 应包含 ORDER BY timestamp DESC", async () => {
       const { useHistoryStore } = await import(
         "../../src/stores/useHistoryStore"
       );
@@ -285,7 +285,7 @@ describe("useHistoryStore", () => {
       expect(sql).toContain("ORDER BY timestamp DESC");
     });
 
-    it("[P0] 載入中應設定 isLoading 為 true，完成後為 false", async () => {
+    it("[P0] 载入中应设定 isLoading 为 true，完成后为 false", async () => {
       let resolveSelect!: (value: unknown[]) => void;
       mockDbSelect.mockReturnValueOnce(
         new Promise((resolve) => {
@@ -306,7 +306,7 @@ describe("useHistoryStore", () => {
       expect(store.isLoading).toBe(false);
     });
 
-    it("[P0] SELECT 失敗後 isLoading 應回復為 false", async () => {
+    it("[P0] SELECT 失败后 isLoading 应回复为 false", async () => {
       mockDbSelect.mockRejectedValueOnce(new Error("DB error"));
 
       const { useHistoryStore } = await import(
@@ -324,7 +324,7 @@ describe("useHistoryStore", () => {
   // ==========================================================================
 
   describe("updateTranscriptionOnRetrySuccess", () => {
-    it("[P0] 應執行 UPDATE SQL 並將 boolean 轉為 INTEGER", async () => {
+    it("[P0] 应执行 UPDATE SQL 并将 boolean 转为 INTEGER", async () => {
       const { useHistoryStore } = await import(
         "../../src/stores/useHistoryStore"
       );
@@ -333,7 +333,7 @@ describe("useHistoryStore", () => {
       await store.updateTranscriptionOnRetrySuccess({
         id: "test-uuid-001",
         rawText: "重送成功的文字",
-        processedText: "AI 整理後的文字",
+        processedText: "AI 整理后的文字",
         transcriptionDurationMs: 350,
         enhancementDurationMs: 200,
         wasEnhanced: true,
@@ -346,7 +346,7 @@ describe("useHistoryStore", () => {
       expect(sql).toContain("SET status = 'success'");
       expect(params).toEqual([
         "重送成功的文字",
-        "AI 整理後的文字",
+        "AI 整理后的文字",
         350,
         200,
         1, // wasEnhanced: true → 1
@@ -355,7 +355,7 @@ describe("useHistoryStore", () => {
       ]);
     });
 
-    it("[P0] wasEnhanced=false 應轉為 0", async () => {
+    it("[P0] wasEnhanced=false 应转为 0", async () => {
       const { useHistoryStore } = await import(
         "../../src/stores/useHistoryStore"
       );
@@ -375,7 +375,7 @@ describe("useHistoryStore", () => {
       expect(params[4]).toBe(0);
     });
 
-    it("[P0] UPDATE 成功後應發送 transcription:completed 事件至 main-window", async () => {
+    it("[P0] UPDATE 成功后应发送 transcription:completed 事件至 main-window", async () => {
       const { useHistoryStore } = await import(
         "../../src/stores/useHistoryStore"
       );
@@ -384,7 +384,7 @@ describe("useHistoryStore", () => {
       await store.updateTranscriptionOnRetrySuccess({
         id: "test-uuid-003",
         rawText: "重送文字",
-        processedText: "整理後文字",
+        processedText: "整理后文字",
         transcriptionDurationMs: 400,
         enhancementDurationMs: 150,
         wasEnhanced: true,
@@ -398,13 +398,13 @@ describe("useHistoryStore", () => {
         expect.objectContaining({
           id: "test-uuid-003",
           rawText: "重送文字",
-          processedText: "整理後文字",
+          processedText: "整理后文字",
           wasEnhanced: true,
         }),
       );
     });
 
-    it("[P0] SQL UPDATE 失敗應拋出錯誤", async () => {
+    it("[P0] SQL UPDATE 失败应抛出错误", async () => {
       mockDbExecute.mockRejectedValueOnce(new Error("SQLITE_ERROR"));
 
       const { useHistoryStore } = await import(
@@ -415,7 +415,7 @@ describe("useHistoryStore", () => {
       await expect(
         store.updateTranscriptionOnRetrySuccess({
           id: "test-uuid-004",
-          rawText: "測試",
+          rawText: "测试",
           processedText: null,
           transcriptionDurationMs: 200,
           enhancementDurationMs: null,
@@ -431,7 +431,7 @@ describe("useHistoryStore", () => {
   // ==========================================================================
 
   describe("fetchDashboardStats", () => {
-    it("[P0] 無記錄時應回傳零值統計", async () => {
+    it("[P0] 无记录时应回传零值统计", async () => {
       // DASHBOARD_STATS_SQL
       mockDbSelect.mockResolvedValueOnce([
         {
@@ -440,7 +440,7 @@ describe("useHistoryStore", () => {
           total_recording_duration_ms: 0,
         },
       ]);
-      // DAILY_QUOTA_USAGE_SQL — 無當日記錄
+      // DAILY_QUOTA_USAGE_SQL — 无当日记录
       mockDbSelect.mockResolvedValueOnce([]);
 
       const { useHistoryStore } = await import(
@@ -464,7 +464,7 @@ describe("useHistoryStore", () => {
       });
     });
 
-    it("[P0] 應使用 SQL 聚合查詢", async () => {
+    it("[P0] 应使用 SQL 聚合查询", async () => {
       mockDbSelect.mockResolvedValueOnce([
         {
           total_count: 0,
@@ -487,8 +487,8 @@ describe("useHistoryStore", () => {
       expect(sql).toContain("SUM(recording_duration_ms)");
     });
 
-    it("[P0] 應正確計算節省時間和整合每日額度用量", async () => {
-      // 節省時間 = 600 / 40 * 60000 - 120000 = 780000ms
+    it("[P0] 应正确计算节省时间和整合每日额度用量", async () => {
+      // 节省时间 = 600 / 40 * 60000 - 120000 = 780000ms
       mockDbSelect.mockResolvedValueOnce([
         {
           total_count: 10,
@@ -539,7 +539,7 @@ describe("useHistoryStore", () => {
   // ==========================================================================
 
   describe("fetchRecentTranscriptionList", () => {
-    it("[P0] 應使用 LIMIT 查詢最近記錄", async () => {
+    it("[P0] 应使用 LIMIT 查询最近记录", async () => {
       mockDbSelect.mockResolvedValueOnce([]);
 
       const { useHistoryStore } = await import(
@@ -555,7 +555,7 @@ describe("useHistoryStore", () => {
       expect(params).toEqual([10]);
     });
 
-    it("[P0] 應回傳 camelCase 映射後的記錄", async () => {
+    it("[P0] 应回传 camelCase 映射后的记录", async () => {
       mockDbSelect.mockResolvedValueOnce([
         createRawRow({ id: "recent-1", raw_text: "最近的文字" }),
       ]);
@@ -572,7 +572,7 @@ describe("useHistoryStore", () => {
       expect(results[0].rawText).toBe("最近的文字");
     });
 
-    it("[P0] 預設 limit 應為 10", async () => {
+    it("[P0] 预设 limit 应为 10", async () => {
       mockDbSelect.mockResolvedValueOnce([]);
 
       const { useHistoryStore } = await import(
@@ -592,7 +592,7 @@ describe("useHistoryStore", () => {
   // ==========================================================================
 
   describe("refreshDashboard", () => {
-    it("[P0] 應同時載入統計、最近列表和趨勢並更新 refs", async () => {
+    it("[P0] 应同时载入统计、最近列表和趋势并更新 refs", async () => {
       // fetchDashboardStats → DASHBOARD_STATS_SQL
       mockDbSelect.mockResolvedValueOnce([
         {
@@ -615,7 +615,7 @@ describe("useHistoryStore", () => {
         createRawRow({ id: "recent-1" }),
         createRawRow({ id: "recent-2" }),
       ]);
-      // fetchDailyUsageTrend（補零後固定 14 天，命中日對應今天）
+      // fetchDailyUsageTrend（补零后固定 14 天，命中日对应今天）
       const todayKey = (() => {
         const now = new Date();
         const y = now.getFullYear();
@@ -650,7 +650,7 @@ describe("useHistoryStore", () => {
       expect(lastDay.totalChars).toBe(100);
     });
 
-    it("[P0] dashboardStats 初始值應全為零", async () => {
+    it("[P0] dashboardStats 初始值应全为零", async () => {
       const { useHistoryStore } = await import(
         "../../src/stores/useHistoryStore"
       );
@@ -678,7 +678,7 @@ describe("useHistoryStore", () => {
   // ==========================================================================
 
   describe("searchTranscriptionList", () => {
-    it("[P0] 有搜尋關鍵字時應使用 LIKE 查詢", async () => {
+    it("[P0] 有搜寻关键字时应使用 LIKE 查询", async () => {
       mockDbSelect.mockResolvedValueOnce([]);
 
       const { useHistoryStore } = await import(
@@ -686,14 +686,14 @@ describe("useHistoryStore", () => {
       );
       const store = useHistoryStore();
 
-      await store.searchTranscriptionList("測試", 20, 0);
+      await store.searchTranscriptionList("测试", 20, 0);
 
       const [sql, params] = mockDbSelect.mock.calls[0];
       expect(sql).toContain("LIKE");
-      expect(params[0]).toBe("%測試%");
+      expect(params[0]).toBe("%测试%");
     });
 
-    it("[P0] 空白搜尋應使用分頁查詢（無 LIKE）", async () => {
+    it("[P0] 空白搜寻应使用分页查询（无 LIKE）", async () => {
       mockDbSelect.mockResolvedValueOnce([]);
 
       const { useHistoryStore } = await import(
@@ -708,7 +708,7 @@ describe("useHistoryStore", () => {
       expect(params).toEqual([20, 0]);
     });
 
-    it("[P0] 應正確傳遞 limit 和 offset 參數", async () => {
+    it("[P0] 应正确传递 limit 和 offset 参数", async () => {
       mockDbSelect.mockResolvedValueOnce([]);
 
       const { useHistoryStore } = await import(
@@ -716,17 +716,17 @@ describe("useHistoryStore", () => {
       );
       const store = useHistoryStore();
 
-      await store.searchTranscriptionList("關鍵字", 10, 30);
+      await store.searchTranscriptionList("关键字", 10, 30);
 
       const params = mockDbSelect.mock.calls[0][1];
-      expect(params[0]).toBe("%關鍵字%");
+      expect(params[0]).toBe("%关键字%");
       expect(params[1]).toBe(10);
       expect(params[2]).toBe(30);
     });
 
-    it("[P0] 應回傳 camelCase 映射後的記錄", async () => {
+    it("[P0] 应回传 camelCase 映射后的记录", async () => {
       mockDbSelect.mockResolvedValueOnce([
-        createRawRow({ id: "found-1", raw_text: "搜尋到的文字" }),
+        createRawRow({ id: "found-1", raw_text: "搜寻到的文字" }),
       ]);
 
       const { useHistoryStore } = await import(
@@ -734,11 +734,11 @@ describe("useHistoryStore", () => {
       );
       const store = useHistoryStore();
 
-      const results = await store.searchTranscriptionList("搜尋", 20, 0);
+      const results = await store.searchTranscriptionList("搜寻", 20, 0);
 
       expect(results).toHaveLength(1);
       expect(results[0].id).toBe("found-1");
-      expect(results[0].rawText).toBe("搜尋到的文字");
+      expect(results[0].rawText).toBe("搜寻到的文字");
     });
   });
 
@@ -747,7 +747,7 @@ describe("useHistoryStore", () => {
   // ==========================================================================
 
   describe("resetAndFetch", () => {
-    it("[P0] 應重設 offset 並載入第一頁", async () => {
+    it("[P0] 应重设 offset 并载入第一页", async () => {
       const page = Array.from({ length: 5 }, (_, i) =>
         createRawRow({ id: `row-${i}` }),
       );
@@ -765,7 +765,7 @@ describe("useHistoryStore", () => {
       expect(store.currentOffset).toBe(5);
     });
 
-    it("[P0] 結果少於 PAGE_SIZE 時 hasMore 應為 false", async () => {
+    it("[P0] 结果少于 PAGE_SIZE 时 hasMore 应为 false", async () => {
       mockDbSelect.mockResolvedValueOnce([createRawRow()]);
 
       const { useHistoryStore } = await import(
@@ -778,7 +778,7 @@ describe("useHistoryStore", () => {
       expect(store.hasMore).toBe(false);
     });
 
-    it("[P0] 結果等於 PAGE_SIZE 時 hasMore 應為 true", async () => {
+    it("[P0] 结果等于 PAGE_SIZE 时 hasMore 应为 true", async () => {
       const fullPage = Array.from({ length: 20 }, (_, i) =>
         createRawRow({ id: `row-${i}` }),
       );
@@ -795,7 +795,7 @@ describe("useHistoryStore", () => {
       expect(store.currentOffset).toBe(20);
     });
 
-    it("[P0] 應使用 searchQuery 進行搜尋", async () => {
+    it("[P0] 应使用 searchQuery 进行搜寻", async () => {
       mockDbSelect.mockResolvedValueOnce([]);
 
       const { useHistoryStore } = await import(
@@ -803,15 +803,15 @@ describe("useHistoryStore", () => {
       );
       const store = useHistoryStore();
 
-      store.searchQuery = "測試搜尋";
+      store.searchQuery = "测试搜寻";
       await store.resetAndFetch();
 
       const [sql, params] = mockDbSelect.mock.calls[0];
       expect(sql).toContain("LIKE");
-      expect(params[0]).toBe("%測試搜尋%");
+      expect(params[0]).toBe("%测试搜寻%");
     });
 
-    it("[P0] 載入中應設定 isLoading，完成後恢復", async () => {
+    it("[P0] 载入中应设定 isLoading，完成后恢复", async () => {
       let resolveSelect!: (value: unknown[]) => void;
       mockDbSelect.mockReturnValueOnce(
         new Promise((resolve) => {
@@ -838,8 +838,8 @@ describe("useHistoryStore", () => {
   // ==========================================================================
 
   describe("loadMore", () => {
-    it("[P0] 應追加結果至現有清單並更新 offset", async () => {
-      // 先載入初始頁
+    it("[P0] 应追加结果至现有清单并更新 offset", async () => {
+      // 先载入初始页
       const initialPage = Array.from({ length: 20 }, (_, i) =>
         createRawRow({ id: `init-${i}` }),
       );
@@ -853,7 +853,7 @@ describe("useHistoryStore", () => {
       await store.resetAndFetch();
       expect(store.transcriptionList).toHaveLength(20);
 
-      // 載入更多
+      // 载入更多
       const nextPage = Array.from({ length: 5 }, (_, i) =>
         createRawRow({ id: `more-${i}` }),
       );
@@ -866,7 +866,7 @@ describe("useHistoryStore", () => {
       expect(store.hasMore).toBe(false);
     });
 
-    it("[P0] hasMore=false 時不應發起查詢", async () => {
+    it("[P0] hasMore=false 时不应发起查询", async () => {
       const { useHistoryStore } = await import(
         "../../src/stores/useHistoryStore"
       );
@@ -880,7 +880,7 @@ describe("useHistoryStore", () => {
       expect(mockDbSelect).not.toHaveBeenCalled();
     });
 
-    it("[P0] isLoading=true 時不應發起查詢", async () => {
+    it("[P0] isLoading=true 时不应发起查询", async () => {
       const { useHistoryStore } = await import(
         "../../src/stores/useHistoryStore"
       );
@@ -895,7 +895,7 @@ describe("useHistoryStore", () => {
       expect(mockDbSelect).not.toHaveBeenCalled();
     });
 
-    it("[P0] 應傳遞正確的 offset 參數", async () => {
+    it("[P0] 应传递正确的 offset 参数", async () => {
       const fullPage = Array.from({ length: 20 }, (_, i) =>
         createRawRow({ id: `row-${i}` }),
       );
@@ -912,7 +912,7 @@ describe("useHistoryStore", () => {
       await store.loadMore();
 
       const params = mockDbSelect.mock.calls[1][1];
-      // 第二次呼叫的 offset 應該是 20（第一頁的結果數）
+      // 第二次呼叫的 offset 应该是 20（第一页的结果数）
       expect(params).toEqual([20, 20]);
     });
   });
@@ -922,7 +922,7 @@ describe("useHistoryStore", () => {
   // ==========================================================================
 
   describe("addApiUsage", () => {
-    it("[P0] 應執行 INSERT SQL 並傳入正確參數", async () => {
+    it("[P0] 应执行 INSERT SQL 并传入正确参数", async () => {
       const { useHistoryStore } = await import(
         "../../src/stores/useHistoryStore"
       );
@@ -962,7 +962,7 @@ describe("useHistoryStore", () => {
       ]);
     });
 
-    it("[P0] chat 類型應正確傳入 token 欄位", async () => {
+    it("[P0] chat 类型应正确传入 token 栏位", async () => {
       const { useHistoryStore } = await import(
         "../../src/stores/useHistoryStore"
       );
@@ -996,7 +996,7 @@ describe("useHistoryStore", () => {
   // ==========================================================================
 
   describe("fetchDailyUsageTrend", () => {
-    it("[P0] 應回傳 camelCase 映射並補零成固定區間的趨勢陣列", async () => {
+    it("[P0] 应回传 camelCase 映射并补零成固定区间的趋势阵列", async () => {
       const { useHistoryStore } = await import(
         "../../src/stores/useHistoryStore"
       );
@@ -1022,7 +1022,7 @@ describe("useHistoryStore", () => {
       mockDbSelect.mockResolvedValueOnce([]);
       // fetchRecentTranscriptionList
       mockDbSelect.mockResolvedValueOnce([]);
-      // fetchDailyUsageTrend（SQL 只回有使用記錄的日期）
+      // fetchDailyUsageTrend（SQL 只回有使用记录的日期）
       mockDbSelect.mockResolvedValueOnce([
         { date: todayKey, count: 5, total_chars: 250 },
         { date: yesterdayKey, count: 3, total_chars: 120 },
@@ -1031,7 +1031,7 @@ describe("useHistoryStore", () => {
       await store.refreshDashboard();
 
       const list = store.dailyUsageTrendList;
-      // 補零後固定 14 天、升冪、今天在最後
+      // 补零后固定 14 天、升幂、今天在最后
       expect(list).toHaveLength(14);
       expect(list[list.length - 1]).toEqual({
         date: todayKey,
@@ -1043,7 +1043,7 @@ describe("useHistoryStore", () => {
         count: 3,
         totalChars: 120,
       });
-      // 缺席日補 0
+      // 缺席日补 0
       expect(list[0]).toEqual({
         date: list[0].date,
         count: 0,
@@ -1051,7 +1051,7 @@ describe("useHistoryStore", () => {
       });
     });
 
-    it("[P0] DAILY_USAGE_TREND_SQL 應包含 GROUP BY 和 LIMIT", async () => {
+    it("[P0] DAILY_USAGE_TREND_SQL 应包含 GROUP BY 和 LIMIT", async () => {
       // fetchDashboardStats → DASHBOARD_STATS_SQL
       mockDbSelect.mockResolvedValueOnce([
         { total_count: 0, total_characters: 0, total_recording_duration_ms: 0 },
@@ -1077,7 +1077,7 @@ describe("useHistoryStore", () => {
       expect(sql).toContain("GROUP BY date");
       expect(sql).toContain("LIMIT");
       const params = trendCall[1] as number[];
-      // cutoff 必須是「本地午夜」（與補零的日曆窗口對齊），而非滾動 24h
+      // cutoff 必须是「本地午夜」（与补零的日历窗口对齐），而非滚动 24h
       const cutoff = new Date(params[0]);
       expect(cutoff.getHours()).toBe(0);
       expect(cutoff.getMinutes()).toBe(0);

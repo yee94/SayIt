@@ -14,9 +14,9 @@ vi.mock("@tauri-apps/api/event", () => ({
 
 const i18n = createI18n({
   legacy: false,
-  locale: "zh-TW",
+  locale: "zh-CN",
   messages: {
-    "zh-TW": {
+    "zh-CN": {
       voiceFlow: {
         vocabularyLearned: "已学习：{terms}",
         vocabularyLearnedTruncated: "已学习：{terms} 等 {count} 个词",
@@ -110,12 +110,12 @@ describe("NotchHud", () => {
       message: "API Key 未设置",
     });
 
-    // scatter dots 仍在上排顯示
+    // scatter dots 仍在上排显示
     expect(wrapper.findAll(".waveform-scatter").length).toBe(6);
-    // 訊息在獨立的下排
+    // 讯息在独立的下排
     expect(wrapper.find(".error-message-row").exists()).toBe(true);
     expect(wrapper.find(".error-message").text()).toBe("API Key 未设置");
-    // notch 應展開
+    // notch 应展开
     expect(wrapper.find(".notch-hud").classes()).toContain(
       "notch-hud-expanded",
     );
@@ -178,11 +178,11 @@ describe("NotchHud", () => {
     await wrapper.setProps({ status: "idle" });
     await wrapper.vm.$nextTick();
 
-    // collapsing 狀態中仍可見
+    // collapsing 状态中仍可见
     expect(wrapper.find(".notch-wrapper").exists()).toBe(true);
     expect(wrapper.find(".notch-hud").classes()).toContain("notch-collapsing");
 
-    // 動畫結束後隱藏
+    // 动画结束后隐藏
     vi.advanceTimersByTime(400);
     await wrapper.vm.$nextTick();
     expect(wrapper.find(".notch-wrapper").exists()).toBe(false);
@@ -221,7 +221,7 @@ describe("NotchHud", () => {
     await wrapper.vm.$nextTick();
     expect(wrapper.find(".notch-hud").classes()).toContain("notch-collapsing");
 
-    // 收縮期間切換到 recording
+    // 收缩期间切换到 recording
     await wrapper.setProps({ status: "recording" });
     await wrapper.vm.$nextTick();
     expect(wrapper.find(".notch-wrapper").exists()).toBe(true);
@@ -229,7 +229,7 @@ describe("NotchHud", () => {
       "notch-collapsing",
     );
 
-    // 推進時間後不應隱藏
+    // 推进时间后不应隐藏
     vi.advanceTimersByTime(400);
     await wrapper.vm.$nextTick();
     expect(wrapper.find(".notch-wrapper").exists()).toBe(true);
@@ -269,7 +269,7 @@ describe("NotchHud", () => {
     expect(wrapper.find(".live-transcript-bdi").text()).toBe(
       "你好世界这是即时字幕",
     );
-    // 與 error/learned 相同：黑底圓角向下擴展
+    // 与 error/learned 相同：黑底圆角向下扩展
     expect(wrapper.find(".notch-hud").classes()).toContain(
       "notch-hud-expanded",
     );

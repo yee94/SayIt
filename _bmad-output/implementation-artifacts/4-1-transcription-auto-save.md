@@ -1,105 +1,105 @@
-# Story 4.1: 轉錄記錄自動儲存
+# Story 4.1: 转录记录自动储存
 
 Status: done
 
 ## Story
 
 As a 使用者,
-I want 每次語音輸入的完整資料自動被記錄下來,
-so that 我能回顧歷史並追蹤使用統計。
+I want 每次语音输入的完整资料自动被记录下来,
+so that 我能回顾历史并追踪使用统计。
 
 ## Acceptance Criteria
 
-1. **AC1: 成功轉錄後自動寫入歷史記錄**
-   - Given 一次成功的語音轉錄流程完成（含或不含 AI 整理）
-   - When useVoiceFlowStore 狀態轉為 'success' 且文字已貼入
-   - Then useHistoryStore.addTranscription() 將完整記錄寫入 SQLite transcriptions 表
-   - And 記錄包含：id（UUID）、timestamp、rawText、processedText（若有）、recordingDurationMs、transcriptionDurationMs、enhancementDurationMs（若有）、charCount、triggerMode、wasEnhanced、wasModified（若已取得）
-   - And created_at 由 SQLite datetime('now') 自動產生
+1. **AC1: 成功转录后自动写入历史记录**
+   - Given 一次成功的语音转录流程完成（含或不含 AI 整理）
+   - When useVoiceFlowStore 状态转为 'success' 且文字已贴入
+   - Then useHistoryStore.addTranscription() 将完整记录写入 SQLite transcriptions 表
+   - And 记录包含：id（UUID）、timestamp、rawText、processedText（若有）、recordingDurationMs、transcriptionDurationMs、enhancementDurationMs（若有）、charCount、triggerMode、wasEnhanced、wasModified（若已取得）
+   - And created_at 由 SQLite datetime('now') 自动产生
 
-2. **AC2: 儲存後發送 Tauri Event**
-   - Given 轉錄記錄已寫入 SQLite
-   - When 儲存成功
-   - Then 發送 `transcription:completed` Tauri Event 至 Main Window
-   - And payload 包含新記錄的摘要資訊 `{ id, rawText, processedText, charCount, wasEnhanced, ... }`
-   - And Main Window 的 Dashboard 若已開啟，即時更新
+2. **AC2: 储存后发送 Tauri Event**
+   - Given 转录记录已写入 SQLite
+   - When 储存成功
+   - Then 发送 `transcription:completed` Tauri Event 至 Main Window
+   - And payload 包含新记录的摘要资讯 `{ id, rawText, processedText, charCount, wasEnhanced, ... }`
+   - And Main Window 的 Dashboard 若已开启，即时更新
 
-3. **AC3: 失敗不寫入**
-   - Given 轉錄流程失敗（API 錯誤、網路斷線）
-   - When useVoiceFlowStore 狀態為 'error'
-   - Then 不寫入歷史記錄
-   - And 不發送 `transcription:completed` 事件
+3. **AC3: 失败不写入**
+   - Given 转录流程失败（API 错误、网路断线）
+   - When useVoiceFlowStore 状态为 'error'
+   - Then 不写入历史记录
+   - And 不发送 `transcription:completed` 事件
 
 4. **AC4: camelCase → snake_case 映射**
    - Given useHistoryStore 的 addTranscription()
-   - When 從 TypeScript camelCase 資料寫入 SQLite
-   - Then 正確映射為 SQLite snake_case 欄位名
-   - And SQLite WAL 模式確保寫入安全
-   - And 寫入操作 < 200ms
+   - When 从 TypeScript camelCase 资料写入 SQLite
+   - Then 正确映射为 SQLite snake_case 栏位名
+   - And SQLite WAL 模式确保写入安全
+   - And 写入操作 < 200ms
 
-5. **AC5: AI 整理跳過時的欄位處理**
-   - Given AI 整理被跳過（字數 < 10 或 timeout fallback）
-   - When 記錄寫入
-   - Then processedText 為 null
-   - And wasEnhanced 為 false
-   - And enhancementDurationMs 為 null
+5. **AC5: AI 整理跳过时的栏位处理**
+   - Given AI 整理被跳过（字数 < 10 或 timeout fallback）
+   - When 记录写入
+   - Then processedText 为 null
+   - And wasEnhanced 为 false
+   - And enhancementDurationMs 为 null
 
-6. **AC6: AI fallback 時的欄位處理**
-   - Given AI 整理失敗但原始文字已貼上（fallback）
-   - When 記錄寫入
-   - Then processedText 為 null（AI 整理未成功產生結果）
-   - And wasEnhanced 為 false
-   - And enhancementDurationMs 記錄嘗試的時長（非 null）
+6. **AC6: AI fallback 时的栏位处理**
+   - Given AI 整理失败但原始文字已贴上（fallback）
+   - When 记录写入
+   - Then processedText 为 null（AI 整理未成功产生结果）
+   - And wasEnhanced 为 false
+   - And enhancementDurationMs 记录尝试的时长（非 null）
 
 ## Tasks / Subtasks
 
-- [x]Task 1: 實作 useHistoryStore.addTranscription() SQLite 寫入 (AC: #1, #4, #5, #6)
+- [x]Task 1: 实作 useHistoryStore.addTranscription() SQLite 写入 (AC: #1, #4, #5, #6)
   - [x]1.1 引入 `getDatabase()` from `lib/database.ts`
-  - [x]1.2 實作 camelCase → snake_case 欄位映射
-  - [x]1.3 INSERT SQL：所有欄位正確對應 transcriptions 表 schema
-  - [x]1.4 wasEnhanced 布林值 → SQLite INTEGER（0/1）轉換
-  - [x]1.5 wasModified 布林值/null → SQLite INTEGER/NULL 轉換
-  - [x]1.6 錯誤處理：寫入失敗 log 錯誤但不影響主流程
+  - [x]1.2 实作 camelCase → snake_case 栏位映射
+  - [x]1.3 INSERT SQL：所有栏位正确对应 transcriptions 表 schema
+  - [x]1.4 wasEnhanced 布林值 → SQLite INTEGER（0/1）转换
+  - [x]1.5 wasModified 布林值/null → SQLite INTEGER/NULL 转换
+  - [x]1.6 错误处理：写入失败 log 错误但不影响主流程
 
-- [x]Task 2: useVoiceFlowStore 在 3 個 success 路徑呼叫 addTranscription (AC: #1, #3, #5, #6)
-  - [x]2.1 收集轉錄記錄所需的全部欄位資料
-  - [x]2.2 AI 整理成功路徑：組裝完整記錄（含 processedText + enhancementDurationMs）
-  - [x]2.3 AI fallback 路徑：processedText=null, wasEnhanced=false, enhancementDurationMs=嘗試時長
-  - [x]2.4 跳過 AI 路徑：processedText=null, wasEnhanced=false, enhancementDurationMs=null
-  - [x]2.5 triggerMode 從 useSettingsStore 取得
-  - [x]2.6 addTranscription 呼叫為 fire-and-forget（不 await 阻塞主流程）
+- [x]Task 2: useVoiceFlowStore 在 3 个 success 路径呼叫 addTranscription (AC: #1, #3, #5, #6)
+  - [x]2.1 收集转录记录所需的全部栏位资料
+  - [x]2.2 AI 整理成功路径：组装完整记录（含 processedText + enhancementDurationMs）
+  - [x]2.3 AI fallback 路径：processedText=null, wasEnhanced=false, enhancementDurationMs=尝试时长
+  - [x]2.4 跳过 AI 路径：processedText=null, wasEnhanced=false, enhancementDurationMs=null
+  - [x]2.5 triggerMode 从 useSettingsStore 取得
+  - [x]2.6 addTranscription 呼叫为 fire-and-forget（不 await 阻塞主流程）
 
-- [x]Task 3: addTranscription 成功後發送 Tauri Event (AC: #2)
-  - [x]3.1 在 INSERT 成功後呼叫 `emitToWindow('main-window', TRANSCRIPTION_COMPLETED, payload)`
-  - [x]3.2 payload 遵循 TranscriptionCompletedPayload 型別
-  - [x]3.3 使用 emitToWindow 而非 emitEvent（僅 Main Window 需要此事件）
+- [x]Task 3: addTranscription 成功后发送 Tauri Event (AC: #2)
+  - [x]3.1 在 INSERT 成功后呼叫 `emitToWindow('main-window', TRANSCRIPTION_COMPLETED, payload)`
+  - [x]3.2 payload 遵循 TranscriptionCompletedPayload 型别
+  - [x]3.3 使用 emitToWindow 而非 emitEvent（仅 Main Window 需要此事件）
 
-- [x]Task 4: useHistoryStore.fetchTranscriptionList() 實作 (AC: #4)
-  - [x]4.1 SELECT 全部記錄 + snake_case → camelCase 映射
+- [x]Task 4: useHistoryStore.fetchTranscriptionList() 实作 (AC: #4)
+  - [x]4.1 SELECT 全部记录 + snake_case → camelCase 映射
   - [x]4.2 按 timestamp DESC 排序
-  - [x]4.3 wasEnhanced INTEGER → boolean 轉換
-  - [x]4.4 wasModified INTEGER/NULL → boolean/null 轉換
+  - [x]4.3 wasEnhanced INTEGER → boolean 转换
+  - [x]4.4 wasModified INTEGER/NULL → boolean/null 转换
 
-- [x]Task 5: 手動整合測試 (AC: #1-#6)
-  - [x]5.1 驗證語音轉錄成功後記錄寫入 SQLite
-  - [x]5.2 驗證 AI 整理成功時 processedText 有值
-  - [x]5.3 驗證 AI 跳過時 processedText 為 null
-  - [x]5.4 驗證 AI fallback 時的欄位值
-  - [x]5.5 驗證轉錄失敗時不寫入
-  - [x]5.6 驗證 transcription:completed 事件發送
-  - [x]5.7 驗證 App 重啟後記錄持久化
+- [x]Task 5: 手动整合测试 (AC: #1-#6)
+  - [x]5.1 验证语音转录成功后记录写入 SQLite
+  - [x]5.2 验证 AI 整理成功时 processedText 有值
+  - [x]5.3 验证 AI 跳过时 processedText 为 null
+  - [x]5.4 验证 AI fallback 时的栏位值
+  - [x]5.5 验证转录失败时不写入
+  - [x]5.6 验证 transcription:completed 事件发送
+  - [x]5.7 验证 App 重启后记录持久化
 
 ## Dev Notes
 
-### 現有骨架分析
+### 现有骨架分析
 
-| 檔案 | 現狀 | Story 4.1 任務 |
+| 档案 | 现状 | Story 4.1 任务 |
 |------|------|----------------|
-| `src/stores/useHistoryStore.ts` | 骨架：addTranscription + fetchTranscriptionList 為 TODO | 實作 SQL INSERT + SELECT |
-| `src/stores/useVoiceFlowStore.ts` | 3 個 success 路徑均無 addTranscription 呼叫 | 在每個 success 路徑加入記錄儲存 |
-| `src/types/transcription.ts` | TranscriptionRecord 完整定義 | 不需修改 |
-| `src/types/events.ts` | TranscriptionCompletedPayload 已定義 | 不需修改 |
-| `src/composables/useTauriEvents.ts` | TRANSCRIPTION_COMPLETED 常數已定義 | 不需修改 |
+| `src/stores/useHistoryStore.ts` | 骨架：addTranscription + fetchTranscriptionList 为 TODO | 实作 SQL INSERT + SELECT |
+| `src/stores/useVoiceFlowStore.ts` | 3 个 success 路径均无 addTranscription 呼叫 | 在每个 success 路径加入记录储存 |
+| `src/types/transcription.ts` | TranscriptionRecord 完整定义 | 不需修改 |
+| `src/types/events.ts` | TranscriptionCompletedPayload 已定义 | 不需修改 |
+| `src/composables/useTauriEvents.ts` | TRANSCRIPTION_COMPLETED 常数已定义 | 不需修改 |
 | `src/lib/database.ts` | transcriptions 表 schema 已建立 | 不需修改 |
 
 ### SQLite transcriptions 表 Schema
@@ -177,33 +177,33 @@ function mapRowToRecord(row: RawTranscriptionRow): TranscriptionRecord {
 }
 ```
 
-### useVoiceFlowStore 的 3 個 Success 路徑
+### useVoiceFlowStore 的 3 个 Success 路径
 
-handleStopRecording() 有 3 個 success 路徑需要加入 addTranscription：
+handleStopRecording() 有 3 个 success 路径需要加入 addTranscription：
 
 ```
-路徑 1: AI 整理成功（lines 275-297）
+路径 1: AI 整理成功（lines 275-297）
   → enhancedText 有值
   → processedText = enhancedText
   → wasEnhanced = true
   → enhancementDurationMs = 有值
 
-路徑 2: AI 整理失敗 fallback（lines 298-308）
-  → 使用 result.rawText 貼上
-  → processedText = null（AI 未成功產生結果）
+路径 2: AI 整理失败 fallback（lines 298-308）
+  → 使用 result.rawText 贴上
+  → processedText = null（AI 未成功产生结果）
   → wasEnhanced = false
-  → enhancementDurationMs = 嘗試的時長（非 null）
+  → enhancementDurationMs = 尝试的时长（非 null）
 
-路徑 3: 跳過 AI（字數 < 10）（lines 309-321）
-  → 直接使用 result.rawText 貼上
+路径 3: 跳过 AI（字数 < 10）（lines 309-321）
+  → 直接使用 result.rawText 贴上
   → processedText = null
   → wasEnhanced = false
   → enhancementDurationMs = null
 ```
 
-### 記錄組裝策略
+### 记录组装策略
 
-建議在 handleStopRecording 中使用 helper 函式組裝記錄，避免 3 個路徑重複組裝邏輯：
+建议在 handleStopRecording 中使用 helper 函式组装记录，避免 3 个路径重复组装逻辑：
 
 ```typescript
 function buildTranscriptionRecord(params: {
@@ -228,44 +228,44 @@ function buildTranscriptionRecord(params: {
     charCount: (params.processedText ?? params.rawText).length,
     triggerMode: settingsStore.triggerMode,
     wasEnhanced: params.wasEnhanced,
-    wasModified: null,   // 品質監控結果稍後由 quality-monitor:result 事件更新
-    createdAt: '',       // SQLite datetime('now') 自動產生，前端不填
+    wasModified: null,   // 品质监控结果稍后由 quality-monitor:result 事件更新
+    createdAt: '',       // SQLite datetime('now') 自动产生，前端不填
   };
 }
 ```
 
 ### triggerMode 取得
 
-useVoiceFlowStore 目前不追蹤 triggerMode。從 `useSettingsStore().triggerMode` computed 取得：
+useVoiceFlowStore 目前不追踪 triggerMode。从 `useSettingsStore().triggerMode` computed 取得：
 
 ```typescript
 const settingsStore = useSettingsStore();
 const triggerMode = settingsStore.triggerMode; // computed → 'hold' | 'toggle'
 ```
 
-useSettingsStore 已在 useVoiceFlowStore 中 import 並使用（line 39, lines 239-245）。
+useSettingsStore 已在 useVoiceFlowStore 中 import 并使用（line 39, lines 239-245）。
 
-### Fire-and-forget 儲存模式
+### Fire-and-forget 储存模式
 
-addTranscription 不應阻塞主流程（貼上 + HUD 狀態轉換已完成）。使用 `void` fire-and-forget：
+addTranscription 不应阻塞主流程（贴上 + HUD 状态转换已完成）。使用 `void` fire-and-forget：
 
 ```typescript
-// 在 transitionTo("success", ...) 之後
+// 在 transitionTo("success", ...) 之后
 const historyStore = useHistoryStore();
 void historyStore.addTranscription(record).catch((err) =>
   writeErrorLog(`useVoiceFlowStore: addTranscription failed: ${extractErrorMessage(err)}`)
 );
 ```
 
-### Tauri Event 發送
+### Tauri Event 发送
 
-使用 `emitToWindow` 而非 `emitEvent`，因為只有 Main Window 需要接收此事件（Dashboard 即時更新）。HUD Window 不消費歷史記錄。
+使用 `emitToWindow` 而非 `emitEvent`，因为只有 Main Window 需要接收此事件（Dashboard 即时更新）。HUD Window 不消费历史记录。
 
 ```typescript
 import { emitToWindow, TRANSCRIPTION_COMPLETED } from '../composables/useTauriEvents';
 import type { TranscriptionCompletedPayload } from '../types/events';
 
-// addTranscription 成功後
+// addTranscription 成功后
 const payload: TranscriptionCompletedPayload = {
   id: record.id,
   rawText: record.rawText,
@@ -279,14 +279,14 @@ const payload: TranscriptionCompletedPayload = {
 await emitToWindow('main-window', TRANSCRIPTION_COMPLETED, payload);
 ```
 
-### wasModified 延遲更新
+### wasModified 延迟更新
 
-TranscriptionRecord.wasModified 在儲存當下為 `null`（品質監控尚未回報結果）。Story 2.3 的 `quality-monitor:result` 事件稍後回報 wasModified，但 **Story 4.1 不需處理此更新** — wasModified 的 SQLite UPDATE 將在未來 story 中處理（或由 quality monitor result 事件直接更新最近一筆記錄）。
+TranscriptionRecord.wasModified 在储存当下为 `null`（品质监控尚未回报结果）。Story 2.3 的 `quality-monitor:result` 事件稍后回报 wasModified，但 **Story 4.1 不需处理此更新** — wasModified 的 SQLite UPDATE 将在未来 story 中处理（或由 quality monitor result 事件直接更新最近一笔记录）。
 
 目前：
 - `lastWasModified` ref 在 useVoiceFlowStore 中由 QUALITY_MONITOR_RESULT 事件更新（line 365-370）
-- 但尚無邏輯將 lastWasModified 回寫至 SQLite transcriptions 表
-- Story 4.1 先寫入 wasModified=null，後續可在 quality monitor result 回來後 UPDATE
+- 但尚无逻辑将 lastWasModified 回写至 SQLite transcriptions 表
+- Story 4.1 先写入 wasModified=null，后续可在 quality monitor result 回来后 UPDATE
 
 ### INSERT SQL
 
@@ -298,7 +298,7 @@ INSERT INTO transcriptions (
 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 ```
 
-**注意**：不 INSERT `created_at`，讓 SQLite DEFAULT datetime('now') 自動產生。
+**注意**：不 INSERT `created_at`，让 SQLite DEFAULT datetime('now') 自动产生。
 
 ### fetchTranscriptionList SQL
 
@@ -310,59 +310,59 @@ FROM transcriptions
 ORDER BY timestamp DESC
 ```
 
-### charCount 計算
+### charCount 计算
 
-`charCount` 應為最終貼上文字的字數：
+`charCount` 应为最终贴上文字的字数：
 - AI 整理成功：`enhancedText.length`
-- AI fallback / 跳過 AI：`rawText.length`
+- AI fallback / 跳过 AI：`rawText.length`
 
 即 `(processedText ?? rawText).length`。
 
 ### HUD Window 中 useHistoryStore 的可用性
 
-語音流程在 HUD Window 執行。addTranscription 需在 HUD Window 中呼叫 useHistoryStore。由於 Story 3.2 已在 HUD Window 初始化 database（App.vue onMounted 中 `await initializeDatabase()`），useHistoryStore 的 SQL 操作可以正常執行。
+语音流程在 HUD Window 执行。addTranscription 需在 HUD Window 中呼叫 useHistoryStore。由于 Story 3.2 已在 HUD Window 初始化 database（App.vue onMounted 中 `await initializeDatabase()`），useHistoryStore 的 SQL 操作可以正常执行。
 
-**前提**：Story 3.2 已完成 HUD Window DB 初始化。如果 Story 3.2 尚未實作，Story 4.1 的 Dev 需確認 DB 在 HUD Window 中可用。
+**前提**：Story 3.2 已完成 HUD Window DB 初始化。如果 Story 3.2 尚未实作，Story 4.1 的 Dev 需确认 DB 在 HUD Window 中可用。
 
-### 不需修改的檔案
+### 不需修改的档案
 
-- `src/types/transcription.ts` — TranscriptionRecord、DashboardStats 已定義
-- `src/types/events.ts` — TranscriptionCompletedPayload 已定義
-- `src/composables/useTauriEvents.ts` — TRANSCRIPTION_COMPLETED 常數已定義
+- `src/types/transcription.ts` — TranscriptionRecord、DashboardStats 已定义
+- `src/types/events.ts` — TranscriptionCompletedPayload 已定义
+- `src/composables/useTauriEvents.ts` — TRANSCRIPTION_COMPLETED 常数已定义
 - `src/lib/database.ts` — transcriptions 表 schema 已建立
-- `src/types/index.ts` — TriggerMode 已定義
+- `src/types/index.ts` — TriggerMode 已定义
 
-### 需要修改的檔案清單
+### 需要修改的档案清单
 
-| 檔案 | 修改範圍 |
+| 档案 | 修改范围 |
 |------|---------|
-| `src/stores/useHistoryStore.ts` | 實作 addTranscription() SQL INSERT + fetchTranscriptionList() SQL SELECT + Tauri Event 發送 |
-| `src/stores/useVoiceFlowStore.ts` | 在 3 個 success 路徑呼叫 addTranscription（fire-and-forget） |
+| `src/stores/useHistoryStore.ts` | 实作 addTranscription() SQL INSERT + fetchTranscriptionList() SQL SELECT + Tauri Event 发送 |
+| `src/stores/useVoiceFlowStore.ts` | 在 3 个 success 路径呼叫 addTranscription（fire-and-forget） |
 
-### 跨 Story 備註
+### 跨 Story 备注
 
-- **Story 4.2** 會消費 fetchTranscriptionList() 在 HistoryView 中顯示歷史記錄
-- **Story 4.3** 會消費 calculateDashboardStats()（已在 useHistoryStore 中有基本骨架）和 transcription:completed 事件在 Dashboard 即時更新
-- **wasModified UPDATE** 尚無 story 覆蓋：quality monitor result 回來後需 UPDATE 最近一筆 transcription 的 was_modified 欄位。這可以在 Story 4.1 Dev 中順帶實作（在 QUALITY_MONITOR_RESULT listener 中），或留待後續
+- **Story 4.2** 会消费 fetchTranscriptionList() 在 HistoryView 中显示历史记录
+- **Story 4.3** 会消费 calculateDashboardStats()（已在 useHistoryStore 中有基本骨架）和 transcription:completed 事件在 Dashboard 即时更新
+- **wasModified UPDATE** 尚无 story 覆盖：quality monitor result 回来后需 UPDATE 最近一笔 transcription 的 was_modified 栏位。这可以在 Story 4.1 Dev 中顺带实作（在 QUALITY_MONITOR_RESULT listener 中），或留待后续
 
 ### Project Structure Notes
 
-- 不新增任何新檔案
-- 所有修改在既有專案結構內
-- 依賴方向符合：`useVoiceFlowStore → useHistoryStore → database.ts`
+- 不新增任何新档案
+- 所有修改在既有专案结构内
+- 依赖方向符合：`useVoiceFlowStore → useHistoryStore → database.ts`
 - useHistoryStore 在 HUD Window 中使用（需 DB 已初始化）
 
 ### References
 
-- [Source: _bmad-output/planning-artifacts/epics.md#Story 4.1] — AC 完整定義（lines 623-658）
+- [Source: _bmad-output/planning-artifacts/epics.md#Story 4.1] — AC 完整定义（lines 623-658）
 - [Source: _bmad-output/planning-artifacts/architecture.md#Data Architecture] — transcriptions 表 schema、前端直接 SQL
-- [Source: _bmad-output/planning-artifacts/architecture.md#Naming Patterns] — snake_case/camelCase 映射規則
-- [Source: _bmad-output/planning-artifacts/architecture.md#Communication Patterns] — Tauri Event 發送、emitToWindow
-- [Source: src/stores/useHistoryStore.ts] — 現有骨架（addTranscription/fetchTranscriptionList TODO）
-- [Source: src/stores/useVoiceFlowStore.ts] — 3 個 success 路徑（lines 275-321）、QUALITY_MONITOR_RESULT listener（lines 365-370）
-- [Source: src/types/transcription.ts] — TranscriptionRecord 完整欄位定義
-- [Source: src/types/events.ts] — TranscriptionCompletedPayload 定義
-- [Source: src/composables/useTauriEvents.ts] — TRANSCRIPTION_COMPLETED 常數
+- [Source: _bmad-output/planning-artifacts/architecture.md#Naming Patterns] — snake_case/camelCase 映射规则
+- [Source: _bmad-output/planning-artifacts/architecture.md#Communication Patterns] — Tauri Event 发送、emitToWindow
+- [Source: src/stores/useHistoryStore.ts] — 现有骨架（addTranscription/fetchTranscriptionList TODO）
+- [Source: src/stores/useVoiceFlowStore.ts] — 3 个 success 路径（lines 275-321）、QUALITY_MONITOR_RESULT listener（lines 365-370）
+- [Source: src/types/transcription.ts] — TranscriptionRecord 完整栏位定义
+- [Source: src/types/events.ts] — TranscriptionCompletedPayload 定义
+- [Source: src/composables/useTauriEvents.ts] — TRANSCRIPTION_COMPLETED 常数
 - [Source: src/lib/database.ts] — transcriptions 表 CREATE TABLE（lines 13-28）
 - [Source: src/stores/useSettingsStore.ts] — triggerMode computed（line 19-21）
 
@@ -374,18 +374,18 @@ Claude Opus 4.6
 
 ### Debug Log References
 
-- vue-tsc: 無新增錯誤
+- vue-tsc: 无新增错误
 - pnpm test: 147 tests passed
 
 ### Completion Notes List
 
-- useHistoryStore 完整重寫（addTranscription SQL INSERT, fetchTranscriptionList, mapRowToRecord snake_case→camelCase）
+- useHistoryStore 完整重写（addTranscription SQL INSERT, fetchTranscriptionList, mapRowToRecord snake_case→camelCase）
 - useVoiceFlowStore 整合 buildTranscriptionRecord + saveTranscriptionRecord (fire-and-forget)
-- TRANSCRIPTION_COMPLETED Tauri Event 發送至 Main Window
+- TRANSCRIPTION_COMPLETED Tauri Event 发送至 Main Window
 
 ### Change Log
 
-- Story 4.1 完整實作 — 轉錄記錄自動儲存
+- Story 4.1 完整实作 — 转录记录自动储存
 
 ### File List
 

@@ -10,11 +10,11 @@ function toLocalKey(date: Date): string {
 }
 
 describe("buildDailyUsageSeries", () => {
-  it("空輸入回傳空陣列（保留圖表空狀態）", () => {
+  it("空输入回传空阵列（保留图表空状态）", () => {
     expect(buildDailyUsageSeries([], 14)).toEqual([]);
   });
 
-  it("days <= 0 回傳空陣列", () => {
+  it("days <= 0 回传空阵列", () => {
     const rows: DailyUsageTrend[] = [
       { date: "2026-03-05", count: 1, totalChars: 10 },
     ];
@@ -22,7 +22,7 @@ describe("buildDailyUsageSeries", () => {
     expect(buildDailyUsageSeries(rows, -3)).toEqual([]);
   });
 
-  it("補零成長度為 days 的升冪連續區間，末日為 endDate", () => {
+  it("补零成长度为 days 的升幂连续区间，末日为 endDate", () => {
     const endDate = new Date(2026, 2, 5); // 2026-03-05 本地
     const rows: DailyUsageTrend[] = [
       { date: "2026-03-05", count: 5, totalChars: 250 },
@@ -30,7 +30,7 @@ describe("buildDailyUsageSeries", () => {
     const series = buildDailyUsageSeries(rows, 7, endDate);
 
     expect(series).toHaveLength(7);
-    // 升冪
+    // 升幂
     const dates = series.map((d) => d.date);
     expect(dates).toEqual([
       "2026-02-27",
@@ -48,7 +48,7 @@ describe("buildDailyUsageSeries", () => {
     });
   });
 
-  it("缺席日補 0、命中日正確映射 count/totalChars", () => {
+  it("缺席日补 0、命中日正确映射 count/totalChars", () => {
     const endDate = new Date(2026, 2, 5);
     const rows: DailyUsageTrend[] = [
       { date: "2026-03-05", count: 5, totalChars: 250 },
@@ -67,7 +67,7 @@ describe("buildDailyUsageSeries", () => {
       count: 5,
       totalChars: 250,
     });
-    // 其餘 5 天皆為 0
+    // 其余 5 天皆为 0
     const zeroDays = series.filter(
       (d) => d.date !== "2026-03-01" && d.date !== "2026-03-05",
     );
@@ -78,7 +78,7 @@ describe("buildDailyUsageSeries", () => {
     }
   });
 
-  it("跨月邊界產生正確的連續日期", () => {
+  it("跨月边界产生正确的连续日期", () => {
     const endDate = new Date(2026, 2, 2); // 2026-03-02
     const series = buildDailyUsageSeries(
       [{ date: "2026-03-02", count: 1, totalChars: 4 }],
@@ -94,22 +94,22 @@ describe("buildDailyUsageSeries", () => {
     ]);
   });
 
-  it("忽略落在區間外的資料列", () => {
+  it("忽略落在区间外的资料列", () => {
     const endDate = new Date(2026, 2, 5);
     const rows: DailyUsageTrend[] = [
       { date: "2026-03-05", count: 5, totalChars: 250 },
-      { date: "2026-02-20", count: 9, totalChars: 999 }, // 區間外
+      { date: "2026-02-20", count: 9, totalChars: 999 }, // 区间外
     ];
     const series = buildDailyUsageSeries(rows, 7, endDate);
 
     expect(series).toHaveLength(7);
     expect(series.some((d) => d.date === "2026-02-20")).toBe(false);
-    // 區間外資料不影響總和
+    // 区间外资料不影响总和
     const total = series.reduce((sum, d) => sum + d.count, 0);
     expect(total).toBe(5);
   });
 
-  it("預設 endDate 為今天，末日為今天的本地日期", () => {
+  it("预设 endDate 为今天，末日为今天的本地日期", () => {
     const series = buildDailyUsageSeries(
       [{ date: toLocalKey(new Date()), count: 2, totalChars: 8 }],
       14,
