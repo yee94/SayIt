@@ -2363,6 +2363,45 @@
                       "children": [
                         {
                           "type": "frame",
+                          "id": "TlpB1",
+                          "name": "typelessImportButton",
+                          "cornerRadius": 8,
+                          "stroke": {
+                            "align": "inside",
+                            "thickness": 1,
+                            "fill": "$--border"
+                          },
+                          "gap": 6,
+                          "padding": [
+                            8,
+                            12
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon_font",
+                              "id": "TlpI1",
+                              "name": "typelessUploadIcon",
+                              "width": 14,
+                              "height": 14,
+                              "iconFontName": "upload",
+                              "iconFontFamily": "lucide",
+                              "fill": "$--foreground"
+                            },
+                            {
+                              "type": "text",
+                              "id": "TlpT1",
+                              "name": "typelessImportText",
+                              "fill": "$--foreground",
+                              "content": "一鍵匯入 Typeless",
+                              "fontFamily": "$--font-primary",
+                              "fontSize": 13,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
                           "id": "dDttr",
                           "name": "dictInput",
                           "width": 200,
@@ -8643,6 +8682,162 @@
                           ]
                         }
                       ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "TlpS1",
+      "x": 1380,
+      "y": 1940,
+      "name": "Dictionary - Typeless Import Button States",
+      "width": 360,
+      "fill": "$--card",
+      "cornerRadius": 12,
+      "stroke": {
+        "align": "inside",
+        "thickness": 1,
+        "fill": "$--border"
+      },
+      "layout": "vertical",
+      "gap": 16,
+      "padding": 20,
+      "children": [
+        {
+          "type": "text",
+          "id": "TlpST",
+          "name": "stateSpecTitle",
+          "fill": "$--foreground",
+          "content": "Typeless 匯入按鈕狀態",
+          "fontFamily": "$--font-primary",
+          "fontSize": 14,
+          "fontWeight": "600"
+        },
+        {
+          "type": "frame",
+          "id": "TlpSR",
+          "name": "buttonStateRow",
+          "gap": 12,
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "TlpSD",
+              "name": "defaultState",
+              "layout": "vertical",
+              "gap": 6,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "TlpDL",
+                  "name": "defaultLabel",
+                  "fill": "$--muted-foreground",
+                  "content": "預設",
+                  "fontFamily": "$--font-primary",
+                  "fontSize": 11,
+                  "fontWeight": "500"
+                },
+                {
+                  "type": "frame",
+                  "id": "TlpDB",
+                  "name": "outlineButtonDefault",
+                  "cornerRadius": 8,
+                  "stroke": {
+                    "align": "inside",
+                    "thickness": 1,
+                    "fill": "$--border"
+                  },
+                  "gap": 6,
+                  "padding": [
+                    8,
+                    12
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon_font",
+                      "id": "TlpDI",
+                      "name": "defaultUploadIcon",
+                      "width": 14,
+                      "height": 14,
+                      "iconFontName": "upload",
+                      "iconFontFamily": "lucide",
+                      "fill": "$--foreground"
+                    },
+                    {
+                      "type": "text",
+                      "id": "TlpDT",
+                      "name": "defaultButtonText",
+                      "fill": "$--foreground",
+                      "content": "一鍵匯入 Typeless",
+                      "fontFamily": "$--font-primary",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "TlpSL",
+              "name": "loadingState",
+              "layout": "vertical",
+              "gap": 6,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "TlpLL",
+                  "name": "loadingLabel",
+                  "fill": "$--muted-foreground",
+                  "content": "載入中 · disabled",
+                  "fontFamily": "$--font-primary",
+                  "fontSize": 11,
+                  "fontWeight": "500"
+                },
+                {
+                  "type": "frame",
+                  "id": "TlpLB",
+                  "name": "outlineButtonLoading",
+                  "opacity": 0.5,
+                  "cornerRadius": 8,
+                  "stroke": {
+                    "align": "inside",
+                    "thickness": 1,
+                    "fill": "$--border"
+                  },
+                  "gap": 6,
+                  "padding": [
+                    8,
+                    12
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon_font",
+                      "id": "TlpLI",
+                      "name": "loadingUploadIcon",
+                      "width": 14,
+                      "height": 14,
+                      "iconFontName": "upload",
+                      "iconFontFamily": "lucide",
+                      "fill": "$--foreground"
+                    },
+                    {
+                      "type": "text",
+                      "id": "TlpLT",
+                      "name": "loadingButtonText",
+                      "fill": "$--foreground",
+                      "content": "匯入中...",
+                      "fontFamily": "$--font-primary",
+                      "fontSize": 13,
+                      "fontWeight": "500"
                     }
                   ]
                 }
