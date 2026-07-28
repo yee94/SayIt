@@ -142,10 +142,6 @@
       "soundFeedbackDescription": "Play sound effects when recording starts, stops, or encounters an error",
       "soundFeedbackEnabled": "Sound feedback enabled",
       "soundFeedbackDisabled": "Sound feedback disabled",
-      "hideDockIcon": "Hide Dock Icon",
-      "hideDockIconDescription": "Remove SayIt from the Dock and use the menu bar icon only",
-      "hideDockIconEnabled": "Dock icon hidden",
-      "hideDockIconDisabled": "Dock icon shown",
       "autoStart": "Launch at Login",
       "autoStartDescription": "Automatically start SayIt when you log in",
       "autoStartEnabled": "Launch at login enabled",
@@ -393,7 +389,7 @@
     },
     "upgradeNotice": {
       "title": "What's New in SayIt",
-      "item1": "Clearer settings: credential visibility and save buttons now use consistent sizing and placement across ASR and LLM settings",
+      "item1": "Improved macOS Dock behavior: the icon appears when Dashboard opens and hides after it closes while SayIt remains available from the menu bar",
       "dismiss": "Got it"
     }
   },

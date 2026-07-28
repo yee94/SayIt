@@ -142,10 +142,6 @@
       "soundFeedbackDescription": "录音开始、结束及错误时播放提示音效",
       "soundFeedbackEnabled": "已启用音效反馈",
       "soundFeedbackDisabled": "已停用音效反馈",
-      "hideDockIcon": "隐藏 Dock 图标",
-      "hideDockIconDescription": "从 Dock 移除 SayIt 图标，仅通过菜单栏图标操作",
-      "hideDockIconEnabled": "已隐藏 Dock 图标",
-      "hideDockIconDisabled": "已显示 Dock 图标",
       "autoStart": "开机自动启动",
       "autoStartDescription": "登录系统后自动启动 SayIt",
       "autoStartEnabled": "已启用开机自启动",
@@ -393,7 +389,7 @@
     },
     "upgradeNotice": {
       "title": "SayIt 更新摘要",
-      "item1": "设置体验优化：ASR 与 LLM 凭证区域的显示、保存按钮采用统一尺寸和排列，操作更加清晰",
+      "item1": "macOS Dock 行为优化：打开 Dashboard 时自动显示 Dock 图标，关闭后自动隐藏并保留菜单栏入口",
       "dismiss": "了解"
     }
   },

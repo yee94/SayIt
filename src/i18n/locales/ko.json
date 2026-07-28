@@ -142,10 +142,6 @@
       "soundFeedbackDescription": "녹음 시작, 종료 및 오류 시 효과음을 재생합니다",
       "soundFeedbackEnabled": "사운드 피드백이 활성화되었습니다",
       "soundFeedbackDisabled": "사운드 피드백이 비활성화되었습니다",
-      "hideDockIcon": "Dock 아이콘 숨기기",
-      "hideDockIconDescription": "Dock에서 SayIt을 제거하고 메뉴 막대 아이콘으로만 사용합니다",
-      "hideDockIconEnabled": "Dock 아이콘을 숨겼습니다",
-      "hideDockIconDisabled": "Dock 아이콘을 표시합니다",
       "autoStart": "부팅 시 자동 시작",
       "autoStartDescription": "시스템 로그인 후 SayIt을 자동으로 시작합니다",
       "autoStartEnabled": "부팅 시 자동 시작이 활성화되었습니다",
@@ -393,7 +389,7 @@
     },
     "upgradeNotice": {
       "title": "SayIt 업데이트 안내",
-      "item1": "설정 화면 개선: ASR과 LLM 인증 정보의 표시 및 저장 버튼 크기와 배치를 통일해 더 명확하게 사용할 수 있습니다",
+      "item1": "macOS Dock 동작 개선: Dashboard를 열면 아이콘이 표시되고 닫으면 자동으로 숨겨지며 메뉴 막대에서 계속 사용할 수 있습니다",
       "dismiss": "확인"
     }
   },

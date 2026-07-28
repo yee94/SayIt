@@ -33,8 +33,7 @@ export type SettingsKey =
   | "soundEffectsEnabled"
   | "promptMode"
   | "audioInputDevice"
-  | "copyTranscriptionToClipboard"
-  | "hideDockIcon";
+  | "copyTranscriptionToClipboard";
 
 export interface SettingsUpdatedPayload {
   key: SettingsKey;

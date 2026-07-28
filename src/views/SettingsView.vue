@@ -569,32 +569,6 @@ async function handleToggleSoundFeedback(newValue: boolean) {
   }
 }
 
-// ── 隐藏 Dock 图示 (gh-56，仅 macOS) ──────────────────────────
-const hideDockIconFeedback = useFeedbackMessage();
-// macOS 对「Dock 显示后 1 秒内的隐藏请求」会静默忽略（Tao 防重复图示守卫），
-// 切换后短暂锁住开关，避免快速连按造成 UI 与实际 Dock 状态脱节
-const isHideDockIconPending = ref(false);
-let hideDockIconPendingTimeoutId: ReturnType<typeof setTimeout> | undefined;
-
-async function handleToggleHideDockIcon(newValue: boolean) {
-  isHideDockIconPending.value = true;
-  try {
-    await settingsStore.saveHideDockIcon(newValue);
-    hideDockIconFeedback.show(
-      "success",
-      newValue
-        ? t("settings.app.hideDockIconEnabled")
-        : t("settings.app.hideDockIconDisabled"),
-    );
-  } catch (err) {
-    hideDockIconFeedback.show("error", extractErrorMessage(err));
-  } finally {
-    hideDockIconPendingTimeoutId = setTimeout(() => {
-      isHideDockIconPending.value = false;
-    }, 1200);
-  }
-}
-
 // ── 转录文字是否复制到剪贴簿 (gh-35) ──────────────────────────
 const copyTranscriptionToClipboardFeedback = useFeedbackMessage();
 
@@ -813,7 +787,6 @@ onBeforeUnmount(() => {
   modelFeedback.clearTimer();
   muteOnRecordingFeedback.clearTimer();
   soundFeedbackFeedback.clearTimer();
-  hideDockIconFeedback.clearTimer();
   copyTranscriptionToClipboardFeedback.clearTimer();
   localeFeedback.clearTimer();
   transcriptionLocaleFeedback.clearTimer();
@@ -823,7 +796,6 @@ onBeforeUnmount(() => {
   providerFeedback.clearTimer();
   clearTimeout(deleteConfirmTimeoutId);
   clearTimeout(resetPromptConfirmTimeoutId);
-  clearTimeout(hideDockIconPendingTimeoutId);
 });
 </script>
 
@@ -1709,37 +1681,6 @@ onBeforeUnmount(() => {
             {{ soundFeedbackFeedback.message.value }}
           </p>
         </transition>
-
-        <template v-if="isMac">
-          <div class="border-t border-border" />
-
-          <div class="flex items-center justify-between">
-            <div>
-              <Label for="hide-dock-icon">{{ $t("settings.app.hideDockIcon") }}</Label>
-              <p class="text-sm text-muted-foreground">{{ $t("settings.app.hideDockIconDescription") }}</p>
-            </div>
-            <Switch
-              id="hide-dock-icon"
-              :model-value="settingsStore.isHideDockIconEnabled"
-              :disabled="isHideDockIconPending"
-              @update:model-value="handleToggleHideDockIcon"
-            />
-          </div>
-
-          <transition name="feedback-fade">
-            <p
-              v-if="hideDockIconFeedback.message.value !== ''"
-              class="text-sm"
-              :class="
-                hideDockIconFeedback.type.value === 'success'
-                  ? 'text-green-400'
-                  : 'text-red-400'
-              "
-            >
-              {{ hideDockIconFeedback.message.value }}
-            </p>
-          </transition>
-        </template>
 
         <div class="border-t border-border" />
 

@@ -345,6 +345,11 @@ fn get_hud_target_position(app: tauri::AppHandle) -> Result<HudTargetPosition, S
 }
 
 fn show_main_window(app: &AppHandle) {
+    // 打开 Dashboard 时恢复 Dock 图标（关窗后会隐藏，见 CloseRequested）
+    #[cfg(target_os = "macos")]
+    {
+        let _ = app.set_dock_visibility(true);
+    }
     if let Some(window) = app.get_webview_window("main-window") {
         let _ = window.show();
         let _ = window.set_focus();
@@ -457,21 +462,6 @@ pub fn run() {
             plugins::sound_feedback::play_learned_sound
         ])
         .setup(|app| {
-            // gh-56：启动时套用「隐藏 Dock 图示」设定（读取失败一律视为未启用，不影响启动）
-            #[cfg(target_os = "macos")]
-            {
-                use tauri_plugin_store::StoreExt;
-                let hide_dock_icon = app
-                    .store("settings.json")
-                    .ok()
-                    .and_then(|store| store.get("hideDockIcon"))
-                    .and_then(|value| value.as_bool())
-                    .unwrap_or(false);
-                if hide_dock_icon {
-                    let _ = app.handle().set_dock_visibility(false);
-                }
-            }
-
             // 初始化 keyboard monitor 状态
             app.manage(plugins::keyboard_monitor::KeyboardMonitorState::new());
             // 初始化 audio control 状态
@@ -533,6 +523,11 @@ pub fn run() {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
                     let _ = window.hide();
+                    // Cmd+W / 点关闭：藏主窗口并隐藏 Dock，仅保留菜单栏托盘
+                    #[cfg(target_os = "macos")]
+                    {
+                        let _ = window.app_handle().set_dock_visibility(false);
+                    }
                     println!("[main-window] Close requested → hidden (not destroyed)");
                 }
             }
