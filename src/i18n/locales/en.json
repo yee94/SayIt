@@ -393,9 +393,7 @@
     },
     "upgradeNotice": {
       "title": "What's New in SayIt",
-      "item1": "Live captions: SayIt now shows streaming SeedASR text while you speak and uses the final result when recording stops — connection failures fall back to full-recording transcription",
-      "item2": "One-click Typeless import: macOS can read the signed-in local Typeless dictionary and add its terms to SayIt, skipping duplicates automatically",
-      "item3": "Simplified Chinese by default: new installs and Chinese system locales now use zh-CN consistently across the interface, formatting, prompts, and errors",
+      "item1": "Clearer settings: credential visibility and save buttons now use consistent sizing and placement across ASR and LLM settings",
       "dismiss": "Got it"
     }
   },

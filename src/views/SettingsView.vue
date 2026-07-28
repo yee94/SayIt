@@ -1033,14 +1033,14 @@ onBeforeUnmount(() => {
             />
             <Button
               variant="outline"
-              size="sm"
-              class="shrink-0"
+              class="w-[80px] shrink-0"
               @click="toggleApiKeyVisibility"
             >
               {{ isApiKeyVisible ? $t("settings.apiKey.hide") : $t("settings.apiKey.show") }}
             </Button>
             <Button
               :disabled="isSubmittingApiKey"
+              class="w-[80px] shrink-0"
               @click="handleSaveApiKey"
             >
               {{ $t("common.save") }}
@@ -1115,29 +1115,46 @@ onBeforeUnmount(() => {
 
         <div class="space-y-2">
           <Label for="llm-api-key">{{ $t("settings.provider.apiKey") }}</Label>
-          <div v-if="settingsStore.hasLlmApiKey" class="flex items-center gap-2">
+          <div v-if="settingsStore.hasLlmApiKey" class="flex gap-2">
             <Input
               id="llm-api-key"
               :model-value="isLlmApiKeyVisible ? settingsStore.llmApiKey : '••••••••••'"
               readonly
               class="flex-1 font-mono text-xs"
             />
-            <Button variant="ghost" size="sm" @click="isLlmApiKeyVisible = !isLlmApiKeyVisible">
+            <Button
+              variant="outline"
+              class="w-[80px] shrink-0"
+              @click="isLlmApiKeyVisible = !isLlmApiKeyVisible"
+            >
               {{ isLlmApiKeyVisible ? $t('settings.apiKey.hide') : $t('settings.apiKey.show') }}
+            </Button>
+            <Button class="w-[80px] shrink-0" @click="handleSaveLlmConfig">
+              {{ $t('common.save') }}
             </Button>
           </div>
           <div v-else class="flex gap-2">
             <Input
               id="llm-api-key"
               v-model="llmApiKeyInput"
-              type="password"
+              :type="isLlmApiKeyVisible ? 'text' : 'password'"
               placeholder="sk-..."
               class="flex-1 font-mono text-xs"
             />
+            <Button
+              variant="outline"
+              class="w-[80px] shrink-0"
+              @click="isLlmApiKeyVisible = !isLlmApiKeyVisible"
+            >
+              {{ isLlmApiKeyVisible ? $t('settings.apiKey.hide') : $t('settings.apiKey.show') }}
+            </Button>
+            <Button class="w-[80px] shrink-0" @click="handleSaveLlmConfig">
+              {{ $t('common.save') }}
+            </Button>
           </div>
         </div>
 
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-start gap-2">
           <Button
             v-if="settingsStore.hasLlmApiKey"
             variant="destructive"
@@ -1150,9 +1167,6 @@ onBeforeUnmount(() => {
             :on-test="() => testLlmConnection(settingsStore.getLlmApiKey() || llmApiKeyInput, { modelId: llmModelInput || settingsStore.selectedLlmModelId, baseUrl: llmBaseUrlInput || settingsStore.getLlmBaseUrl() })"
             :disabled="!(settingsStore.hasLlmApiKey || llmApiKeyInput.trim())"
           />
-          <Button class="ml-auto" size="sm" @click="handleSaveLlmConfig">
-            {{ $t('common.save') }}
-          </Button>
         </div>
 
         <transition name="feedback-fade">
