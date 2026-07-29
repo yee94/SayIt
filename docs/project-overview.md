@@ -65,11 +65,11 @@ say-it/
 
 | 文件                                                     | 用途                                         |
 | -------------------------------------------------------- | -------------------------------------------- |
-| `_bmad-output/project-context.md`                        | 全部 AI Agent 实作规则（323 条）             |
+| `_bmad-output/project-context.md`                        | 全部 AI Agent 实作规则                        |
 | `CLAUDE.md`                                              | Claude Code 专案记忆 + IPC 契约表 + Hook 设定 |
 | `_bmad-output/planning-artifacts/architecture.md`        | 架构决策（ADR）                              |
 | `_bmad-output/planning-artifacts/ux-ui-design-spec.md`   | UI 设计、色彩、元件规范                      |
-| `design.pen`                                             | Pencil MCP 设计稿（UI 实作前必读）           |
+| `design.pen`                                             | 可选的历史 UI 设计稿参考                      |
 
 ### 5.2 本次扫描产出（docs/）
 

@@ -16,6 +16,7 @@ const { t } = useI18n();
 
 type VisualMode =
   | "hidden"
+  | "connecting"
   | "recording"
   | "morphing"
   | "transcribing"
@@ -217,6 +218,7 @@ const notchHudClassList = computed(() => ({
 const isVoiceFlowBusy = computed(() => {
   const s = props.status;
   return (
+    s === "connecting" ||
     s === "recording" ||
     s === "transcribing" ||
     s === "enhancing" ||
@@ -231,6 +233,7 @@ const isHighPriorityMode = computed(() => {
   if (isVoiceFlowBusy.value) return true;
   const mode = visualMode.value;
   return (
+    mode === "connecting" ||
     mode === "recording" ||
     mode === "morphing" ||
     mode === "transcribing" ||
@@ -395,6 +398,15 @@ watch(
       return;
     }
 
+    if (nextStatus === "connecting") {
+      stopWaveformAnimation();
+      if (visualMode.value === "learned") {
+        requeueActiveLearnedIfAny();
+      }
+      visualMode.value = "connecting";
+      return;
+    }
+
     if (
       nextStatus === "transcribing" ||
       nextStatus === "enhancing" ||
@@ -492,6 +504,16 @@ onUnmounted(() => {
           </svg>
           <!-- Learned: 上排留空，内容在下方扩展行 -->
           <template v-else-if="visualMode === 'learned'" />
+          <!-- Connecting: low-intensity device connection indicator -->
+          <template v-else-if="visualMode === 'connecting'">
+            <div class="connection-container" aria-hidden="true">
+              <span
+                v-for="index in 3"
+                :key="index"
+                class="connection-dot"
+              />
+            </div>
+          </template>
           <!-- Other modes: waveform + checkmark -->
           <template v-else>
             <div class="waveform-container">
@@ -530,6 +552,15 @@ onUnmounted(() => {
           </span>
           <span v-else-if="visualMode === 'mode-switch'" class="mode-switch-label">
             {{ props.modeSwitchLabel }}
+          </span>
+          <span
+            v-else-if="visualMode === 'connecting'"
+            class="connecting-label"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            {{ props.message || t('voiceFlow.connecting') }}
           </span>
           <template v-else-if="visualMode === 'recording'">
             <span v-if="props.isEditMode" class="hud-badge edit-mode-badge">{{ t('voiceFlow.editMode') }}</span>
@@ -646,6 +677,42 @@ onUnmounted(() => {
   align-items: center;
   gap: 3px;
   height: 28px;
+}
+
+/* ---- Connecting: low-intensity microphone connection ---- */
+.connection-container {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+}
+
+.connection-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.38);
+  animation: connectionPulse 1.4s ease-in-out infinite;
+}
+
+.connection-dot:nth-child(2) { animation-delay: 0.18s; }
+.connection-dot:nth-child(3) { animation-delay: 0.36s; }
+
+@keyframes connectionPulse {
+  0%, 100% {
+    opacity: 0.35;
+    transform: scale(0.86);
+  }
+  45% {
+    opacity: 0.75;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .connection-dot {
+    animation: none;
+  }
 }
 
 /* ---- Shared Waveform Element ---- */
@@ -842,6 +909,14 @@ onUnmounted(() => {
 .cancelled-label {
   color: rgba(255, 255, 255, 0.6);
   font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  animation: cancelledTextFadeIn 0.3s ease-out;
+}
+
+.connecting-label {
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
   animation: cancelledTextFadeIn 0.3s ease-out;

@@ -90,11 +90,11 @@
 
 ### 4.1 规范性文件（authoritative · 必读）
 
-- [`_bmad-output/project-context.md`](../_bmad-output/project-context.md) — **AI Agent 必读规则 · 323 条**（最高优先）
+- [`_bmad-output/project-context.md`](../_bmad-output/project-context.md) — **AI Agent 必读规则**（最高优先）
 - [`CLAUDE.md`](../CLAUDE.md) — Claude Code 专案记忆、IPC 契约表、Hooks 设定
 - [`_bmad-output/planning-artifacts/architecture.md`](../_bmad-output/planning-artifacts/architecture.md) — 架构决策（ADR）
 - [`_bmad-output/planning-artifacts/ux-ui-design-spec.md`](../_bmad-output/planning-artifacts/ux-ui-design-spec.md) — UI 设计规范
-- [`design.pen`](../design.pen) — Pencil MCP 设计稿（UI 实作前必读）
+- [`design.pen`](../design.pen) — 可选的历史 UI 设计稿参考
 
 ### 4.2 规划 / 故事文件（`_bmad-output/`）
 
@@ -129,12 +129,12 @@
 | 第一次接触这专案                  | `project-overview.md` → `index.md`（这个）→ `source-tree-analysis.md` |
 | 写 brownfield PRD                 | `project-overview.md` + `integration-architecture.md` + `architecture-{frontend,backend}.md` |
 | 加 IPC 契约                       | `api-contracts-backend.md` §七 checklist + `integration-architecture.md` §九 |
-| 改 UI                             | `_bmad-output/planning-artifacts/ux-ui-design-spec.md` + `design.pen`（先设计）+ `component-inventory-frontend.md` |
+| 改 UI                             | `_bmad-output/planning-artifacts/ux-ui-design-spec.md` + `component-inventory-frontend.md` |
 | 改 SQLite                         | `data-models.md` §三 Migration                                        |
 | 加 LLM Provider                   | `architecture-frontend.md` §4.4 + `development-guide.md` §4.4         |
 | 改 hotkey / paste 机制            | `architecture-backend.md` §4.1 / §4.4 + `_bmad-output/project-context.md` |
 | 发版                              | `deployment-guide.md` §四 + `scripts/release.sh`                      |
-| 看实作规则（323 条）              | `_bmad-output/project-context.md`                                     |
+| 看实作规则                        | `_bmad-output/project-context.md`                                     |
 | 看 IPC 契约表                     | `CLAUDE.md` §IPC 契约表（authoritative）                              |
 
 ---
@@ -151,9 +151,8 @@
 6. **❌ `@tabler/icons-vue`** → ✅ 只用 `lucide-vue-next`
 7. **❌ 手写 UI 元件** → ✅ shadcn-vue（new-york style）
 8. **❌ 直接 import Tauri event API** → ✅ 透过 `composables/useTauriEvents.ts`
-9. **❌ 未经 Pencil 设计直接写 UI** → ✅ 先在 `design.pen` 完成设计
-10. **❌ 改旧 SQL migration**（v1～v8） → ✅ 追加 v9 等新版本
-11. **❌ 改 `Cargo.lock` / `pnpm-lock.yaml`** → ✅ 受 `protect-config.sh` 阻挡
+9. **❌ 改旧 SQL migration**（v1～v8） → ✅ 追加 v9 等新版本
+10. **❌ 改 `Cargo.lock` / `pnpm-lock.yaml`** → ✅ 受 `protect-config.sh` 阻挡
 
 ---
 
@@ -163,7 +162,6 @@
 | ------------------------------------------------------------------- | ------------------------------------------------- |
 | `tauri.conf.json` CSP `connect-src` 缺 OpenAI / Anthropic           | 加入 `https://api.openai.com` + `https://api.anthropic.com` |
 | CI 没跑 `cargo test`、`cargo clippy`、`eslint`                       | 加进 `ci.yml`                                     |
-| `CLAUDE.md` 开头声称「261 条」，但 `project-context.md` 实为 323 条   | 同步数字                                          |
 | `addApiUsage` FK 失败（787）偶发                                     | 调查 `transcriptions` 与 `api_usage` 写入 race    |
 | autoUpdater 用 `window.confirm` 在 Tauri WKWebView 静默忽略           | 改 in-app UI                                      |
 | `text_field_reader::read_selected_text` Fn-c 字元穿透（issue #25）   | 待修                                              |

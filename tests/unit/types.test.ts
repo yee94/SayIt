@@ -7,6 +7,7 @@ describe("Type Definitions", () => {
     // Given: all valid HUD statuses
     const validStatuses: HudStatus[] = [
       "idle",
+      "connecting",
       "recording",
       "transcribing",
       "enhancing",

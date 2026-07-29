@@ -1,7 +1,7 @@
 # SayIt — Claude Code 专案记忆档
 
 > Tauri v2 + Vue 3 + Rust 语音转文字桌面应用
-> 完整规则请读：`_bmad-output/project-context.md`（323 条）
+> 完整规则请读：`_bmad-output/project-context.md`
 
 ## 中文文案硬规则（强制）
 
@@ -17,7 +17,6 @@
 | 完整规则 | `_bmad-output/project-context.md` | 所有 AI Agent 实作规则（必读） |
 | UX/UI 规范 | `_bmad-output/planning-artifacts/ux-ui-design-spec.md` | UI 设计、色彩、元件规范 |
 | 架构设计 | `_bmad-output/planning-artifacts/architecture.md` | 架构决策文件 |
-| 设计稿 | `design.pen` | Pencil MCP 设计稿（UI 实作前必须先完成） |
 
 ## 双视窗架构
 
@@ -148,8 +147,7 @@
 6. **❌ `@tabler/icons-vue`** → 只用 `lucide-vue-next`
 7. **❌ 手写 UI 元件** → 用 shadcn-vue（new-york style），详见下方「shadcn-vue 元件使用规则」
 8. **❌ 直接 import Tauri event API** → 用 `useTauriEvents.ts` 封装
-9. **❌ 未经设计直接实作 UI** → 先用 Pencil MCP 完成 `design.pen` 设计稿，再写程式码
-10. **❌ 新增繁体中文** → 中文一律简体；日语 locale 保持日语（见上方「中文文案硬规则」）
+9. **❌ 新增繁体中文** → 中文一律简体；日语 locale 保持日语（见上方「中文文案硬规则」）
 
 ## shadcn-vue 元件使用规则
 

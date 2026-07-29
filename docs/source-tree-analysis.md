@@ -22,7 +22,7 @@ say-it/
 ├── assets/                 # 共用静态资源
 ├── _bmad/                  # BMad framework（不入版本记录）
 ├── _bmad-output/           # BMad 规划 / 实作 / 测试产出物
-│   ├── project-context.md  #   AI Agent 必读规则（323 条）
+│   ├── project-context.md  #   AI Agent 必读规则
 │   ├── planning-artifacts/ #   PRD / Architecture / UX-UI Spec
 │   ├── implementation-artifacts/  # Story / Tech Spec
 │   └── test-artifacts/     #   测试框架文件
@@ -33,7 +33,7 @@ say-it/
 │   ├── claude.yml          #   Claude Code GitHub Actions
 │   └── claude-code-review.yml
 ├── .claude/                # Claude Code skills + hooks 设定
-├── design.pen              # Pencil MCP 设计稿（UI 实作前必读）
+├── design.pen              # 可选的历史 UI 设计稿参考
 ├── CLAUDE.md               # Claude Code 专案记忆档
 ├── CHANGELOG.md
 ├── README.md

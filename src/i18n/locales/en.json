@@ -301,6 +301,7 @@
   },
   "voiceFlow": {
     "noSpeechDetected": "No speech detected",
+    "connecting": "Connecting microphone...",
     "recording": "Recording...",
     "transcribing": "Transcribing...",
     "pasteSuccess": "Pasted",

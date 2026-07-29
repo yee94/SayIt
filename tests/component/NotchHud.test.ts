@@ -18,6 +18,7 @@ const i18n = createI18n({
   messages: {
     "zh-CN": {
       voiceFlow: {
+        connecting: "正在连接麦克风...",
         vocabularyLearned: "已学习：{terms}",
         vocabularyLearnedTruncated: "已学习：{terms} 等{count}个",
       },
@@ -27,7 +28,13 @@ const i18n = createI18n({
 
 function mountNotchHud(props: Record<string, unknown>) {
   return mount(NotchHud, {
-    props: { isEditMode: false, ...props },
+    props: {
+      canRetry: false,
+      promptModeLabel: "",
+      modeSwitchLabel: "",
+      isEditMode: false,
+      ...props,
+    },
     global: {
       plugins: [i18n],
     },
@@ -51,6 +58,64 @@ describe("NotchHud", () => {
     expect(wrapper.find(".waveform-container").exists()).toBe(true);
     expect(wrapper.findAll(".waveform-element").length).toBe(6);
     expect(wrapper.find(".elapsed-timer").text()).toBe("0:03");
+  });
+
+  it("[P0] connecting 状态应显示连接动效和文案，且不显示波形、计时器或字幕", () => {
+    const wrapper = mountNotchHud({
+      status: "connecting",
+      recordingElapsedSeconds: 0,
+      message: "正在连接麦克风...",
+      liveTranscript: "不应显示",
+    });
+
+    expect(wrapper.find(".connection-container").exists()).toBe(true);
+    expect(wrapper.findAll(".connection-dot").length).toBe(3);
+    expect(wrapper.find(".connecting-label").text()).toBe(
+      "正在连接麦克风...",
+    );
+    expect(wrapper.find(".connecting-label").attributes()).toMatchObject({
+      role: "status",
+      "aria-live": "polite",
+      "aria-atomic": "true",
+    });
+    expect(wrapper.find(".waveform-container").exists()).toBe(false);
+    expect(wrapper.find(".elapsed-timer").exists()).toBe(false);
+    expect(wrapper.find(".live-transcript-row").exists()).toBe(false);
+    expect(mockListen).toHaveBeenCalledTimes(1);
+  });
+
+  it("[P0] connecting 切到 recording 后才显示波形和计时器", async () => {
+    const wrapper = mountNotchHud({
+      status: "connecting",
+      recordingElapsedSeconds: 0,
+      message: "正在连接麦克风...",
+    });
+
+    await wrapper.setProps({
+      status: "recording",
+      recordingElapsedSeconds: 0,
+      message: "录音中...",
+    });
+
+    expect(wrapper.find(".connection-container").exists()).toBe(false);
+    expect(wrapper.find(".waveform-container").exists()).toBe(true);
+    expect(wrapper.find(".elapsed-timer").text()).toBe("0:00");
+  });
+
+  it("[P0] connecting 应占用高优先级，词汇学习通知排队不抢 HUD", async () => {
+    const wrapper = mountNotchHud({
+      status: "connecting",
+      recordingElapsedSeconds: 0,
+      message: "正在连接麦克风...",
+    });
+
+    const learnedCallback = mockListen.mock.calls[0]?.[1];
+    expect(learnedCallback).toBeTypeOf("function");
+    learnedCallback({ payload: { termList: ["SayIt"] } });
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find(".connection-container").exists()).toBe(true);
+    expect(wrapper.find(".learned-terms-row").exists()).toBe(false);
   });
 
   it("[P0] transcribing 状态应显示脉冲 dots", async () => {

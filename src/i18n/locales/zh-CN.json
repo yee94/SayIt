@@ -301,6 +301,7 @@
   },
   "voiceFlow": {
     "noSpeechDetected": "未检测到语音",
+    "connecting": "正在连接麦克风...",
     "recording": "录音中...",
     "transcribing": "转录中...",
     "pasteSuccess": "已粘贴 ✓",

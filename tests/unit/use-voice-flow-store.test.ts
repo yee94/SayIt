@@ -433,7 +433,7 @@ describe("useVoiceFlowStore", () => {
     vi.useRealTimers();
   });
 
-  it("[P0] 热键按下时应在录音设备 ready 前显示 HUD，并异步查询位置", async () => {
+  it("[P0] 热键按下时应在录音设备 ready 前显示连接态 HUD，并异步查询位置", async () => {
     const recordingStart = createDeferredPromise<void>();
     const hudPosition = createDeferredPromise<{
       monitorKey: string;
@@ -451,8 +451,12 @@ describe("useVoiceFlowStore", () => {
 
     triggerHotkeyEvent("hotkey:pressed");
 
-    expect(store.status).toBe("recording");
+    expect(store.status).toBe("connecting");
+    expect(store.recordingElapsedSeconds).toBe(0);
     expect(mockInvoke).toHaveBeenCalledWith("present_hud_window");
+    expect(
+      mockInvoke.mock.calls.some(([command]) => command === "start_live_asr"),
+    ).toBe(false);
     await vi.waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith("get_hud_target_position");
     });
@@ -472,6 +476,47 @@ describe("useVoiceFlowStore", () => {
     await Promise.resolve();
     await Promise.resolve();
     expect(mockHudWindowSetPosition).not.toHaveBeenCalled();
+    store.cleanup();
+  });
+
+  it("[P0] start_recording 成功且会话有效后才进入 recording 并启动 live ASR", async () => {
+    const recordingStart = createDeferredPromise<void>();
+    const base = createMockInvokeHandler();
+    mockInvoke.mockImplementation(async (cmd: string, args?: unknown) => {
+      if (cmd === "start_recording") return recordingStart.promise;
+      return base(cmd, args);
+    });
+    const store = useVoiceFlowStore();
+    await store.initialize();
+
+    triggerHotkeyEvent("hotkey:pressed");
+
+    expect(store.status).toBe("connecting");
+    expect(
+      mockInvoke.mock.calls.some(([command]) => command === "start_live_asr"),
+    ).toBe(false);
+
+    recordingStart.resolvePromise();
+
+    await vi.waitFor(() => {
+      expect(store.status).toBe("recording");
+    });
+    await vi.waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("start_live_asr", {
+        appId: "test-app-id",
+        accessKey: "test-access-key",
+        vocabularyTermList: null,
+        language: "zh",
+      });
+    });
+    expect(mockEmit).toHaveBeenCalledWith("voice-flow:state-changed", {
+      status: "connecting",
+      message: "voiceFlow.connecting",
+    });
+    expect(mockEmit).toHaveBeenCalledWith("voice-flow:state-changed", {
+      status: "recording",
+      message: "voiceFlow.recording",
+    });
     store.cleanup();
   });
 
@@ -495,6 +540,14 @@ describe("useVoiceFlowStore", () => {
     await Promise.resolve();
 
     expect(mockInvoke).not.toHaveBeenCalledWith("stop_recording");
+    expect(store.status).toBe("connecting");
+    expect(
+      mockEmit.mock.calls.some(
+        (call) =>
+          call[0] === "voice-flow:state-changed" &&
+          (call[1] as { status: string }).status === "recording",
+      ),
+    ).toBe(false);
 
     recordingStart.resolvePromise();
 
@@ -507,6 +560,13 @@ describe("useVoiceFlowStore", () => {
         restoreClipboard: false,
       });
     });
+    expect(
+      mockEmit.mock.calls.some(
+        (call) =>
+          call[0] === "voice-flow:state-changed" &&
+          (call[1] as { status: string }).status === "recording",
+      ),
+    ).toBe(false);
     store.cleanup();
   });
 
@@ -527,6 +587,7 @@ describe("useVoiceFlowStore", () => {
       });
     });
     triggerHotkeyEvent("escape:pressed");
+    expect(store.status).toBe("cancelled");
     triggerHotkeyEvent("hotkey:pressed");
 
     expect(
@@ -537,6 +598,13 @@ describe("useVoiceFlowStore", () => {
     await vi.waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith("stop_recording");
     });
+    expect(
+      mockEmit.mock.calls.some(
+        (call) =>
+          call[0] === "voice-flow:state-changed" &&
+          (call[1] as { status: string }).status === "recording",
+      ),
+    ).toBe(false);
 
     triggerHotkeyEvent("hotkey:pressed");
     await vi.waitFor(() => {
@@ -578,7 +646,7 @@ describe("useVoiceFlowStore", () => {
     store.cleanup();
   });
 
-  it("[P0] HOTKEY_PRESSED 只会在未录音时启动录音并广播 recording", async () => {
+  it("[P0] HOTKEY_PRESSED 只会在未录音时启动录音并先广播 connecting", async () => {
     const store = useVoiceFlowStore();
     await store.initialize();
 
@@ -597,6 +665,10 @@ describe("useVoiceFlowStore", () => {
     ).length;
     expect(startRecordingCallCount).toBe(1);
     expect(store.status).toBe("recording");
+    expect(mockEmit).toHaveBeenCalledWith("voice-flow:state-changed", {
+      status: "connecting",
+      message: "voiceFlow.connecting",
+    });
     expect(mockEmit).toHaveBeenCalledWith("voice-flow:state-changed", {
       status: "recording",
       message: "voiceFlow.recording",

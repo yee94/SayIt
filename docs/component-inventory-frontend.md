@@ -145,15 +145,3 @@ App.vue（HUD root）
 ```
 
 ---
-
-## 六、设计流程强制（不可跳过）
-
-> **❌ 未经设计直接实作 UI** → ✅ **先用 Pencil MCP 完成 `design.pen` 设计稿**
-
-新 UI 功能必须走：
-1. 在 `design.pen` 完成视觉设计（Pencil MCP `batch_design`）
-2. 跟使用者对齐设计稿
-3. 才开始实作 Vue 元件
-4. 实作后对照设计稿微调
-
-> 详见 `_bmad-output/planning-artifacts/ux-ui-design-spec.md`。

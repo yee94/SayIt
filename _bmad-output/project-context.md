@@ -4,7 +4,6 @@ user_name: 'Jackle'
 date: '2026-03-28'
 sections_completed: ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'code_quality', 'workflow_rules', 'critical_rules', 'sentry_telemetry', 'i18n', 'smart_dictionary', 'model_registry_v2', 'esc_global_abort', 'hallucination_v3', 'sound_feedback', 'enhancement_anomaly', 'audio_input_device', 'audio_preview', 'combo_hotkey', 'rust_driven_recording', 'edit_mode', 'feature_guide', 'gemini_provider']
 status: 'complete'
-rule_count: 323
 optimized_for_llm: true
 ---
 
@@ -394,7 +393,6 @@ _This file contains critical rules and patterns that AI agents must follow when 
 #### UI 设计规范（强制）
 
 - **规范文件** — `_bmad-output/planning-artifacts/ux-ui-design-spec.md`，所有 UI 实作必须遵循
-- **设计稿先行** — 任何 UI 实作前必须先在 `design.pen` 完成设计稿并取得使用者确认
 - **shadcn-vue 强制** — 所有 UI 元件使用 shadcn-vue（new-york style, neutral base），禁止手写替代品
 - **语意色彩** — 禁止 Tailwind 原生色彩（`zinc-*`, `teal-*`），必须用语意变数（`bg-primary`, `text-foreground`）
 - **品牌色** — Teal 主题（`pnpm dlx shadcn-vue@latest init --theme teal`）
@@ -703,7 +701,6 @@ src/
 - **❌ 使用 `@tabler/icons-vue`** — 虽已安装（dashboard-01 block 附带），但 UI 规范强制只用 `lucide-vue-next`
 - **❌ 手写 Button/Input/Card/Dialog** — 必须安装并使用 shadcn-vue 元件
 - **❌ 使用 Tailwind 原生色彩** — `zinc-*`, `teal-*`, `red-*` 等全部禁止，用 `bg-primary`, `text-foreground` 等语意变数
-- **❌ 未经设计稿确认就写 UI** — 所有 UI 实作前必须先在 `design.pen` 完成设计稿并取得使用者确认
 - **❌ 手动修改 `src/components/ui/`** — shadcn CLI 生成的元件不手动修改，透过 `cn()` 在使用端覆盖
 - **❌ 直接 import Tauri event API** — 使用 `useTauriEvents.ts` 汇出的封装函式和常量，不直接从 `@tauri-apps/api/event` import
 - **❌ 录音时未静音系统喇叭** — 录音开始前必须呼叫 `mute_system_audio`，结束后呼叫 `restore_system_audio`，避免系统音效被录进去

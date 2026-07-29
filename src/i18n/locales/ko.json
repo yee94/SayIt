@@ -301,6 +301,7 @@
   },
   "voiceFlow": {
     "noSpeechDetected": "음성이 감지되지 않았습니다",
+    "connecting": "마이크 연결 중...",
     "recording": "녹음 중...",
     "transcribing": "전사 중...",
     "pasteSuccess": "붙여넣기 완료 ✓",

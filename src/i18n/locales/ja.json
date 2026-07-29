@@ -301,6 +301,7 @@
   },
   "voiceFlow": {
     "noSpeechDetected": "音声が検出されませんでした",
+    "connecting": "マイクに接続中...",
     "recording": "録音中...",
     "transcribing": "文字起こし中...",
     "pasteSuccess": "貼り付け完了 ✓",

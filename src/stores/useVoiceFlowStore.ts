@@ -435,6 +435,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
 
     if (
       nextStatus === "recording" ||
+      nextStatus === "connecting" ||
       nextStatus === "transcribing" ||
       nextStatus === "enhancing"
     ) {
@@ -720,6 +721,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     try {
       // 语音流程进行中：只广播事件（HUD 会排队），绝不 present 抢占录音刘海
       const voiceBusy =
+        status.value === "connecting" ||
         status.value === "recording" ||
         status.value === "transcribing" ||
         status.value === "enhancing" ||
@@ -1357,7 +1359,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     const recordingStartPromise = pendingRecordingStart;
     pendingRecordingStart = null;
 
-    if (currentStatus === "recording") {
+    if (currentStatus === "connecting" || currentStatus === "recording") {
       void invoke("cancel_live_asr").catch(() => {});
       stopRecorderAfterStart(recordingStartPromise);
       stopElapsedTimer();
@@ -1453,7 +1455,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       }
     }
 
-    transitionTo("recording", t("voiceFlow.recording"));
+    transitionTo("connecting", t("voiceFlow.connecting"));
     playSoundIfEnabled("play_start_sound");
     delayedMuteTimer = setTimeout(() => {
       delayedMuteTimer = null;
@@ -1488,8 +1490,8 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       .catch(() => {});
 
     const recordingStartPromise = invoke<void>("start_recording", {
-        deviceName: useSettingsStore().selectedAudioInputDeviceName,
-      });
+      deviceName: useSettingsStore().selectedAudioInputDeviceName,
+    });
     pendingRecordingStart = recordingStartPromise;
 
     try {
@@ -1502,12 +1504,20 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         return;
       }
       if (isStopRequested) return;
+      transitionTo("recording", t("voiceFlow.recording"));
       startElapsedTimer();
       writeInfoLog("useVoiceFlowStore: recording started");
 
       // 边说边出：录音开始后立刻挂上 live ASR（失败不阻断录音）
       void startLiveAsrIfPossible();
     } catch (error) {
+      if (
+        currentRecordingEpoch !== recordingEpoch ||
+        isAborted.value ||
+        !isRecording.value
+      ) {
+        return;
+      }
       const errorMessage = getMicrophoneErrorMessage(error);
       const technicalErrorMessage = extractErrorMessage(error);
       failRecordingFlow(

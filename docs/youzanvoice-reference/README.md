@@ -102,7 +102,6 @@ SayIt 应采用同样的会话边界，并新增更严格的控制：
 3. **原始文本最小化。** 调试日志只记录候选数量、字符长度、耗时、策略与错误类别；原文、字段摘录、截图和模型原始回复不进入常规日志。
 4. **截图是一次性能力。** 捕获、上传、推理和清理属于同一个会话；SQLite 只保存操作元数据和用户最终采纳的文本。
 5. **用户拥有控制权。** 自动学习、LLM 复核、近期上下文、截图助手都是独立开关，并在设置页提供清除动作。
-6. **UI 先完成 Pencil 设计。** 新增开关、热键、截图状态和结果采纳界面进入 `design.pen` 后再实现 Vue 组件。
 
 ## 已知差异与取舍
 
@@ -119,6 +118,6 @@ SayIt 应采用同样的会话边界，并新增更严格的控制：
 - [`../_bmad-output/project-context.md`](../../_bmad-output/project-context.md)：项目实现规则与 IPC 约束。
 - [`../_bmad-output/implementation-artifacts/tech-spec-smart-dictionary-learning.md`](../../_bmad-output/implementation-artifacts/tech-spec-smart-dictionary-learning.md)：现有智慧词典规格。
 - [`../_bmad-output/implementation-artifacts/3-2-vocabulary-injection-whisper-ai.md`](../../_bmad-output/implementation-artifacts/3-2-vocabulary-injection-whisper-ai.md)：词汇注入转录模型的已有设计。
-- [`../design.pen`](../../design.pen)：所有新增用户界面的设计来源。
+- [`../design.pen`](../../design.pen)：可选的历史界面设计参考。
 
 后续实现从 [04-实施顺序与验证.md](./04-实施顺序与验证.md) 的 Phase 0 开始。

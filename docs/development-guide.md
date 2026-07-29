@@ -279,7 +279,6 @@ sqlite3 %APPDATA%\com.sayit.app\app.db
 □ cargo check (src-tauri)    Rust 编译通过
 □ pnpm exec eslint src       ESLint 无错（hook 已自动跑）
 □ 若改 IPC：用 tauri-reviewer subagent 双端对齐审查
-□ 若改 UI：先在 design.pen 完成设计稿
 □ 若改 SQL schema：写 v(N+1) migration 不改旧 migration
 ```
 

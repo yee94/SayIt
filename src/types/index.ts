@@ -1,5 +1,6 @@
 export type HudStatus =
   | "idle"
+  | "connecting"
   | "recording"
   | "transcribing"
   | "enhancing"
