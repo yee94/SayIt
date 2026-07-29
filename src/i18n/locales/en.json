@@ -409,8 +409,7 @@
     },
     "upgradeNotice": {
       "title": "What's New in SayIt",
-      "item1": "Simpler Dictionary view: all terms live in one list, and AI-learned words show a robot icon so you can tell them apart at a glance.",
-      "item2": "Smart learning no longer interrupts recording: learned-term toasts queue behind live captions instead of stacking on top while you speak or polish text.",
+      "item1": "Clearer microphone connection status: after you press the hotkey, the HUD shows “Connecting microphone” so you know recording is starting.",
       "dismiss": "Got it"
     }
   },
