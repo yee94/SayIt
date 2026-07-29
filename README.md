@@ -43,7 +43,7 @@ SayIt 在交互上借鉴了 [Typeless](https://www.typeless.com/)：全局热键
 | 语音识别 / 整理 | 官方打包服务 | **自行配置 ASR + LLM** |
 | 费用 | 官方套餐订阅 | 按所用 API 的用量计费，通常远低于订阅套餐 |
 | 模型选择 | 由官方决定 | 可换 ASR 凭据；LLM 接任意 OpenAI 兼容接口 |
-| 字典 | 内置词典体系 | 自定义字典；macOS 可从 Typeless **一键导入**已有词条 |
+| 词典 | 内置词典体系 | 词典；macOS 可从 Typeless **一键导入**已有词条 |
 
 效果上：选用合适的 ASR（当前默认对接豆包 SeedASR）与 LLM 后，整理质量可以做到接近同类产品；成本侧则是「你自己的 API 账单」，而不是按月锁死在官方套餐里。
 
@@ -77,7 +77,7 @@ SayIt 在交互上借鉴了 [Typeless](https://www.typeless.com/)：全局热键
 | ESC 取消 | 中止当前录音 / 流程 |
 | HUD | 顶部浮层：波形、模式、计时、实时字幕 |
 
-### 自定义字典
+### 词典
 
 - 手动添加专有名词、品牌名、术语  
 - 智能学习：可从修正中自动收录新词  
@@ -136,7 +136,7 @@ LLM 只要兼容 OpenAI Chat Completions（`/v1/chat/completions`）即可，例
 
 ```
 全局热键 → 豆包 SeedASR（流式转写）→ OpenAI 兼容 LLM（整理）→ 粘贴到光标
-              ↑ 字典注入                    ↑ 精简 / 积极 / 自定义
+              ↑ 词典注入                    ↑ 精简 / 积极 / 自定义
                                             ↑ 语意守卫（必要时回退原文）
 ```
 
@@ -145,7 +145,7 @@ LLM 只要兼容 OpenAI Chat Completions（`/v1/chat/completions`）即可，例
 | 窗口 | 用途 |
 |------|------|
 | HUD | 透明置顶状态浮层（录音 / 转写 / 整理 / 完成） |
-| Dashboard | 设置、历史、字典、统计、功能导览（默认隐藏） |
+| Dashboard | 设置、历史、词典、统计、功能导览（默认隐藏） |
 
 ---
 
@@ -158,7 +158,7 @@ LLM 只要兼容 OpenAI Chat Completions（`/v1/chat/completions`）即可，例
 | 后端 | Rust（音频、热键、剪贴板、系统音频控制等） |
 | 语音转写 | 豆包 SeedASR（流式） |
 | 文字整理 | OpenAI 兼容 Chat Completions |
-| 存储 | SQLite（历史 / 字典）+ tauri-plugin-store（API Key，不进库） |
+| 存储 | SQLite（历史 / 词典）+ tauri-plugin-store（API Key，不进库） |
 | 测试 | Vitest · Playwright · Rust unit tests |
 | 发布 | GitHub Actions 三平台构建 |
 

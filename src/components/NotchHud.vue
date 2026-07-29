@@ -54,9 +54,19 @@ let learnedTimer: ReturnType<typeof setTimeout> | null = null;
 let unlistenVocabularyLearned: UnlistenFn | null = null;
 const pendingLearnedTermList = ref<string[][]>([]);
 const learnedDisplayText = ref("");
+/** 当前正在展示的词条（被录音打断时可重新入队） */
+const activeLearnedTermList = ref<string[]>([]);
 const COLLAPSE_ANIMATION_DURATION_MS = 400;
 const LEARNED_DISPLAY_DURATION_MS = 2000;
 const MAX_DISPLAY_TERM_COUNT = 3;
+
+function requeueActiveLearnedIfAny() {
+  if (activeLearnedTermList.value.length === 0) return;
+  pendingLearnedTermList.value.unshift([...activeLearnedTermList.value]);
+  activeLearnedTermList.value = [];
+  learnedDisplayText.value = "";
+  clearLearnedTimer();
+}
 
 const { waveformLevelList, startWaveformAnimation, stopWaveformAnimation } =
   useAudioWaveform();
@@ -203,7 +213,22 @@ const notchHudClassList = computed(() => ({
   "notch-collapsing": visualMode.value === "collapsing",
 }));
 
+/** 语音主流程占用刘海时，已学习通知必须排队，禁止叠层 */
+const isVoiceFlowBusy = computed(() => {
+  const s = props.status;
+  return (
+    s === "recording" ||
+    s === "transcribing" ||
+    s === "enhancing" ||
+    s === "editing" ||
+    s === "success" ||
+    s === "error" ||
+    s === "cancelled"
+  );
+});
+
 const isHighPriorityMode = computed(() => {
+  if (isVoiceFlowBusy.value) return true;
   const mode = visualMode.value;
   return (
     mode === "recording" ||
@@ -250,19 +275,28 @@ function formatLearnedText(termList: string[]): string {
 }
 
 function showLearnedNotification(termList: string[]) {
+  // 语音占用刘海时绝不抢显（含迟到回调覆盖 recording 的竞态）
+  if (isVoiceFlowBusy.value) {
+    pendingLearnedTermList.value.push(termList);
+    return;
+  }
+
+  activeLearnedTermList.value = [...termList];
   learnedDisplayText.value = formatLearnedText(termList);
-  // 先写文案，下一帧再切 visualMode，让布局与动画分帧，减轻首帧卡顿
-  requestAnimationFrame(() => {
-    visualMode.value = "learned";
-    if (useSettingsStore().isSoundEffectsEnabled) {
-      // 音效延后一拍，不和动画启动抢主线程
-      setTimeout(() => {
-        void invoke("play_learned_sound").catch(() => {});
-      }, 80);
-    }
-  });
+  // 同步切模式：禁止 rAF（隐藏窗口会挂起；迟到的 rAF 会覆盖 recording 造成叠层）
+  visualMode.value = "learned";
+  if (useSettingsStore().isSoundEffectsEnabled) {
+    setTimeout(() => {
+      void invoke("play_learned_sound").catch(() => {});
+    }, 80);
+  }
   clearLearnedTimer();
   learnedTimer = setTimeout(() => {
+    if (isVoiceFlowBusy.value) {
+      requeueActiveLearnedIfAny();
+      return;
+    }
+    activeLearnedTermList.value = [];
     visualMode.value = "collapsing";
     collapsingTimer = setTimeout(() => {
       visualMode.value = "hidden";
@@ -273,19 +307,23 @@ function showLearnedNotification(termList: string[]) {
 
 function processNextLearnedNotification() {
   if (pendingLearnedTermList.value.length === 0) return;
-  if (isHighPriorityMode.value) return;
+  if (isHighPriorityMode.value || isVoiceFlowBusy.value) return;
   const nextTermList = pendingLearnedTermList.value.shift()!;
   showLearnedNotification(nextTermList);
 }
 
 function handleVocabularyLearned(payload: VocabularyLearnedPayload) {
   console.log(
-    `[NotchHud] VOCABULARY_LEARNED received: termList=${JSON.stringify(payload.termList)}, visualMode=${visualMode.value}, isHighPriority=${isHighPriorityMode.value}`,
+    `[NotchHud] VOCABULARY_LEARNED received: termList=${JSON.stringify(payload.termList)}, visualMode=${visualMode.value}, status=${props.status}, isHighPriority=${isHighPriorityMode.value}`,
   );
   if (!payload.termList || payload.termList.length === 0) return;
 
-  if (isHighPriorityMode.value || visualMode.value === "learned") {
-    console.log("[NotchHud] queued (high priority or already showing learned)");
+  if (
+    isHighPriorityMode.value ||
+    isVoiceFlowBusy.value ||
+    visualMode.value === "learned"
+  ) {
+    console.log("[NotchHud] queued (voice busy / high priority / already learned)");
     pendingLearnedTermList.value.push(payload.termList);
     return;
   }
@@ -348,6 +386,10 @@ watch(
     }
 
     if (nextStatus === "recording") {
+      // 打断「已学习」：重新入队，录音结束后再播，避免与字幕叠层
+      if (visualMode.value === "learned") {
+        requeueActiveLearnedIfAny();
+      }
       visualMode.value = "recording";
       startWaveformAnimation();
       return;
@@ -359,6 +401,9 @@ watch(
       nextStatus === "editing"
     ) {
       stopWaveformAnimation();
+      if (visualMode.value === "learned") {
+        requeueActiveLearnedIfAny();
+      }
       if (
         visualMode.value === "recording" ||
         visualMode.value === "morphing"
@@ -501,8 +546,11 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <!-- Learned: 原宽下扩，🎉 + 已学习：xxx（超宽省略） -->
-      <div v-if="visualMode === 'learned'" class="learned-terms-row">
+      <!-- Learned：仅在非语音字幕时显示，禁止与 live transcript 叠层 -->
+      <div
+        v-if="visualMode === 'learned' && !showLiveTranscript"
+        class="learned-terms-row"
+      >
         <div class="learned-terms-inner">
           <span class="learned-emoji" aria-hidden="true">🎉</span>
           <span class="learned-terms">{{ learnedDisplayText }}</span>
@@ -513,7 +561,7 @@ onUnmounted(() => {
         <span class="error-message">{{ props.message }}</span>
       </div>
 
-      <!-- 即时转写字幕 / 整理中状态：黑底圆角向下扩展的同一块留海 -->
+      <!-- 即时转写字幕优先：与 learned 互斥 -->
       <div v-if="showLiveTranscript" class="live-transcript-row">
         <span
           class="live-transcript-text"

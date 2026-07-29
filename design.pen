@@ -2277,7 +2277,7 @@
                   "id": "iCzF4",
                   "name": "dTitle",
                   "fill": "$--foreground",
-                  "content": "自定义字典",
+                  "content": "词典",
                   "fontFamily": "$--font-primary",
                   "fontSize": 16,
                   "fontWeight": "600"
@@ -2313,7 +2313,7 @@
                           "id": "jiCp9",
                           "name": "dictTitle",
                           "fill": "$--foreground",
-                          "content": "自定义字典",
+                          "content": "词典",
                           "fontFamily": "Inter",
                           "fontSize": 20,
                           "fontWeight": "600"
@@ -5773,7 +5773,7 @@
                   "y": 11
                 },
                 "WCEn2": {
-                  "content": "自定义字典",
+                  "content": "词典",
                   "x": 40,
                   "y": 10
                 }
@@ -8126,7 +8126,7 @@
               "y": 11
             },
             "YXukb/WCEn2": {
-              "content": "自定义字典",
+              "content": "词典",
               "x": 40,
               "y": 10
             },

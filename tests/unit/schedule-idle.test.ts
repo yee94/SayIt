@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  runAfterPaint,
+  runDeferred,
   runWhenIdle,
   waitForNextPaint,
   yieldToMain,
@@ -14,23 +14,25 @@ describe("scheduleIdle", () => {
   });
 
   it("yieldToMain 后任务一定执行", async () => {
-    const task = vi.fn();
+    let ran = false;
     await yieldToMain();
-    task();
-    expect(task).toHaveBeenCalledOnce();
+    ran = true;
+    expect(ran).toBe(true);
   });
 
-  it("runAfterPaint 保证 task 执行且返回结果可用", async () => {
+  it("runDeferred 保证 task 执行且不依赖 rAF", async () => {
+    // 模拟 HUD 隐藏：rAF 永不回调 —— runDeferred 仍须完成
+    vi.stubGlobal("requestAnimationFrame", () => 0);
     let value = 0;
-    await runAfterPaint(() => {
+    await runDeferred(() => {
       value = 42;
     });
     expect(value).toBe(42);
   });
 
-  it("runAfterPaint 支持 async task", async () => {
+  it("runDeferred 支持 async task", async () => {
     let value = "";
-    await runAfterPaint(async () => {
+    await runDeferred(async () => {
       await Promise.resolve();
       value = "ok";
     });
@@ -51,13 +53,13 @@ describe("scheduleIdle", () => {
     await expect(waitForNextPaint()).resolves.toBeUndefined();
   });
 
-  it("学习关键路径：runAfterPaint 包裹 extractCorrections 结果与同步调用一致", async () => {
+  it("学习关键路径：runDeferred 包裹 extractCorrections 结果与同步调用一致", async () => {
     const original = "如果用 Type less 的话怎么做";
     const corrected = "如果用 Typeless 的话怎么做";
 
     const syncResult = extractCorrections(original, corrected, []);
     let asyncResult: string[] = [];
-    await runAfterPaint(() => {
+    await runDeferred(() => {
       asyncResult = extractCorrections(original, corrected, []);
     });
 

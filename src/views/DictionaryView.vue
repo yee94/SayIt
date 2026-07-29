@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { useVocabularyStore } from "../stores/useVocabularyStore";
-import { useSettingsStore } from "../stores/useSettingsStore";
 import { extractErrorMessage } from "../lib/errorUtils";
 import { useFeedbackMessage } from "../composables/useFeedbackMessage";
 import { useI18n } from "vue-i18n";
@@ -9,14 +8,13 @@ import {
   Plus,
   Trash2,
   Bot,
-  Hand,
   Info,
   Upload,
   Pencil,
   Check,
   X,
 } from "lucide-vue-next";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +29,6 @@ import {
 import { captureError } from "../lib/sentry";
 
 const vocabularyStore = useVocabularyStore();
-const settingsStore = useSettingsStore();
 const { t, locale } = useI18n();
 
 const newTermInput = ref("");
@@ -286,33 +283,11 @@ onBeforeUnmount(() => {
       </Card>
     </div>
 
-    <!-- Dictionary sections -->
-    <div v-else class="mt-6 space-y-6">
-      <!-- AI Recommended Section -->
+    <!-- Unified dictionary list -->
+    <div v-else class="mt-6">
       <Card>
-        <CardHeader class="pb-3">
-          <div class="flex items-center gap-2">
-            <CardTitle class="text-base">
-              <Bot class="inline h-4 w-4 mr-1" />
-              {{ $t("dictionary.aiRecommended") }}
-            </CardTitle>
-            <Badge v-if="vocabularyStore.aiSuggestedTermList.length > 0" variant="secondary">
-              {{ $t("dictionary.aiTermCount", { count: vocabularyStore.aiSuggestedTermList.length }) }}
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div
-            v-if="vocabularyStore.aiSuggestedTermList.length === 0"
-            class="py-4 text-center text-sm text-muted-foreground"
-          >
-            {{
-              settingsStore.isSmartDictionaryEnabled
-                ? $t("dictionary.noAiSuggestionsEnabled")
-                : $t("dictionary.noAiSuggestions")
-            }}
-          </div>
-          <Table v-else>
+        <CardContent class="pt-6">
+          <Table>
             <TableHeader>
               <TableRow>
                 <TableHead class="w-full">{{ $t("dictionary.termHeader") }}</TableHead>
@@ -322,30 +297,43 @@ onBeforeUnmount(() => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              <TableRow v-for="entry in vocabularyStore.aiSuggestedTermList" :key="entry.id">
+              <TableRow v-for="entry in vocabularyStore.termList" :key="entry.id">
                 <TableCell class="font-medium text-foreground">
                   <div v-if="editingTermId === entry.id" class="flex flex-col gap-1">
-                    <Input
-                      v-model="editingTermValue"
-                      data-edit-term="true"
-                      class="h-8 max-w-xs"
-                      :disabled="isSavingEdit"
-                      @keydown.enter.prevent="saveEdit"
-                      @keydown.escape.prevent="cancelEdit"
-                    />
+                    <div class="flex items-center gap-2">
+                      <Bot
+                        v-if="entry.source === 'ai'"
+                        class="h-4 w-4 shrink-0 text-muted-foreground"
+                        :title="$t('dictionary.aiRecommended')"
+                      />
+                      <Input
+                        v-model="editingTermValue"
+                        data-edit-term="true"
+                        class="h-8 max-w-xs"
+                        :disabled="isSavingEdit"
+                        @keydown.enter.prevent="saveEdit"
+                        @keydown.escape.prevent="cancelEdit"
+                      />
+                    </div>
                     <p v-if="showEditDuplicateHint" class="text-xs text-destructive">
                       {{ $t("dictionary.duplicateEntry") }}
                     </p>
                   </div>
-                  <button
-                    v-else
-                    type="button"
-                    class="term-edit-trigger text-left font-medium text-foreground hover:underline underline-offset-2"
-                    :title="$t('dictionary.edit')"
-                    @click="startEdit(entry.id, entry.term)"
-                  >
-                    {{ entry.term }}
-                  </button>
+                  <div v-else class="flex items-center gap-2">
+                    <Bot
+                      v-if="entry.source === 'ai'"
+                      class="h-4 w-4 shrink-0 text-muted-foreground"
+                      :title="$t('dictionary.aiRecommended')"
+                    />
+                    <button
+                      type="button"
+                      class="term-edit-trigger text-left font-medium text-foreground hover:underline underline-offset-2"
+                      :title="$t('dictionary.edit')"
+                      @click="startEdit(entry.id, entry.term)"
+                    >
+                      {{ entry.term }}
+                    </button>
+                  </div>
                 </TableCell>
                 <TableCell class="text-center">
                   <Badge :variant="getWeightVariant(entry.weight)">{{ entry.weight }}</Badge>
@@ -397,106 +385,6 @@ onBeforeUnmount(() => {
               </TableRow>
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
-
-      <!-- Manual Section -->
-      <Card>
-        <CardHeader class="pb-3">
-          <CardTitle class="text-base">
-            <Hand class="inline h-4 w-4 mr-1" />
-            {{ $t("dictionary.manualAdded") }}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table v-if="vocabularyStore.manualTermList.length > 0">
-            <TableHeader>
-              <TableRow>
-                <TableHead class="w-full">{{ $t("dictionary.termHeader") }}</TableHead>
-                <TableHead class="w-24 text-center">{{ $t("dictionary.weight") }}</TableHead>
-                <TableHead class="w-40">{{ $t("dictionary.dateHeader") }}</TableHead>
-                <TableHead class="w-20 text-left">{{ $t("dictionary.actionHeader") }}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <TableRow v-for="entry in vocabularyStore.manualTermList" :key="entry.id">
-                <TableCell class="font-medium text-foreground">
-                  <div v-if="editingTermId === entry.id" class="flex flex-col gap-1">
-                    <Input
-                      v-model="editingTermValue"
-                      data-edit-term="true"
-                      class="h-8 max-w-xs"
-                      :disabled="isSavingEdit"
-                      @keydown.enter.prevent="saveEdit"
-                      @keydown.escape.prevent="cancelEdit"
-                    />
-                    <p v-if="showEditDuplicateHint" class="text-xs text-destructive">
-                      {{ $t("dictionary.duplicateEntry") }}
-                    </p>
-                  </div>
-                  <button
-                    v-else
-                    type="button"
-                    class="term-edit-trigger text-left font-medium text-foreground hover:underline underline-offset-2"
-                    :title="$t('dictionary.edit')"
-                    @click="startEdit(entry.id, entry.term)"
-                  >
-                    {{ entry.term }}
-                  </button>
-                </TableCell>
-                <TableCell class="text-center">
-                  <Badge :variant="getWeightVariant(entry.weight)">{{ entry.weight }}</Badge>
-                </TableCell>
-                <TableCell class="text-muted-foreground">{{ formatDate(entry.createdAt) }}</TableCell>
-                <TableCell class="text-left">
-                  <div class="flex items-center gap-1">
-                    <template v-if="editingTermId === entry.id">
-                      <Button
-                        variant="default"
-                        size="icon-sm"
-                        :disabled="isSavingEdit || !editingTermValue.trim() || showEditDuplicateHint"
-                        :title="$t('dictionary.save')"
-                        @click="saveEdit"
-                      >
-                        <Check class="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="icon-sm"
-                        :disabled="isSavingEdit"
-                        :title="$t('dictionary.cancelEdit')"
-                        @click="cancelEdit"
-                      >
-                        <X class="h-4 w-4" />
-                      </Button>
-                    </template>
-                    <template v-else>
-                      <Button
-                        variant="outline"
-                        size="icon-sm"
-                        :disabled="isImporting || isSavingEdit"
-                        :title="$t('dictionary.edit')"
-                        @click="startEdit(entry.id, entry.term)"
-                      >
-                        <Pencil class="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="icon-sm"
-                        :disabled="removingTermIdSet.has(entry.id)"
-                        @click="handleRemoveTerm(entry.id, entry.term)"
-                      >
-                        <Trash2 class="h-4 w-4" />
-                      </Button>
-                    </template>
-                  </div>
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-          <div v-else class="py-4 text-center text-sm text-muted-foreground">
-            {{ $t("dictionary.emptyState") }}
-          </div>
         </CardContent>
       </Card>
     </div>

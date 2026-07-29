@@ -408,9 +408,8 @@
     },
     "upgradeNotice": {
       "title": "What's New in SayIt",
-      "item1": "Smart Dictionary learns your corrections: edit pasted text within about 30 seconds and SayIt learns new terms from the changes, improving recognition of the words you use most.",
-      "item2": "Screen Context Awareness: capture one screenshot and the frontmost app name while recording to help AI cleanup recognize UI-specific names and context.",
-      "item3": "Retry failed recognition: when a failed history record has saved audio, re-transcribe it directly from the original recording.",
+      "item1": "Simpler Dictionary view: all terms live in one list, and AI-learned words show a robot icon so you can tell them apart at a glance.",
+      "item2": "Smart learning no longer interrupts recording: learned-term toasts queue behind live captions instead of stacking on top while you speak or polish text.",
       "dismiss": "Got it"
     }
   },
@@ -443,7 +442,7 @@
       "description": "\"Minimal\" just fixes typos and adds punctuation — keeps your words mostly as-is. \"Active\" also tidies up the layout so it reads better. Want full control? Use \"Custom\" to write your own instructions for AI."
     },
     "dictionary": {
-      "title": "Custom Dictionary",
+      "title": "Dictionary",
       "description": "Add proper nouns, brand names, and jargon so AI uses the correct spelling. Enable Smart Learning to let AI automatically pick up new terms from your corrections."
     },
     "history": {

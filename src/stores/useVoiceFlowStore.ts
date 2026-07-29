@@ -19,9 +19,8 @@ import { analyzeCorrections } from "../lib/vocabularyAnalyzer";
 import { extractCorrections } from "../lib/correctionLearner";
 import { canonicalizeTranscription } from "../lib/termCanonicalizer";
 import {
-  runAfterPaint,
+  runDeferred,
   runWhenIdle,
-  waitForNextPaint,
   yieldToMain,
 } from "../lib/scheduleIdle";
 import i18n from "../i18n";
@@ -659,8 +658,8 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     const newTermList: string[] = [];
     const weightBumpIdList: string[] = [];
 
-    // 落库：先让出渲染帧，再同步写入（不用 idle，避免饿死导致学不到）
-    await runAfterPaint(async () => {
+    // 落库：只 yield 一次再写（不用 rAF：HUD 隐藏时 rAF 会挂起，拖到下次录音才完成）
+    await runDeferred(async () => {
       for (const term of suggestedTermList) {
         if (vocabularyStore.isDuplicateTerm(term)) {
           const existingEntry = vocabularyStore.termList.find(
@@ -719,13 +718,24 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       `useVoiceFlowStore: emitting VOCABULARY_LEARNED: ${newTermList.join(", ")}`,
     );
     try {
-      // 先让窗口就位，再等一帧，最后发事件启动动画 —— 避免 IPC + 差分收尾堵动画首帧
-      clearLearnedHideTimer();
-      const appWindow = getAppWindow();
-      await invoke("present_hud_window");
-      await appWindow.setIgnoreCursorEvents(true);
-      await waitForNextPaint();
-      await yieldToMain();
+      // 语音流程进行中：只广播事件（HUD 会排队），绝不 present 抢占录音刘海
+      const voiceBusy =
+        status.value === "recording" ||
+        status.value === "transcribing" ||
+        status.value === "enhancing" ||
+        status.value === "editing";
+
+      if (!voiceBusy) {
+        clearLearnedHideTimer();
+        const appWindow = getAppWindow();
+        await invoke("present_hud_window");
+        await appWindow.setIgnoreCursorEvents(true);
+        await yieldToMain();
+      } else {
+        writeInfoLog(
+          `[correction] voice busy (${status.value}) — skip present_hud, queue learned UI`,
+        );
+      }
 
       await emitEvent(VOCABULARY_LEARNED, {
         termList: newTermList,
@@ -734,16 +744,18 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         "useVoiceFlowStore: VOCABULARY_LEARNED emitted successfully",
       );
 
-      learnedHideTimer = setTimeout(() => {
-        learnedHideTimer = null;
-        if (status.value === "idle") {
-          hideHud().catch((err) =>
-            writeErrorLog(
-              `useVoiceFlowStore: learned hideHud failed: ${extractErrorMessage(err)}`,
-            ),
-          );
-        }
-      }, LEARNED_NOTIFICATION_TOTAL_DURATION_MS);
+      if (!voiceBusy) {
+        learnedHideTimer = setTimeout(() => {
+          learnedHideTimer = null;
+          if (status.value === "idle") {
+            hideHud().catch((err) =>
+              writeErrorLog(
+                `useVoiceFlowStore: learned hideHud failed: ${extractErrorMessage(err)}`,
+              ),
+            );
+          }
+        }, LEARNED_NOTIFICATION_TOTAL_DURATION_MS);
+      }
     } catch (emitErr) {
       writeErrorLog(
         `useVoiceFlowStore: VOCABULARY_LEARNED emit failed: ${extractErrorMessage(emitErr)}`,
@@ -799,12 +811,12 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       `[correction] text modified (overlap=${Math.round((check.overlapRatio ?? 0) * 100)}%)\n  original:  ${pastedText.slice(0, 80)}\n  corrected: ${fieldText.slice(0, 80)}`,
     );
 
-    // 本地差分：确定性让出一帧后再跑（保证必执行，语义与同步 extract 一致）
+    // 本地差分：yield 后再跑（不用 rAF，避免 HUD 隐藏时挂起）
     const vocabularyStore = useVocabularyStore();
     const existingTerms = vocabularyStore.termList.map((e) => e.term);
 
     let suggestedTermList: string[] = [];
-    await runAfterPaint(() => {
+    await runDeferred(() => {
       suggestedTermList = extractCorrections(
         pastedText,
         fieldText,
