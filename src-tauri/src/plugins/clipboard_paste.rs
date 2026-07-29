@@ -262,7 +262,7 @@ pub fn capture_target_window(state: State<'_, FocusState>) -> Result<i64, String
                 *guard = raw;
             }
             println!("[clipboard-paste] Captured target window: {:?}", hwnd);
-            return Ok(raw as i64);
+            Ok(raw as i64)
         }
     }
     #[cfg(target_os = "macos")]
