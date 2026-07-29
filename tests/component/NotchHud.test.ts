@@ -18,7 +18,7 @@ const i18n = createI18n({
   messages: {
     "zh-CN": {
       voiceFlow: {
-        connecting: "正在连接麦克风...",
+        connecting: "连接麦克风...",
         vocabularyLearned: "已学习：{terms}",
         vocabularyLearnedTruncated: "已学习：{terms} 等{count}个",
       },
@@ -64,14 +64,14 @@ describe("NotchHud", () => {
     const wrapper = mountNotchHud({
       status: "connecting",
       recordingElapsedSeconds: 0,
-      message: "正在连接麦克风...",
+      message: "连接麦克风...",
       liveTranscript: "不应显示",
     });
 
     expect(wrapper.find(".connection-container").exists()).toBe(true);
     expect(wrapper.findAll(".connection-dot").length).toBe(3);
     expect(wrapper.find(".connecting-label").text()).toBe(
-      "正在连接麦克风...",
+      "连接麦克风...",
     );
     expect(wrapper.find(".connecting-label").attributes()).toMatchObject({
       role: "status",
@@ -88,7 +88,7 @@ describe("NotchHud", () => {
     const wrapper = mountNotchHud({
       status: "connecting",
       recordingElapsedSeconds: 0,
-      message: "正在连接麦克风...",
+      message: "连接麦克风...",
     });
 
     await wrapper.setProps({
@@ -106,7 +106,7 @@ describe("NotchHud", () => {
     const wrapper = mountNotchHud({
       status: "connecting",
       recordingElapsedSeconds: 0,
-      message: "正在连接麦克风...",
+      message: "连接麦克风...",
     });
 
     const learnedCallback = mockListen.mock.calls[0]?.[1];
