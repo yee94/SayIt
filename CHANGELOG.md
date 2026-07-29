@@ -2,6 +2,13 @@
 
 SayIt 版本更新纪录。
 
+## [0.12.8] - 2026-07-29
+
+### Added
+
+- macOS 正式发布链路：Developer ID 签名、GitHub Actions 证书导入与 App Store Connect 公证配置
+- Tauri 应用内自动更新：GitHub Release 生成签名更新包与 `latest.json`
+
 ## [0.12.7] - 2026-07-29
 
 ### Added
