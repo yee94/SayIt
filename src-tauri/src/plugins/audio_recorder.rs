@@ -1,9 +1,11 @@
+use std::collections::VecDeque;
 use std::io::Cursor;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
+    mpsc::{self, Receiver, RecvTimeoutError, SyncSender, TrySendError},
     Arc, Mutex,
 };
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use rustfft::{num_complex::Complex, FftPlanner};
@@ -21,6 +23,8 @@ pub enum AudioRecorderError {
     BuildStream(String),
     #[error("Failed to start audio stream: {0}")]
     PlayStream(String),
+    #[error("Timed out waiting for first audio frame")]
+    FirstFrameTimeout,
     #[error("Not recording")]
     NotRecording,
     #[error("WAV encoding failed: {0}")]
@@ -63,8 +67,154 @@ pub struct StopRecordingResult {
 struct RecordingInner {
     samples: Mutex<Vec<i16>>,
     should_stop: AtomicBool,
-    /// 即时 ASR 订阅：录音 callback 会 clone 一段 mono PCM 送出（不阻塞主缓冲）
-    live_pcm_tx: Mutex<Option<std::sync::mpsc::SyncSender<Vec<i16>>>>,
+    /// 即时 ASR 订阅与首帧前缓冲，共用一把锁以保持 batch 顺序。
+    live_pcm: Mutex<LivePcmSinkState>,
+}
+
+const FIRST_FRAME_READY_TIMEOUT: Duration = Duration::from_secs(10);
+const MAX_PREBUFFERED_LIVE_PCM_BATCHES: usize = 8;
+
+#[derive(Default)]
+struct LivePcmSinkState {
+    tx: Option<SyncSender<Vec<i16>>>,
+    prebuffered_batches: VecDeque<Vec<i16>>,
+}
+
+/// Sends one non-blocking readiness signal after PCM has entered the recorder buffer.
+struct FirstFrameReadyNotifier {
+    sent: AtomicBool,
+    ready_tx: SyncSender<Result<u32, AudioRecorderError>>,
+    sample_rate: u32,
+}
+
+impl FirstFrameReadyNotifier {
+    fn new(ready_tx: SyncSender<Result<u32, AudioRecorderError>>, sample_rate: u32) -> Self {
+        Self {
+            sent: AtomicBool::new(false),
+            ready_tx,
+            sample_rate,
+        }
+    }
+
+    fn notify_after_pcm_buffered(&self) {
+        self.try_notify(Ok(self.sample_rate));
+    }
+
+    fn notify_stream_error_before_pcm(&self, error: AudioRecorderError) {
+        self.try_notify(Err(error));
+    }
+
+    fn try_notify(&self, result: Result<u32, AudioRecorderError>) {
+        if self
+            .sent
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_ok()
+        {
+            let _ = self.ready_tx.try_send(result);
+        }
+    }
+}
+
+fn cache_pcm_and_notify(
+    samples: &Mutex<Vec<i16>>,
+    pcm: &[i16],
+    first_frame_notifier: &FirstFrameReadyNotifier,
+) {
+    if pcm.is_empty() {
+        return;
+    }
+
+    match samples.lock() {
+        Ok(mut buffered_samples) => {
+            buffered_samples.extend_from_slice(pcm);
+            first_frame_notifier.notify_after_pcm_buffered();
+        }
+        Err(_) => {
+            first_frame_notifier.notify_stream_error_before_pcm(AudioRecorderError::LockPoisoned);
+        }
+    }
+}
+
+fn flush_prebuffered_live_pcm(live_pcm: &mut LivePcmSinkState) {
+    let Some(tx) = live_pcm.tx.clone() else {
+        return;
+    };
+
+    while let Some(batch) = live_pcm.prebuffered_batches.pop_front() {
+        match tx.try_send(batch) {
+            Ok(()) => {}
+            Err(TrySendError::Full(batch)) => {
+                live_pcm.prebuffered_batches.push_front(batch);
+                break;
+            }
+            Err(TrySendError::Disconnected(_)) => {
+                live_pcm.tx = None;
+                live_pcm.prebuffered_batches.clear();
+                break;
+            }
+        }
+    }
+}
+
+fn prebuffer_live_pcm_batch(live_pcm: &mut LivePcmSinkState, batch: Vec<i16>) {
+    if live_pcm.prebuffered_batches.len() < MAX_PREBUFFERED_LIVE_PCM_BATCHES {
+        live_pcm.prebuffered_batches.push_back(batch);
+    }
+}
+
+fn queue_or_send_live_pcm(live_pcm: &Mutex<LivePcmSinkState>, batch: &[i16]) {
+    if batch.is_empty() {
+        return;
+    }
+
+    let Ok(mut live_pcm) = live_pcm.lock() else {
+        return;
+    };
+    flush_prebuffered_live_pcm(&mut live_pcm);
+
+    let Some(tx) = live_pcm.tx.clone() else {
+        prebuffer_live_pcm_batch(&mut live_pcm, batch.to_vec());
+        return;
+    };
+
+    if let Err(TrySendError::Disconnected(batch)) = tx.try_send(batch.to_vec()) {
+        live_pcm.tx = None;
+        live_pcm.prebuffered_batches.clear();
+        prebuffer_live_pcm_batch(&mut live_pcm, batch);
+    }
+}
+
+fn attach_and_flush_live_pcm_sink(
+    live_pcm: &Mutex<LivePcmSinkState>,
+    tx: SyncSender<Vec<i16>>,
+) -> Result<(), AudioRecorderError> {
+    let mut live_pcm = live_pcm
+        .lock()
+        .map_err(|_| AudioRecorderError::LockPoisoned)?;
+    live_pcm.tx = Some(tx);
+    flush_prebuffered_live_pcm(&mut live_pcm);
+    Ok(())
+}
+
+fn wait_for_first_frame(
+    ready_rx: &Receiver<Result<u32, AudioRecorderError>>,
+    timeout: Duration,
+) -> Result<u32, AudioRecorderError> {
+    match ready_rx.recv_timeout(timeout) {
+        Ok(result) => result,
+        Err(RecvTimeoutError::Timeout) => Err(AudioRecorderError::FirstFrameTimeout),
+        Err(RecvTimeoutError::Disconnected) => Err(AudioRecorderError::BuildStream(
+            "Recording thread exited unexpectedly".to_string(),
+        )),
+    }
+}
+
+fn release_recording_thread_after_failed_start(
+    inner: &Arc<RecordingInner>,
+    thread: std::thread::JoinHandle<()>,
+) {
+    inner.should_stop.store(true, Ordering::SeqCst);
+    let _ = thread.join();
 }
 
 struct RecordingHandle {
@@ -97,12 +247,7 @@ impl AudioRecorderState {
             .lock()
             .map_err(|_| AudioRecorderError::LockPoisoned)?;
         let handle = guard.as_ref().ok_or(AudioRecorderError::NotRecording)?;
-        let mut sink = handle
-            .inner
-            .live_pcm_tx
-            .lock()
-            .map_err(|_| AudioRecorderError::LockPoisoned)?;
-        *sink = Some(tx);
+        attach_and_flush_live_pcm_sink(&handle.inner.live_pcm, tx)?;
         Ok(handle.sample_rate)
     }
 
@@ -112,8 +257,9 @@ impl AudioRecorderState {
             return;
         };
         if let Some(handle) = guard.as_ref() {
-            if let Ok(mut sink) = handle.inner.live_pcm_tx.lock() {
-                *sink = None;
+            if let Ok(mut live_pcm) = handle.inner.live_pcm.lock() {
+                live_pcm.tx = None;
+                live_pcm.prebuffered_batches.clear();
             }
         }
     }
@@ -125,8 +271,9 @@ impl AudioRecorderState {
         };
         if let Some(mut handle) = guard.take() {
             handle.inner.should_stop.store(true, Ordering::SeqCst);
-            if let Ok(mut sink) = handle.inner.live_pcm_tx.lock() {
-                *sink = None;
+            if let Ok(mut live_pcm) = handle.inner.live_pcm.lock() {
+                live_pcm.tx = None;
+                live_pcm.prebuffered_batches.clear();
             }
             if let Some(thread) = handle.thread.take() {
                 let _ = thread.join();
@@ -321,11 +468,11 @@ pub fn start_recording(
     let inner = Arc::new(RecordingInner {
         samples: Mutex::new(Vec::with_capacity(16000 * 30)),
         should_stop: AtomicBool::new(false),
-        live_pcm_tx: Mutex::new(None),
+        live_pcm: Mutex::new(LivePcmSinkState::default()),
     });
 
     let inner_for_thread = inner.clone();
-    let (ready_tx, ready_rx) = std::sync::mpsc::channel::<Result<u32, AudioRecorderError>>();
+    let (ready_tx, ready_rx) = mpsc::sync_channel::<Result<u32, AudioRecorderError>>(1);
     let start_time = Instant::now();
 
     let device_name_for_thread = device_name;
@@ -336,9 +483,10 @@ pub fn start_recording(
         })
         .map_err(|e| AudioRecorderError::BuildStream(format!("Thread spawn failed: {e}")))?;
 
-    // Wait for the recording thread to report success or failure
-    match ready_rx.recv() {
-        Ok(Ok(sample_rate)) => {
+    // `stream.play()` only means the driver accepted the start request. Wait until the
+    // input callback has buffered a real PCM batch before exposing the recorder as ready.
+    match wait_for_first_frame(&ready_rx, FIRST_FRAME_READY_TIMEOUT) {
+        Ok(sample_rate) => {
             *guard = Some(RecordingHandle {
                 inner,
                 thread: Some(thread),
@@ -347,15 +495,9 @@ pub fn start_recording(
             });
             Ok(())
         }
-        Ok(Err(e)) => {
-            let _ = thread.join();
+        Err(e) => {
+            release_recording_thread_after_failed_start(&inner, thread);
             Err(e)
-        }
-        Err(_) => {
-            let _ = thread.join();
-            Err(AudioRecorderError::BuildStream(
-                "Recording thread exited unexpectedly".to_string(),
-            ))
         }
     }
 }
@@ -434,7 +576,7 @@ pub fn stop_recording(
 fn run_recording_thread(
     app: AppHandle,
     inner: Arc<RecordingInner>,
-    ready_tx: std::sync::mpsc::Sender<Result<u32, AudioRecorderError>>,
+    ready_tx: SyncSender<Result<u32, AudioRecorderError>>,
     device_name: String,
 ) {
     // ── Get input device ──
@@ -462,8 +604,15 @@ fn run_recording_thread(
     let sample_rate = selection.sample_rate;
     let channels = selection.channels;
 
-    let stream = match build_input_stream(&device, &selection.supported_config, inner.clone(), app)
-    {
+    let first_frame_notifier =
+        Arc::new(FirstFrameReadyNotifier::new(ready_tx.clone(), sample_rate));
+    let stream = match build_input_stream(
+        &device,
+        &selection.supported_config,
+        inner.clone(),
+        app,
+        first_frame_notifier,
+    ) {
         Ok(stream) => stream,
         Err(error) => {
             let _ = ready_tx.send(Err(error));
@@ -478,7 +627,6 @@ fn run_recording_thread(
     }
 
     println!("[audio-recorder] Recording started ({sample_rate}Hz, {channels}ch)");
-    let _ = ready_tx.send(Ok(sample_rate));
 
     // ── Keep stream alive until told to stop ──
     while !inner.should_stop.load(Ordering::SeqCst) {
@@ -767,42 +915,93 @@ fn build_input_stream(
     supported_config: &cpal::SupportedStreamConfig,
     inner: Arc<RecordingInner>,
     app: AppHandle,
+    first_frame_notifier: Arc<FirstFrameReadyNotifier>,
 ) -> Result<cpal::Stream, AudioRecorderError> {
     let sample_format = supported_config.sample_format();
     let config = supported_config.config();
     let channels = config.channels;
 
     match sample_format {
-        cpal::SampleFormat::I8 => {
-            build_typed_input_stream::<i8>(device, &config, channels, inner, app)
-        }
-        cpal::SampleFormat::I16 => {
-            build_typed_input_stream::<i16>(device, &config, channels, inner, app)
-        }
-        cpal::SampleFormat::I32 => {
-            build_typed_input_stream::<i32>(device, &config, channels, inner, app)
-        }
-        cpal::SampleFormat::I64 => {
-            build_typed_input_stream::<i64>(device, &config, channels, inner, app)
-        }
-        cpal::SampleFormat::U8 => {
-            build_typed_input_stream::<u8>(device, &config, channels, inner, app)
-        }
-        cpal::SampleFormat::U16 => {
-            build_typed_input_stream::<u16>(device, &config, channels, inner, app)
-        }
-        cpal::SampleFormat::U32 => {
-            build_typed_input_stream::<u32>(device, &config, channels, inner, app)
-        }
-        cpal::SampleFormat::U64 => {
-            build_typed_input_stream::<u64>(device, &config, channels, inner, app)
-        }
-        cpal::SampleFormat::F32 => {
-            build_typed_input_stream::<f32>(device, &config, channels, inner, app)
-        }
-        cpal::SampleFormat::F64 => {
-            build_typed_input_stream::<f64>(device, &config, channels, inner, app)
-        }
+        cpal::SampleFormat::I8 => build_typed_input_stream::<i8>(
+            device,
+            &config,
+            channels,
+            inner,
+            app,
+            first_frame_notifier,
+        ),
+        cpal::SampleFormat::I16 => build_typed_input_stream::<i16>(
+            device,
+            &config,
+            channels,
+            inner,
+            app,
+            first_frame_notifier,
+        ),
+        cpal::SampleFormat::I32 => build_typed_input_stream::<i32>(
+            device,
+            &config,
+            channels,
+            inner,
+            app,
+            first_frame_notifier,
+        ),
+        cpal::SampleFormat::I64 => build_typed_input_stream::<i64>(
+            device,
+            &config,
+            channels,
+            inner,
+            app,
+            first_frame_notifier,
+        ),
+        cpal::SampleFormat::U8 => build_typed_input_stream::<u8>(
+            device,
+            &config,
+            channels,
+            inner,
+            app,
+            first_frame_notifier,
+        ),
+        cpal::SampleFormat::U16 => build_typed_input_stream::<u16>(
+            device,
+            &config,
+            channels,
+            inner,
+            app,
+            first_frame_notifier,
+        ),
+        cpal::SampleFormat::U32 => build_typed_input_stream::<u32>(
+            device,
+            &config,
+            channels,
+            inner,
+            app,
+            first_frame_notifier,
+        ),
+        cpal::SampleFormat::U64 => build_typed_input_stream::<u64>(
+            device,
+            &config,
+            channels,
+            inner,
+            app,
+            first_frame_notifier,
+        ),
+        cpal::SampleFormat::F32 => build_typed_input_stream::<f32>(
+            device,
+            &config,
+            channels,
+            inner,
+            app,
+            first_frame_notifier,
+        ),
+        cpal::SampleFormat::F64 => build_typed_input_stream::<f64>(
+            device,
+            &config,
+            channels,
+            inner,
+            app,
+            first_frame_notifier,
+        ),
         other => Err(AudioRecorderError::BuildStream(format!(
             "Unsupported sample format: {other}"
         ))),
@@ -815,6 +1014,7 @@ fn build_typed_input_stream<T>(
     channels: u16,
     inner: Arc<RecordingInner>,
     app: AppHandle,
+    first_frame_notifier: Arc<FirstFrameReadyNotifier>,
 ) -> Result<cpal::Stream, AudioRecorderError>
 where
     T: cpal::Sample + cpal::SizedSample,
@@ -822,6 +1022,8 @@ where
 {
     let inner_for_callback = inner;
     let app_for_callback = app;
+    let first_frame_notifier_for_callback = first_frame_notifier;
+    let first_frame_notifier_for_error = first_frame_notifier_for_callback.clone();
     let chunk_size = channels as usize;
 
     let fft = FftPlanner::<f32>::new().plan_fft_forward(FFT_SIZE);
@@ -858,16 +1060,14 @@ where
                     total_mono_samples += 1;
                 }
 
-                if let Ok(mut samples) = inner_for_callback.samples.lock() {
-                    samples.extend_from_slice(&mono_batch);
-                }
+                cache_pcm_and_notify(
+                    &inner_for_callback.samples,
+                    &mono_batch,
+                    &first_frame_notifier_for_callback,
+                );
 
-                // 即时 ASR：非阻塞送出本批 mono；满了就丢这批，避免拖慢录音 callback
-                if let Ok(sink) = inner_for_callback.live_pcm_tx.lock() {
-                    if let Some(tx) = sink.as_ref() {
-                        let _ = tx.try_send(mono_batch.clone());
-                    }
-                }
+                // 即时 ASR：首帧前先缓冲，接上 sink 后维持 earliest-first 的非阻塞送出。
+                queue_or_send_live_pcm(&inner_for_callback.live_pcm, &mono_batch);
 
                 if total_mono_samples >= FFT_SIZE
                     && last_emit.elapsed().as_millis() >= WAVEFORM_EMIT_INTERVAL_MS
@@ -896,6 +1096,9 @@ where
             },
             move |err| {
                 eprintln!("[audio-recorder] Stream error: {err}");
+                first_frame_notifier_for_error.notify_stream_error_before_pcm(
+                    AudioRecorderError::BuildStream(format!("Stream error: {err}")),
+                );
             },
             None,
         )
@@ -1164,5 +1367,140 @@ mod tests {
         assert!(flag.load(Ordering::SeqCst));
         // shutdown uses take(), so handle should be None now
         assert!(state.handle.lock().unwrap().is_none());
+    }
+
+    #[test]
+    fn first_frame_ready_notifies_once_after_non_empty_pcm_is_buffered() {
+        let (ready_tx, ready_rx) = mpsc::sync_channel(1);
+        let notifier = FirstFrameReadyNotifier::new(ready_tx, 16_000);
+        let samples = Mutex::new(Vec::new());
+
+        cache_pcm_and_notify(&samples, &[], &notifier);
+        assert!(matches!(
+            ready_rx.recv_timeout(Duration::from_millis(0)),
+            Err(RecvTimeoutError::Timeout)
+        ));
+
+        cache_pcm_and_notify(&samples, &[0, 1, -1], &notifier);
+        assert_eq!(ready_rx.recv().unwrap().unwrap(), 16_000);
+        assert_eq!(*samples.lock().unwrap(), vec![0, 1, -1]);
+
+        cache_pcm_and_notify(&samples, &[2], &notifier);
+        assert!(matches!(
+            ready_rx.recv_timeout(Duration::from_millis(0)),
+            Err(RecvTimeoutError::Timeout)
+        ));
+        assert_eq!(*samples.lock().unwrap(), vec![0, 1, -1, 2]);
+    }
+
+    #[test]
+    fn first_frame_wait_reports_a_native_timeout() {
+        let (_ready_tx, ready_rx) = mpsc::sync_channel(1);
+
+        assert!(matches!(
+            wait_for_first_frame(&ready_rx, Duration::from_millis(0)),
+            Err(AudioRecorderError::FirstFrameTimeout)
+        ));
+    }
+
+    #[test]
+    fn first_frame_wait_delivers_startup_errors() {
+        let (ready_tx, ready_rx) = mpsc::sync_channel(1);
+        ready_tx
+            .send(Err(AudioRecorderError::PlayStream(
+                "play failed".to_string(),
+            )))
+            .unwrap();
+
+        assert!(matches!(
+            wait_for_first_frame(&ready_rx, Duration::from_millis(0)),
+            Err(AudioRecorderError::PlayStream(message)) if message == "play failed"
+        ));
+    }
+
+    #[test]
+    fn stream_error_before_first_pcm_rejects_first_frame_wait() {
+        let (ready_tx, ready_rx) = mpsc::sync_channel(1);
+        let notifier = FirstFrameReadyNotifier::new(ready_tx, 16_000);
+
+        notifier.notify_stream_error_before_pcm(AudioRecorderError::BuildStream(
+            "Stream error: input disconnected".to_string(),
+        ));
+        notifier.notify_after_pcm_buffered();
+
+        assert!(matches!(
+            wait_for_first_frame(&ready_rx, Duration::from_millis(0)),
+            Err(AudioRecorderError::BuildStream(message)) if message == "Stream error: input disconnected"
+        ));
+    }
+
+    #[test]
+    fn poisoned_samples_before_first_pcm_rejects_first_frame_wait() {
+        let (ready_tx, ready_rx) = mpsc::sync_channel(1);
+        let notifier = FirstFrameReadyNotifier::new(ready_tx, 16_000);
+        let samples = Arc::new(Mutex::new(Vec::new()));
+        let poisoned_samples = samples.clone();
+        let _ = std::thread::spawn(move || {
+            let _guard = poisoned_samples.lock().unwrap();
+            panic!("poison samples mutex");
+        })
+        .join();
+
+        cache_pcm_and_notify(&samples, &[1], &notifier);
+
+        assert!(matches!(
+            wait_for_first_frame(&ready_rx, Duration::from_millis(0)),
+            Err(AudioRecorderError::LockPoisoned)
+        ));
+    }
+
+    #[test]
+    fn prebuffered_first_pcm_reaches_live_sink_in_earliest_first_order() {
+        let recorder = AudioRecorderState::new();
+        let inner = Arc::new(RecordingInner {
+            samples: Mutex::new(Vec::new()),
+            should_stop: AtomicBool::new(false),
+            live_pcm: Mutex::new(LivePcmSinkState::default()),
+        });
+        queue_or_send_live_pcm(&inner.live_pcm, &[1, 2]);
+        queue_or_send_live_pcm(&inner.live_pcm, &[3, 4]);
+        *recorder.recording.lock().unwrap() = Some(RecordingHandle {
+            inner: inner.clone(),
+            thread: None,
+            start_time: Instant::now(),
+            sample_rate: 16_000,
+        });
+        let (tx, rx) = mpsc::sync_channel(1);
+
+        assert_eq!(recorder.attach_live_pcm_sink(tx).unwrap(), 16_000);
+        assert_eq!(rx.recv().unwrap(), vec![1, 2]);
+
+        let mut live_pcm_guard = inner.live_pcm.lock().unwrap();
+        flush_prebuffered_live_pcm(&mut live_pcm_guard);
+        drop(live_pcm_guard);
+        assert_eq!(rx.recv().unwrap(), vec![3, 4]);
+    }
+
+    #[test]
+    fn failed_start_releases_the_recording_thread() {
+        let inner = Arc::new(RecordingInner {
+            samples: Mutex::new(Vec::new()),
+            should_stop: AtomicBool::new(false),
+            live_pcm: Mutex::new(LivePcmSinkState::default()),
+        });
+        let inner_for_thread = inner.clone();
+        let thread_finished = Arc::new(AtomicBool::new(false));
+        let thread_finished_for_thread = thread_finished.clone();
+        let thread = std::thread::spawn(move || {
+            while !inner_for_thread.should_stop.load(Ordering::SeqCst) {
+                std::thread::yield_now();
+            }
+            thread_finished_for_thread.store(true, Ordering::SeqCst);
+        });
+
+        release_recording_thread_after_failed_start(&inner, thread);
+
+        assert!(inner.should_stop.load(Ordering::SeqCst));
+        assert!(thread_finished.load(Ordering::SeqCst));
     }
 }

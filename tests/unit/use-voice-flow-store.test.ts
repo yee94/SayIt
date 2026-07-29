@@ -480,6 +480,7 @@ describe("useVoiceFlowStore", () => {
   });
 
   it("[P0] start_recording 成功且会话有效后才进入 recording 并启动 live ASR", async () => {
+    vi.useFakeTimers();
     const recordingStart = createDeferredPromise<void>();
     const base = createMockInvokeHandler();
     mockInvoke.mockImplementation(async (cmd: string, args?: unknown) => {
@@ -495,7 +496,18 @@ describe("useVoiceFlowStore", () => {
     expect(
       mockInvoke.mock.calls.some(([command]) => command === "start_live_asr"),
     ).toBe(false);
+    vi.advanceTimersByTime(3_000);
+    expect(store.status).toBe("connecting");
+    expect(store.recordingElapsedSeconds).toBe(0);
+    expect(
+      mockEmit.mock.calls.some(
+        (call) =>
+          call[0] === "voice-flow:state-changed" &&
+          (call[1] as { status: string }).status === "recording",
+      ),
+    ).toBe(false);
 
+    vi.useRealTimers();
     recordingStart.resolvePromise();
 
     await vi.waitFor(() => {
