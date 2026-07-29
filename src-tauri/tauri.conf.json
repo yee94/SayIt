@@ -63,12 +63,12 @@
       "endpoints": [
         "https://github.com/yee94/SayIt/releases/latest/download/latest.json"
       ],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDBENjAzMzYyRTMxMTNGQjgKUldTNFB4SGpZak5nRFJoYUpxR0RGMkZyZUhHYStyNzgxWEwxVHR2ZEFZMzh3eFQ1QlpXVEJLVGUK"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDkyRDFEOTk0QzA1NjNBQ0EKUldUS09sYkFsTm5Sa29NNGhBbUZrekg5YmpCdGZLcStPdWFMM1pDYkJWN1RPZVBSVmx5Mk9tdTQK"
     }
   },
   "bundle": {
     "active": true,
-    "createUpdaterArtifacts": false,
+    "createUpdaterArtifacts": true,
     "targets": "all",
     "icon": [
       "icons/32x32.png",
@@ -79,7 +79,8 @@
     ],
     "macOS": {
       "entitlements": "./Entitlements.plist",
-      "signingIdentity": "-"
+      "signingIdentity": "Developer ID Application: yee wang (6W97S9B7CZ)",
+      "hardenedRuntime": true
     }
   }
 }

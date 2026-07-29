@@ -113,7 +113,9 @@ SayIt 在交互上借鉴了 [Typeless](https://www.typeless.com/)：全局热键
 
 更多版本见 [Releases](https://github.com/yee94/SayIt/releases)，变更记录见 [CHANGELOG.md](CHANGELOG.md)。
 
-> macOS 为 ad-hoc 签名；Windows 安装包未做代码签名。首次打开若被系统拦截，请在系统设置中允许打开。
+> macOS release 使用 Apple Developer ID 签名与公证。开发者需要先完成[本地与 CI 的签名配置](docs/apple-signing.md)；Windows 安装包未做代码签名。
+
+应用内更新使用 GitHub Releases 的 Tauri 签名更新包，配置说明见 [自动更新](docs/auto-updates.md)。
 
 ---
 

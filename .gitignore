@@ -9,6 +9,7 @@ src-tauri/target/
 .env
 .env.local
 .env.*.local
+.apple-signing.env
 
 # IDE
 .vscode/
@@ -35,6 +36,10 @@ playwright/.auth/
 # Tauri signing keys
 *.key
 *.key.pub
+*.p8
+*.p12
+*.cer
+*.mobileprovision
 
 # Auto-generated documentation scanner output
 docs/project-scan-report.json
