@@ -7,6 +7,7 @@ import type {
   ApiUsageRecord,
   DailyUsageTrend,
 } from "../types/transcription";
+import type { TranscriptionResult } from "../types/audio";
 import type { TriggerMode } from "../types";
 import type { TranscriptionCompletedPayload } from "../types/events";
 import { invoke } from "@tauri-apps/api/core";
@@ -14,10 +15,22 @@ import { getDatabase } from "../lib/database";
 import { buildDailyUsageSeries } from "../lib/usageTrend";
 import { extractErrorMessage } from "../lib/errorUtils";
 import { captureError } from "../lib/sentry";
+import { enhanceText } from "../lib/enhancer";
+import {
+  detectEnhancementAnomaly,
+  detectSemanticDrift,
+} from "../lib/hallucinationDetector";
+import {
+  calculateChatCostCeiling,
+  calculateWhisperCostCeiling,
+} from "../lib/apiPricing";
 import {
   emitToWindow,
   TRANSCRIPTION_COMPLETED,
 } from "../composables/useTauriEvents";
+import { useSettingsStore } from "./useSettingsStore";
+import { useVocabularyStore } from "./useVocabularyStore";
+import i18n from "../i18n";
 
 const PAGE_SIZE = 20;
 const USAGE_TREND_DAYS = 14;
@@ -565,6 +578,192 @@ export const useHistoryStore = defineStore("history", () => {
     return deletedCount;
   }
 
+  /**
+   * 历史页：对「识别失败」且仍有录音文件的记录重新 ASR（可选 AI 整理），UPDATE 原记录。
+   * 不自动粘贴（用户在 Dashboard 浏览，焦点未必在目标输入框）。
+   */
+  async function retranscribeFailedRecord(record: TranscriptionRecord): Promise<{
+    rawText: string;
+    processedText: string | null;
+  }> {
+    if (record.status !== "failed") {
+      throw new Error(i18n.global.t("history.retranscribeNotFailed"));
+    }
+    if (!record.audioFilePath) {
+      throw new Error(i18n.global.t("history.noRecordingFile"));
+    }
+
+    const settingsStore = useSettingsStore();
+    let appId = settingsStore.getDoubaoAppId();
+    let accessKey = settingsStore.getDoubaoAccessKey();
+    if (!appId || !accessKey) {
+      await settingsStore.refreshApiKey();
+      appId = settingsStore.getDoubaoAppId();
+      accessKey = settingsStore.getDoubaoAccessKey();
+    }
+    if (!appId || !accessKey) {
+      throw new Error(i18n.global.t("errors.apiKeyMissing"));
+    }
+
+    const vocabularyStore = useVocabularyStore();
+    const whisperTermList = await vocabularyStore.getTopTermListByWeight(50);
+    const hasVocabulary = whisperTermList.length > 0;
+
+    const result = await invoke<TranscriptionResult>("retranscribe_from_file", {
+      filePath: record.audioFilePath,
+      appId,
+      accessKey,
+      vocabularyTermList: hasVocabulary ? whisperTermList : null,
+      language: settingsStore.getWhisperLanguageCode(),
+    });
+
+    if (!result.rawText || !result.rawText.trim()) {
+      throw new Error(i18n.global.t("history.retranscribeEmpty"));
+    }
+
+    let processedText: string | null = null;
+    let wasEnhanced = false;
+    let enhancementDurationMs: number | null = null;
+    let chatUsage: {
+      promptTokens: number;
+      completionTokens: number;
+      totalTokens: number;
+      promptTimeMs?: number;
+      completionTimeMs?: number;
+      totalTimeMs?: number;
+    } | null = null;
+
+    const shouldEnhance =
+      !settingsStore.isEnhancementThresholdEnabled ||
+      result.rawText.length >= settingsStore.enhancementThresholdCharCount;
+
+    if (shouldEnhance) {
+      try {
+        await settingsStore.refreshLlmApiKey();
+        const llmApiKey = settingsStore.getLlmApiKey();
+        if (llmApiKey) {
+          const enhancementStart = performance.now();
+          const enhancementTermList =
+            await vocabularyStore.getTopTermListByWeight(50);
+          let enhanceResult = await enhanceText(result.rawText, llmApiKey, {
+            systemPrompt: settingsStore.getAiPrompt(),
+            vocabularyTermList:
+              enhancementTermList.length > 0 ? enhancementTermList : undefined,
+            modelId: settingsStore.selectedLlmModelId,
+            baseUrl: settingsStore.getLlmBaseUrl(),
+          });
+
+          const anomaly = detectEnhancementAnomaly({
+            rawText: result.rawText,
+            enhancedText: enhanceResult.text,
+          });
+          const drift = detectSemanticDrift(
+            result.rawText,
+            enhanceResult.text,
+          );
+          if (anomaly.isAnomaly || drift.isDrift) {
+            enhanceResult = { ...enhanceResult, text: result.rawText };
+            wasEnhanced = false;
+          } else {
+            wasEnhanced = true;
+            processedText = enhanceResult.text;
+          }
+          enhancementDurationMs = performance.now() - enhancementStart;
+          chatUsage = enhanceResult.usage;
+        }
+      } catch (enhanceErr) {
+        console.error(
+          `[useHistoryStore] retranscribe enhance failed: ${extractErrorMessage(enhanceErr)}`,
+        );
+        captureError(enhanceErr, {
+          source: "history",
+          step: "retranscribe-enhance",
+        });
+        // 整理失败仍保留 ASR 原文
+        processedText = null;
+        wasEnhanced = false;
+      }
+    }
+
+    const charCount = result.rawText.length;
+    const transcriptionDurationMs = Math.round(result.transcriptionDurationMs);
+
+    await updateTranscriptionOnRetrySuccess({
+      id: record.id,
+      rawText: result.rawText,
+      processedText,
+      transcriptionDurationMs,
+      enhancementDurationMs:
+        enhancementDurationMs !== null
+          ? Math.round(enhancementDurationMs)
+          : null,
+      wasEnhanced,
+      charCount,
+    });
+
+    // 本地列表即时更新（不必等 resetAndFetch）
+    const idx = transcriptionList.value.findIndex((r) => r.id === record.id);
+    if (idx >= 0) {
+      const prev = transcriptionList.value[idx];
+      transcriptionList.value[idx] = {
+        ...prev,
+        status: "success",
+        rawText: result.rawText,
+        processedText,
+        transcriptionDurationMs,
+        enhancementDurationMs:
+          enhancementDurationMs !== null
+            ? Math.round(enhancementDurationMs)
+            : null,
+        wasEnhanced,
+        charCount,
+      };
+    }
+
+    // API 用量（best-effort）
+    void addApiUsage({
+      id: crypto.randomUUID(),
+      transcriptionId: record.id,
+      apiType: "whisper",
+      model: "doubao-seedasr",
+      promptTokens: null,
+      completionTokens: null,
+      totalTokens: null,
+      promptTimeMs: null,
+      completionTimeMs: null,
+      totalTimeMs: null,
+      audioDurationMs: record.recordingDurationMs,
+      estimatedCostCeiling: calculateWhisperCostCeiling(
+        record.recordingDurationMs,
+        settingsStore.selectedWhisperModelId,
+      ),
+    }).catch(() => {});
+
+    if (chatUsage) {
+      void addApiUsage({
+        id: crypto.randomUUID(),
+        transcriptionId: record.id,
+        apiType: "chat",
+        model: settingsStore.selectedLlmModelId,
+        promptTokens: chatUsage.promptTokens,
+        completionTokens: chatUsage.completionTokens,
+        totalTokens: chatUsage.totalTokens,
+        promptTimeMs: chatUsage.promptTimeMs ?? null,
+        completionTimeMs: chatUsage.completionTimeMs ?? null,
+        totalTimeMs: chatUsage.totalTimeMs ?? null,
+        audioDurationMs: null,
+        estimatedCostCeiling: calculateChatCostCeiling(
+          chatUsage.totalTokens,
+          settingsStore.selectedLlmModelId,
+        ),
+      }).catch(() => {});
+    }
+
+    void refreshDashboard().catch(() => {});
+
+    return { rawText: result.rawText, processedText };
+  }
+
   return {
     transcriptionList,
     isLoading,
@@ -581,6 +780,7 @@ export const useHistoryStore = defineStore("history", () => {
     loadMore,
     addTranscription,
     updateTranscriptionOnRetrySuccess,
+    retranscribeFailedRecord,
     addApiUsage,
     fetchDashboardStats,
     fetchRecentTranscriptionList,

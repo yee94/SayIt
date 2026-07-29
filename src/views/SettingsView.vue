@@ -625,6 +625,18 @@ async function handleToggleSmartDictionary(newValue: boolean) {
   }
 }
 
+// ── 屏幕上下文感知 ──────────────────────────────────────────
+const screenContextFeedback = useFeedbackMessage();
+
+async function handleToggleScreenContext(newValue: boolean) {
+  try {
+    await settingsStore.saveScreenContextEnabled(newValue);
+    screenContextFeedback.show("success", t("common.save"));
+  } catch (err) {
+    screenContextFeedback.show("error", extractErrorMessage(err));
+  }
+}
+
 // ── 录音储存管理 ──────────────────────────────────────────
 const recordingCleanupFeedback = useFeedbackMessage();
 const recordingAutoCleanupEnabled = ref(false);
@@ -792,6 +804,7 @@ onBeforeUnmount(() => {
   transcriptionLocaleFeedback.clearTimer();
   autoStartFeedback.clearTimer();
   smartDictionaryFeedback.clearTimer();
+  screenContextFeedback.clearTimer();
   recordingCleanupFeedback.clearTimer();
   providerFeedback.clearTimer();
   clearTimeout(deleteConfirmTimeoutId);
@@ -1251,6 +1264,94 @@ onBeforeUnmount(() => {
       </CardContent>
     </Card>
 
+    <!-- 智能字典学习（贴上后自动学习纠错词） -->
+    <Card>
+      <CardHeader class="border-b border-border">
+        <CardTitle class="text-base">{{ $t("settings.smartDictionary.title") }}</CardTitle>
+      </CardHeader>
+      <CardContent class="space-y-4">
+        <p class="text-sm text-muted-foreground leading-relaxed">
+          {{ $t("settings.smartDictionary.description") }}
+        </p>
+
+        <div class="flex items-center justify-between">
+          <Label for="smart-dictionary-toggle">{{ $t("settings.smartDictionary.title") }}</Label>
+          <Switch
+            id="smart-dictionary-toggle"
+            :model-value="settingsStore.isSmartDictionaryEnabled"
+            @update:model-value="handleToggleSmartDictionary"
+          />
+        </div>
+
+        <p class="text-xs text-muted-foreground">
+          {{ $t("settings.smartDictionary.privacyNote") }}
+        </p>
+
+        <transition name="feedback-fade">
+          <p
+            v-if="smartDictionaryFeedback.message.value !== ''"
+            class="text-sm"
+            :class="
+              smartDictionaryFeedback.type.value === 'success'
+                ? 'text-green-400'
+                : 'text-red-400'
+            "
+          >
+            {{ smartDictionaryFeedback.message.value }}
+          </p>
+        </transition>
+      </CardContent>
+    </Card>
+
+    <!-- 屏幕上下文感知（录音时截图 + 前台应用，供 AI 整理；需 Vision LLM） -->
+    <Card>
+      <CardHeader class="border-b border-border">
+        <CardTitle class="text-base">{{ $t("settings.screenContext.title") }}</CardTitle>
+      </CardHeader>
+      <CardContent class="space-y-4">
+        <p class="text-sm text-muted-foreground leading-relaxed">
+          {{ $t("settings.screenContext.description") }}
+        </p>
+
+        <div
+          class="rounded-md border border-border bg-muted/40 px-3 py-2.5 text-xs leading-relaxed text-foreground"
+          role="note"
+        >
+          {{ $t("settings.screenContext.llmRequirement") }}
+        </div>
+
+        <div class="flex items-center justify-between">
+          <Label for="screen-context-toggle">{{ $t("settings.screenContext.title") }}</Label>
+          <Switch
+            id="screen-context-toggle"
+            :model-value="settingsStore.isScreenContextEnabled"
+            @update:model-value="handleToggleScreenContext"
+          />
+        </div>
+
+        <p class="text-xs text-muted-foreground">
+          {{ $t("settings.screenContext.privacyNote") }}
+        </p>
+        <p class="text-xs text-muted-foreground">
+          {{ $t("settings.screenContext.permissionHint") }}
+        </p>
+
+        <transition name="feedback-fade">
+          <p
+            v-if="screenContextFeedback.message.value !== ''"
+            class="text-sm"
+            :class="
+              screenContextFeedback.type.value === 'success'
+                ? 'text-green-400'
+                : 'text-red-400'
+            "
+          >
+            {{ screenContextFeedback.message.value }}
+          </p>
+        </transition>
+      </CardContent>
+    </Card>
+
     <!-- 短文字门槛 -->
     <Card>
       <CardHeader class="border-b border-border">
@@ -1299,45 +1400,6 @@ onBeforeUnmount(() => {
             "
           >
             {{ enhancementThresholdFeedback.message.value }}
-          </p>
-        </transition>
-      </CardContent>
-    </Card>
-
-    <!-- 智慧字典学习（macOS: AXUIElement；Windows: UI Automation） -->
-    <Card>
-      <CardHeader class="border-b border-border">
-        <CardTitle class="text-base">{{ $t("settings.smartDictionary.title") }}</CardTitle>
-      </CardHeader>
-      <CardContent class="space-y-4">
-        <p class="text-sm text-muted-foreground leading-relaxed">
-          {{ $t("settings.smartDictionary.description") }}
-        </p>
-
-        <div class="flex items-center justify-between">
-          <Label for="smart-dictionary-toggle">{{ $t("settings.smartDictionary.title") }}</Label>
-          <Switch
-            id="smart-dictionary-toggle"
-            :model-value="settingsStore.isSmartDictionaryEnabled"
-            @update:model-value="handleToggleSmartDictionary"
-          />
-        </div>
-
-        <p class="text-xs text-muted-foreground">
-          {{ $t("settings.smartDictionary.privacyNote") }}
-        </p>
-
-        <transition name="feedback-fade">
-          <p
-            v-if="smartDictionaryFeedback.message.value !== ''"
-            class="text-sm"
-            :class="
-              smartDictionaryFeedback.type.value === 'success'
-                ? 'text-green-400'
-                : 'text-red-400'
-            "
-          >
-            {{ smartDictionaryFeedback.message.value }}
           </p>
         </transition>
       </CardContent>

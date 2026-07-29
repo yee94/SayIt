@@ -251,10 +251,16 @@ function formatLearnedText(termList: string[]): string {
 
 function showLearnedNotification(termList: string[]) {
   learnedDisplayText.value = formatLearnedText(termList);
-  visualMode.value = "learned";
-  if (useSettingsStore().isSoundEffectsEnabled) {
-    void invoke("play_learned_sound").catch(() => {});
-  }
+  // 先写文案，下一帧再切 visualMode，让布局与动画分帧，减轻首帧卡顿
+  requestAnimationFrame(() => {
+    visualMode.value = "learned";
+    if (useSettingsStore().isSoundEffectsEnabled) {
+      // 音效延后一拍，不和动画启动抢主线程
+      setTimeout(() => {
+        void invoke("play_learned_sound").catch(() => {});
+      }, 80);
+    }
+  });
   clearLearnedTimer();
   learnedTimer = setTimeout(() => {
     visualMode.value = "collapsing";
@@ -439,22 +445,8 @@ onUnmounted(() => {
             <line x1="18" y1="6" x2="6" y2="18" />
             <line x1="6" y1="6" x2="18" y2="18" />
           </svg>
-          <!-- Learned: book icon -->
-          <svg
-            v-else-if="visualMode === 'learned'"
-            class="learned-icon-svg"
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="rgba(147, 197, 253, 0.95)"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
-          </svg>
+          <!-- Learned: 上排留空，内容在下方扩展行 -->
+          <template v-else-if="visualMode === 'learned'" />
           <!-- Other modes: waveform + checkmark -->
           <template v-else>
             <div class="waveform-container">
@@ -491,9 +483,6 @@ onUnmounted(() => {
           <span v-if="visualMode === 'cancelled'" class="cancelled-label">
             {{ $t('voiceFlow.cancelled') }}
           </span>
-          <span v-else-if="visualMode === 'learned'" class="learned-label">
-            {{ $t('voiceFlow.vocabularyLearnedLabel') }}
-          </span>
           <span v-else-if="visualMode === 'mode-switch'" class="mode-switch-label">
             {{ props.modeSwitchLabel }}
           </span>
@@ -512,9 +501,12 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <!-- Learned: terms row below camera -->
+      <!-- Learned: 原宽下扩，🎉 + 已学习：xxx（超宽省略） -->
       <div v-if="visualMode === 'learned'" class="learned-terms-row">
-        <span class="learned-terms">{{ learnedDisplayText }}</span>
+        <div class="learned-terms-inner">
+          <span class="learned-emoji" aria-hidden="true">🎉</span>
+          <span class="learned-terms">{{ learnedDisplayText }}</span>
+        </div>
       </div>
 
       <div v-if="hasErrorMessage" class="error-message-row">
@@ -719,66 +711,74 @@ onUnmounted(() => {
 }
 
 
-/* ---- Learned: blue glow + text ---- */
+/* ---- Learned: 白字精简，原宽向下扩展 ---- */
 .notch-wrapper-learned {
-  filter:
-    drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3))
-    drop-shadow(0 0 10px rgba(59, 130, 246, 0.5))
-    drop-shadow(0 0 25px rgba(59, 130, 246, 0.2));
-  animation: learnedGlow 2s ease-out forwards;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
 }
 
-@keyframes learnedGlow {
-  0% {
-    filter:
-      drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3))
-      drop-shadow(0 0 12px rgba(59, 130, 246, 0.6))
-      drop-shadow(0 0 30px rgba(59, 130, 246, 0.3));
+.learned-emoji {
+  flex-shrink: 0;
+  font-size: 13px;
+  line-height: 1;
+  animation: learnedEmojiFadeIn 0.28s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+@keyframes learnedEmojiFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
   }
-  100% {
-    filter:
-      drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3))
-      drop-shadow(0 0 2px rgba(59, 130, 246, 0));
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
-}
-
-.learned-icon-svg {
-  animation: learnedIconFadeIn 0.3s ease-out;
-}
-
-@keyframes learnedIconFadeIn {
-  from { opacity: 0; transform: scale(0.5); }
-  to   { opacity: 1; transform: scale(1); }
-}
-
-.learned-label {
-  color: rgba(147, 197, 253, 0.95);
-  font-size: 14px;
-  font-weight: 600;
-  white-space: nowrap;
-  animation: learnedTextFadeIn 0.3s ease-out;
 }
 
 .learned-terms-row {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 40px 6px;
-  animation: learnedTextFadeIn 0.3s ease-out 0.2s both;
+  width: 100%;
+  min-width: 0;
+  padding: 0 24px 8px;
+  box-sizing: border-box;
+  overflow: hidden;
+  /* 隔离布局，降低动画期间对上层 reflow 的影响 */
+  contain: layout style;
+  animation: learnedTextFadeIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both;
+}
+
+.learned-terms-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .learned-terms {
-  color: rgba(147, 197, 253, 0.95);
-  font-size: 14px;
+  /* min-width:0 才能在 flex 里收缩；强制单行省略，不换行 */
+  min-width: 0;
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 13px;
   font-weight: 500;
+  letter-spacing: 0.01em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 @keyframes learnedTextFadeIn {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* ---- Cancelled: X icon + label ---- */
@@ -921,6 +921,7 @@ onUnmounted(() => {
 .notch-collapsing .notch-content,
 .notch-collapsing .error-message-row,
 .notch-collapsing .learned-terms-row,
+.notch-collapsing .learned-terms-inner,
 .notch-collapsing .live-transcript-row {
   opacity: 0;
   transition: opacity 0.15s ease;

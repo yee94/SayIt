@@ -4638,6 +4638,7 @@ name = "sayit"
 version = "0.12.4"
 dependencies = [
  "arboard",
+ "base64 0.22.1",
  "core-foundation 0.10.1",
  "core-graphics",
  "cpal",

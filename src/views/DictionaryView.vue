@@ -1,11 +1,21 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { useVocabularyStore } from "../stores/useVocabularyStore";
 import { useSettingsStore } from "../stores/useSettingsStore";
 import { extractErrorMessage } from "../lib/errorUtils";
 import { useFeedbackMessage } from "../composables/useFeedbackMessage";
 import { useI18n } from "vue-i18n";
-import { Plus, Trash2, Bot, Hand, Info, Upload } from "lucide-vue-next";
+import {
+  Plus,
+  Trash2,
+  Bot,
+  Hand,
+  Info,
+  Upload,
+  Pencil,
+  Check,
+  X,
+} from "lucide-vue-next";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,6 +38,9 @@ const newTermInput = ref("");
 const isAdding = ref(false);
 const isImporting = ref(false);
 const removingTermIdSet = ref(new Set<string>());
+const editingTermId = ref<string | null>(null);
+const editingTermValue = ref("");
+const isSavingEdit = ref(false);
 const feedback = useFeedbackMessage();
 
 const isAddDisabled = computed(
@@ -39,6 +52,13 @@ const showDuplicateHint = computed(
     newTermInput.value.trim() !== "" &&
     vocabularyStore.isDuplicateTerm(newTermInput.value),
 );
+
+const showEditDuplicateHint = computed(() => {
+  if (editingTermId.value === null) return false;
+  const value = editingTermValue.value.trim();
+  if (!value) return false;
+  return vocabularyStore.isDuplicateTerm(value, editingTermId.value);
+});
 
 function getWeightVariant(weight: number): "default" | "secondary" | "outline" {
   if (weight >= 30) return "default";
@@ -64,6 +84,9 @@ async function handleAddTerm() {
 
 async function handleRemoveTerm(id: string, term: string) {
   if (removingTermIdSet.value.has(id)) return;
+  if (editingTermId.value === id) {
+    cancelEdit();
+  }
 
   try {
     removingTermIdSet.value.add(id);
@@ -73,6 +96,50 @@ async function handleRemoveTerm(id: string, term: string) {
     feedback.show("error", extractErrorMessage(err));
   } finally {
     removingTermIdSet.value.delete(id);
+  }
+}
+
+async function startEdit(id: string, term: string) {
+  if (isImporting.value || isSavingEdit.value) return;
+  editingTermId.value = id;
+  editingTermValue.value = term;
+  await nextTick();
+  const input = document.querySelector<HTMLInputElement>(
+    'input[data-edit-term="true"]',
+  );
+  input?.focus();
+  input?.select();
+}
+
+function cancelEdit() {
+  editingTermId.value = null;
+  editingTermValue.value = "";
+  isSavingEdit.value = false;
+}
+
+async function saveEdit() {
+  const id = editingTermId.value;
+  if (!id || isSavingEdit.value) return;
+
+  const term = editingTermValue.value.trim();
+  if (!term) {
+    feedback.show("error", t("dictionary.emptyTerm"));
+    return;
+  }
+  if (showEditDuplicateHint.value) {
+    feedback.show("error", t("dictionary.duplicateEntry"));
+    return;
+  }
+
+  try {
+    isSavingEdit.value = true;
+    await vocabularyStore.updateTerm(id, term);
+    feedback.show("success", t("dictionary.updated", { term }));
+    cancelEdit();
+  } catch (err) {
+    feedback.show("error", extractErrorMessage(err));
+  } finally {
+    isSavingEdit.value = false;
   }
 }
 
@@ -256,20 +323,76 @@ onBeforeUnmount(() => {
             </TableHeader>
             <TableBody>
               <TableRow v-for="entry in vocabularyStore.aiSuggestedTermList" :key="entry.id">
-                <TableCell class="font-medium text-foreground">{{ entry.term }}</TableCell>
+                <TableCell class="font-medium text-foreground">
+                  <div v-if="editingTermId === entry.id" class="flex flex-col gap-1">
+                    <Input
+                      v-model="editingTermValue"
+                      data-edit-term="true"
+                      class="h-8 max-w-xs"
+                      :disabled="isSavingEdit"
+                      @keydown.enter.prevent="saveEdit"
+                      @keydown.escape.prevent="cancelEdit"
+                    />
+                    <p v-if="showEditDuplicateHint" class="text-xs text-destructive">
+                      {{ $t("dictionary.duplicateEntry") }}
+                    </p>
+                  </div>
+                  <button
+                    v-else
+                    type="button"
+                    class="term-edit-trigger text-left font-medium text-foreground hover:underline underline-offset-2"
+                    :title="$t('dictionary.edit')"
+                    @click="startEdit(entry.id, entry.term)"
+                  >
+                    {{ entry.term }}
+                  </button>
+                </TableCell>
                 <TableCell class="text-center">
                   <Badge :variant="getWeightVariant(entry.weight)">{{ entry.weight }}</Badge>
                 </TableCell>
                 <TableCell class="text-muted-foreground">{{ formatDate(entry.createdAt) }}</TableCell>
                 <TableCell class="text-left">
-                  <Button
-                    variant="destructive"
-                    size="icon-sm"
-                    :disabled="removingTermIdSet.has(entry.id)"
-                    @click="handleRemoveTerm(entry.id, entry.term)"
-                  >
-                    <Trash2 class="h-4 w-4" />
-                  </Button>
+                  <div class="flex items-center gap-1">
+                    <template v-if="editingTermId === entry.id">
+                      <Button
+                        variant="default"
+                        size="icon-sm"
+                        :disabled="isSavingEdit || !editingTermValue.trim() || showEditDuplicateHint"
+                        :title="$t('dictionary.save')"
+                        @click="saveEdit"
+                      >
+                        <Check class="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon-sm"
+                        :disabled="isSavingEdit"
+                        :title="$t('dictionary.cancelEdit')"
+                        @click="cancelEdit"
+                      >
+                        <X class="h-4 w-4" />
+                      </Button>
+                    </template>
+                    <template v-else>
+                      <Button
+                        variant="outline"
+                        size="icon-sm"
+                        :disabled="isImporting || isSavingEdit"
+                        :title="$t('dictionary.edit')"
+                        @click="startEdit(entry.id, entry.term)"
+                      >
+                        <Pencil class="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="icon-sm"
+                        :disabled="removingTermIdSet.has(entry.id)"
+                        @click="handleRemoveTerm(entry.id, entry.term)"
+                      >
+                        <Trash2 class="h-4 w-4" />
+                      </Button>
+                    </template>
+                  </div>
                 </TableCell>
               </TableRow>
             </TableBody>
@@ -297,20 +420,76 @@ onBeforeUnmount(() => {
             </TableHeader>
             <TableBody>
               <TableRow v-for="entry in vocabularyStore.manualTermList" :key="entry.id">
-                <TableCell class="font-medium text-foreground">{{ entry.term }}</TableCell>
+                <TableCell class="font-medium text-foreground">
+                  <div v-if="editingTermId === entry.id" class="flex flex-col gap-1">
+                    <Input
+                      v-model="editingTermValue"
+                      data-edit-term="true"
+                      class="h-8 max-w-xs"
+                      :disabled="isSavingEdit"
+                      @keydown.enter.prevent="saveEdit"
+                      @keydown.escape.prevent="cancelEdit"
+                    />
+                    <p v-if="showEditDuplicateHint" class="text-xs text-destructive">
+                      {{ $t("dictionary.duplicateEntry") }}
+                    </p>
+                  </div>
+                  <button
+                    v-else
+                    type="button"
+                    class="term-edit-trigger text-left font-medium text-foreground hover:underline underline-offset-2"
+                    :title="$t('dictionary.edit')"
+                    @click="startEdit(entry.id, entry.term)"
+                  >
+                    {{ entry.term }}
+                  </button>
+                </TableCell>
                 <TableCell class="text-center">
                   <Badge :variant="getWeightVariant(entry.weight)">{{ entry.weight }}</Badge>
                 </TableCell>
                 <TableCell class="text-muted-foreground">{{ formatDate(entry.createdAt) }}</TableCell>
                 <TableCell class="text-left">
-                  <Button
-                    variant="destructive"
-                    size="icon-sm"
-                    :disabled="removingTermIdSet.has(entry.id)"
-                    @click="handleRemoveTerm(entry.id, entry.term)"
-                  >
-                    <Trash2 class="h-4 w-4" />
-                  </Button>
+                  <div class="flex items-center gap-1">
+                    <template v-if="editingTermId === entry.id">
+                      <Button
+                        variant="default"
+                        size="icon-sm"
+                        :disabled="isSavingEdit || !editingTermValue.trim() || showEditDuplicateHint"
+                        :title="$t('dictionary.save')"
+                        @click="saveEdit"
+                      >
+                        <Check class="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon-sm"
+                        :disabled="isSavingEdit"
+                        :title="$t('dictionary.cancelEdit')"
+                        @click="cancelEdit"
+                      >
+                        <X class="h-4 w-4" />
+                      </Button>
+                    </template>
+                    <template v-else>
+                      <Button
+                        variant="outline"
+                        size="icon-sm"
+                        :disabled="isImporting || isSavingEdit"
+                        :title="$t('dictionary.edit')"
+                        @click="startEdit(entry.id, entry.term)"
+                      >
+                        <Pencil class="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="icon-sm"
+                        :disabled="removingTermIdSet.has(entry.id)"
+                        @click="handleRemoveTerm(entry.id, entry.term)"
+                      >
+                        <Trash2 class="h-4 w-4" />
+                      </Button>
+                    </template>
+                  </div>
                 </TableCell>
               </TableRow>
             </TableBody>

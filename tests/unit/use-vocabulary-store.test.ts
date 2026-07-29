@@ -100,6 +100,91 @@ describe("useVocabularyStore", () => {
   });
 
   // ==========================================================================
+  // updateTerm
+  // ==========================================================================
+
+  describe("updateTerm", () => {
+    it("应更新指定 id 的词汇文案", async () => {
+      mockDbSelect.mockResolvedValueOnce([
+        createRawVocabularyRow({ id: "vocab-1", term: "Vue.js" }),
+      ]);
+      mockDbSelect.mockResolvedValueOnce([
+        createRawVocabularyRow({ id: "vocab-1", term: "Vue 3" }),
+      ]);
+
+      const { useVocabularyStore } = await import(
+        "../../src/stores/useVocabularyStore"
+      );
+      const store = useVocabularyStore();
+      await store.fetchTermList();
+
+      await store.updateTerm("vocab-1", "Vue 3");
+
+      const updateCall = mockDbExecute.mock.calls.find(
+        (call) =>
+          typeof call[0] === "string" &&
+          call[0].includes("UPDATE vocabulary SET term"),
+      );
+      expect(updateCall).toBeDefined();
+      expect(updateCall?.[1]).toEqual(["Vue 3", "vocab-1"]);
+      expect(mockEmit).toHaveBeenCalledWith(
+        "vocabulary:changed",
+        expect.objectContaining({ action: "updated", term: "Vue 3" }),
+      );
+    });
+
+    it("与自身相同文案时不执行 UPDATE", async () => {
+      mockDbSelect.mockResolvedValueOnce([
+        createRawVocabularyRow({ id: "vocab-1", term: "Vue.js" }),
+      ]);
+
+      const { useVocabularyStore } = await import(
+        "../../src/stores/useVocabularyStore"
+      );
+      const store = useVocabularyStore();
+      await store.fetchTermList();
+      mockDbExecute.mockClear();
+
+      await store.updateTerm("vocab-1", "Vue.js");
+
+      expect(mockDbExecute).not.toHaveBeenCalled();
+    });
+
+    it("与其他词重复时应抛 duplicateEntry", async () => {
+      mockDbSelect.mockResolvedValueOnce([
+        createRawVocabularyRow({ id: "vocab-1", term: "Vue.js" }),
+        createRawVocabularyRow({ id: "vocab-2", term: "Tauri" }),
+      ]);
+
+      const { useVocabularyStore } = await import(
+        "../../src/stores/useVocabularyStore"
+      );
+      const store = useVocabularyStore();
+      await store.fetchTermList();
+
+      await expect(store.updateTerm("vocab-1", "Tauri")).rejects.toThrow(
+        "dictionary.duplicateEntry",
+      );
+    });
+
+    it("空字串应抛 emptyTerm", async () => {
+      mockDbSelect.mockResolvedValueOnce([
+        createRawVocabularyRow({ id: "vocab-1", term: "Vue.js" }),
+      ]);
+
+      const { useVocabularyStore } = await import(
+        "../../src/stores/useVocabularyStore"
+      );
+      const store = useVocabularyStore();
+      await store.fetchTermList();
+
+      await expect(store.updateTerm("vocab-1", "  ")).rejects.toThrow(
+        "dictionary.emptyTerm",
+      );
+    });
+  });
+
+  // ==========================================================================
   // batchIncrementWeights
   // ==========================================================================
 

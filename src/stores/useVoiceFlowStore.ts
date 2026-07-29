@@ -16,6 +16,14 @@ import { enhanceText, buildSystemPrompt } from "../lib/enhancer";
 import { getEditModePromptForLocale } from "../i18n/prompts";
 import type { SupportedLocale } from "../i18n/languageConfig";
 import { analyzeCorrections } from "../lib/vocabularyAnalyzer";
+import { extractCorrections } from "../lib/correctionLearner";
+import { canonicalizeTranscription } from "../lib/termCanonicalizer";
+import {
+  runAfterPaint,
+  runWhenIdle,
+  waitForNextPaint,
+  yieldToMain,
+} from "../lib/scheduleIdle";
 import i18n from "../i18n";
 import { useVocabularyStore } from "./useVocabularyStore";
 import { useHistoryStore } from "./useHistoryStore";
@@ -150,6 +158,12 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
   let lastMonitorKey = "";
   let isRepositioning = false;
   let hudPresentationEpoch = 0;
+
+  /** 当次录音的屏幕上下文（隐私：仅内存，用后清空） */
+  let pendingScreenContext: {
+    imageBase64: string | null;
+    appName: string | null;
+  } | null = null;
 
   function getAppWindow() {
     if (!cachedAppWindow) cachedAppWindow = getCurrentWindow();
@@ -569,13 +583,38 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
   }
 
   const SNAPSHOT_POLL_INTERVAL_MS = 500;
+  /** 贴上后最长监听窗口（与有赞 ~30s 对齐） */
+  const CORRECTION_WATCH_MS = 30_000;
+  /**
+   * 等 success 动画播完再开学习侦测，避免与 HUD 成功动画抢渲染。
+   * 仅延后「启动侦测」；窗口仍是完整 30s，且用户在延时期间的修改会在首轮轮询读到。
+   * 不用再等 collapse，以免缩短可学习窗口。
+   */
+  const CORRECTION_START_AFTER_SUCCESS_MS = SUCCESS_DISPLAY_DURATION_MS;
+  /** 有赞：等粘贴落入目标输入框后再开始首轮 AX 读取 */
+  const CORRECTION_INITIAL_DELAY_MS = 500;
+  let correctionStartTimer: ReturnType<typeof setTimeout> | null = null;
+  /**
+   * 字段内容停止变化多久后才做差分。
+   * 过短会在用户还在打字时采样（如只改出「T」），本地/AI 都会得到空候选。
+   */
+  const CORRECTION_STABLE_MS = 1_200;
   let correctionSnapshotTimer: ReturnType<typeof setInterval> | null = null;
+  let correctionWatchTimer: ReturnType<typeof setTimeout> | null = null;
   let correctionMonitorUnlisten: UnlistenFn | null = null;
+  let correctionSessionActive = false;
 
   function stopCorrectionSnapshotPolling() {
     if (correctionSnapshotTimer) {
       clearInterval(correctionSnapshotTimer);
       correctionSnapshotTimer = null;
+    }
+  }
+
+  function stopCorrectionWatchTimer() {
+    if (correctionWatchTimer) {
+      clearTimeout(correctionWatchTimer);
+      correctionWatchTimer = null;
     }
   }
 
@@ -586,254 +625,472 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     }
   }
 
+  function clearCorrectionStartTimer() {
+    if (correctionStartTimer) {
+      clearTimeout(correctionStartTimer);
+      correctionStartTimer = null;
+    }
+  }
+
+  function stopCorrectionDetectionSession() {
+    correctionSessionActive = false;
+    clearCorrectionStartTimer();
+    stopCorrectionSnapshotPolling();
+    stopCorrectionWatchTimer();
+    cleanupCorrectionMonitorListener();
+  }
+
+  async function persistLearnedTerms(
+    suggestedTermList: string[],
+    transcriptionId: string,
+    analysisUsage: {
+      promptTokens: number;
+      completionTokens: number;
+      totalTokens: number;
+      promptTimeMs?: number;
+      completionTimeMs?: number;
+      totalTimeMs?: number;
+    } | null,
+  ) {
+    if (suggestedTermList.length === 0) return;
+
+    const settingsStore = useSettingsStore();
+    const vocabularyStore = useVocabularyStore();
+    const newTermList: string[] = [];
+    const weightBumpIdList: string[] = [];
+
+    // 落库：先让出渲染帧，再同步写入（不用 idle，避免饿死导致学不到）
+    await runAfterPaint(async () => {
+      for (const term of suggestedTermList) {
+        if (vocabularyStore.isDuplicateTerm(term)) {
+          const existingEntry = vocabularyStore.termList.find(
+            (e) => e.term.trim().toLowerCase() === term.trim().toLowerCase(),
+          );
+          if (existingEntry) {
+            weightBumpIdList.push(existingEntry.id);
+          }
+        } else {
+          await vocabularyStore.addAiSuggestedTerm(term);
+          newTermList.push(term);
+        }
+      }
+
+      if (weightBumpIdList.length > 0) {
+        void vocabularyStore
+          .batchIncrementWeights(weightBumpIdList)
+          .catch((err) =>
+            writeErrorLog(
+              `useVoiceFlowStore: batchIncrementWeights failed: ${extractErrorMessage(err)}`,
+            ),
+          );
+      }
+
+      if (analysisUsage) {
+        const historyStore = useHistoryStore();
+        void historyStore
+          .addApiUsage({
+            id: crypto.randomUUID(),
+            transcriptionId,
+            apiType: "vocabulary_analysis",
+            model: settingsStore.selectedLlmModelId,
+            promptTokens: analysisUsage.promptTokens,
+            completionTokens: analysisUsage.completionTokens,
+            totalTokens: analysisUsage.totalTokens,
+            promptTimeMs: analysisUsage.promptTimeMs ?? null,
+            completionTimeMs: analysisUsage.completionTimeMs ?? null,
+            totalTimeMs: analysisUsage.totalTimeMs ?? null,
+            audioDurationMs: null,
+            estimatedCostCeiling: calculateChatCostCeiling(
+              analysisUsage.totalTokens,
+              settingsStore.selectedLlmModelId,
+            ),
+          })
+          .catch((err) =>
+            writeErrorLog(
+              `useVoiceFlowStore: addApiUsage(vocabulary_analysis) failed: ${extractErrorMessage(err)}`,
+            ),
+          );
+      }
+    });
+
+    if (newTermList.length === 0) return;
+
+    writeInfoLog(
+      `useVoiceFlowStore: emitting VOCABULARY_LEARNED: ${newTermList.join(", ")}`,
+    );
+    try {
+      // 先让窗口就位，再等一帧，最后发事件启动动画 —— 避免 IPC + 差分收尾堵动画首帧
+      clearLearnedHideTimer();
+      const appWindow = getAppWindow();
+      await invoke("present_hud_window");
+      await appWindow.setIgnoreCursorEvents(true);
+      await waitForNextPaint();
+      await yieldToMain();
+
+      await emitEvent(VOCABULARY_LEARNED, {
+        termList: newTermList,
+      } satisfies VocabularyLearnedPayload);
+      writeInfoLog(
+        "useVoiceFlowStore: VOCABULARY_LEARNED emitted successfully",
+      );
+
+      learnedHideTimer = setTimeout(() => {
+        learnedHideTimer = null;
+        if (status.value === "idle") {
+          hideHud().catch((err) =>
+            writeErrorLog(
+              `useVoiceFlowStore: learned hideHud failed: ${extractErrorMessage(err)}`,
+            ),
+          );
+        }
+      }, LEARNED_NOTIFICATION_TOTAL_DURATION_MS);
+    } catch (emitErr) {
+      writeErrorLog(
+        `useVoiceFlowStore: VOCABULARY_LEARNED emit failed: ${extractErrorMessage(emitErr)}`,
+      );
+    }
+  }
+
+  function isFieldModifiedFromPaste(
+    pastedText: string,
+    fieldText: string,
+  ): { ok: boolean; reason?: string; overlapRatio?: number } {
+    const trimmedField = fieldText.trim();
+    if (!trimmedField) {
+      return { ok: false, reason: "empty" };
+    }
+    // excerpt 可能只是游标附近；若仍完全包含原文或原文包含 excerpt，视为未改
+    if (
+      fieldText.includes(pastedText) ||
+      pastedText.includes(trimmedField)
+    ) {
+      return { ok: false, reason: "unchanged" };
+    }
+    // Set 查表 O(n+m)，避免 pastedText.includes 在长文上 O(n*m) 卡住主线程
+    const pasteCharSet = new Set(pastedText);
+    let overlapCharCount = 0;
+    for (const ch of trimmedField) {
+      if (pasteCharSet.has(ch)) overlapCharCount += 1;
+    }
+    const overlapRatio =
+      trimmedField.length > 0 ? overlapCharCount / trimmedField.length : 0;
+    if (overlapRatio < 0.25) {
+      return { ok: false, reason: "unrelated", overlapRatio };
+    }
+    return { ok: true, overlapRatio };
+  }
+
+  async function analyzeCorrectionAndLearn(
+    pastedText: string,
+    fieldText: string,
+    transcriptionId: string,
+    apiKey: string | null,
+  ): Promise<void> {
+    const settingsStore = useSettingsStore();
+    const check = isFieldModifiedFromPaste(pastedText, fieldText);
+    if (!check.ok) {
+      writeInfoLog(
+        `[correction] skip analysis (${check.reason}${check.overlapRatio !== undefined ? ` overlap=${Math.round(check.overlapRatio * 100)}%` : ""})`,
+      );
+      return;
+    }
+
+    writeInfoLog(
+      `[correction] text modified (overlap=${Math.round((check.overlapRatio ?? 0) * 100)}%)\n  original:  ${pastedText.slice(0, 80)}\n  corrected: ${fieldText.slice(0, 80)}`,
+    );
+
+    // 本地差分：确定性让出一帧后再跑（保证必执行，语义与同步 extract 一致）
+    const vocabularyStore = useVocabularyStore();
+    const existingTerms = vocabularyStore.termList.map((e) => e.term);
+
+    let suggestedTermList: string[] = [];
+    await runAfterPaint(() => {
+      suggestedTermList = extractCorrections(
+        pastedText,
+        fieldText,
+        existingTerms,
+      );
+    });
+    writeInfoLog(
+      `[correction] local extract: ${JSON.stringify(suggestedTermList)}`,
+    );
+
+    let analysisUsage: {
+      promptTokens: number;
+      completionTokens: number;
+      totalTokens: number;
+      promptTimeMs?: number;
+      completionTimeMs?: number;
+      totalTimeMs?: number;
+    } | null = null;
+
+    if (suggestedTermList.length === 0 && apiKey) {
+      writeInfoLog("[correction] local empty — falling back to AI analysis");
+      // 网络本身异步；前后 yield 不改变结果，只避免解析挤在同一帧
+      await yieldToMain();
+      const analysisResult = await analyzeCorrections(
+        pastedText,
+        fieldText,
+        apiKey,
+        {
+          modelId: settingsStore.selectedLlmModelId,
+          baseUrl: settingsStore.getLlmBaseUrl(),
+        },
+      );
+      await yieldToMain();
+      writeInfoLog(`[correction] AI raw: ${analysisResult.rawResponse}`);
+      writeInfoLog(
+        `[correction] AI result: ${JSON.stringify(analysisResult.suggestedTermList)} (tokens: ${analysisResult.usage?.totalTokens ?? "??"})`,
+      );
+      suggestedTermList = analysisResult.suggestedTermList;
+      analysisUsage = analysisResult.usage;
+    }
+
+    if (suggestedTermList.length === 0) {
+      writeInfoLog("[correction] no terms extracted — nothing learned");
+      return;
+    }
+
+    // 落库 + 通知：同样保证执行，只是错开动画帧
+    await persistLearnedTerms(
+      suggestedTermList,
+      transcriptionId,
+      analysisUsage,
+    );
+  }
+
+  /**
+   * 贴上后自动学习：
+   * 1) 主路径：30s 内每 500ms 读焦点输入框；一旦相对粘贴内容有可学习的修改 → 立即差分学习
+   * 2) 辅路径：键盘 monitor（Enter / idle）触发时立刻再读一次分析
+   */
   function startCorrectionDetectionFlow(
     pastedText: string,
     transcriptionId: string,
-    apiKey: string,
+    apiKey: string | null,
   ) {
     void (async () => {
       try {
         const settingsStore = useSettingsStore();
-        if (!settingsStore.isSmartDictionaryEnabled) return;
+        if (!settingsStore.isSmartDictionaryEnabled) {
+          writeInfoLog("[correction] smart dictionary disabled — skip");
+          return;
+        }
 
-        // 清除前一次的 listener，避免重复累积
-        cleanupCorrectionMonitorListener();
+        stopCorrectionDetectionSession();
+        correctionSessionActive = true;
+        writeInfoLog(
+          `[correction] watch started (${CORRECTION_WATCH_MS}ms) pasteLen=${pastedText.length} pastePreview="${pastedText.slice(0, 60).replace(/\n/g, " ")}" smartDict=on hasLlmKey=${Boolean(apiKey)}`,
+        );
+        void invoke<string>("get_debug_log_path")
+          .then((p) => writeInfoLog(`[correction] debug log file: ${p}`))
+          .catch(() => {});
 
-        // 启动修正监控
-        await invoke("start_correction_monitor");
-
-        // Phase 2 snapshot polling
-        let latestSnapshot: string | null = null;
-        stopCorrectionSnapshotPolling();
-
-        correctionSnapshotTimer = setInterval(() => {
-          void (async () => {
+        // AX 诊断放到 idle，避免 success 动画刚结束又立刻同步重活
+        void runWhenIdle(
+          async () => {
+            if (!correctionSessionActive) return;
             try {
-              const text = await invoke<string | null>(
-                "read_focused_text_field",
+              const d = await invoke<{
+                axTrusted: boolean;
+                targetPid: number;
+                frontmostPid: number;
+                ourPid: number;
+                sampleRead: string | null;
+                note: string;
+              }>("diagnose_learning_ax", { pasteHint: pastedText });
+              writeInfoLog(
+                `[correction] AX diagnose: trusted=${d.axTrusted} targetPid=${d.targetPid} frontmost=${d.frontmostPid} our=${d.ourPid} sample=${d.sampleRead ? `yes(${d.sampleRead.length})` : "null"} note=${d.note}`,
               );
-              if (text) {
-                latestSnapshot = text;
-              }
-            } catch {
-              // AX 读取失败静默处理
+            } catch (err) {
+              writeErrorLog(
+                `[correction] diagnose_learning_ax failed: ${extractErrorMessage(err)}`,
+              );
             }
-          })();
-        }, SNAPSHOT_POLL_INTERVAL_MS);
+          },
+          { timeoutMs: 2_000 },
+        );
 
-        // 一次性监听 correction-monitor:result
+        // 辅：键盘 monitor（Enter / idle 可提前收束）
+        void invoke("start_correction_monitor").catch((err) => {
+          writeErrorLog(
+            `[correction] start_correction_monitor failed: ${extractErrorMessage(err)}`,
+          );
+        });
+
+        let latestSnapshot: string | null = null;
+        let analysisStarted = false;
+        let pollInFlight = false;
+        let pollCount = 0;
+        let emptyReadCount = 0;
+        let lastSkipReason = "";
+        /** 最近一次「相对粘贴已修改」的字段快照与时间，用于稳定后再差分 */
+        let pendingModifiedText: string | null = null;
+        let pendingModifiedSince = 0;
+
+        const tryAnalyze = async (
+          fieldText: string,
+          trigger: string,
+        ): Promise<boolean> => {
+          if (!correctionSessionActive || analysisStarted) return false;
+          const check = isFieldModifiedFromPaste(pastedText, fieldText);
+          if (!check.ok) {
+            pendingModifiedText = null;
+            pendingModifiedSince = 0;
+            const reason = `${check.reason ?? "?"}${check.overlapRatio !== undefined ? `@${Math.round(check.overlapRatio * 100)}%` : ""}`;
+            if (reason !== lastSkipReason) {
+              lastSkipReason = reason;
+              writeInfoLog(
+                `[correction] poll skip reason=${reason} fieldLen=${fieldText.length}`,
+              );
+            }
+            return false;
+          }
+
+          // 稳定防抖：内容还在变就只更新快照，不立刻提词（避免「Yes→T」半成品）
+          if (fieldText !== pendingModifiedText) {
+            pendingModifiedText = fieldText;
+            pendingModifiedSince = Date.now();
+            writeInfoLog(
+              `[correction] modified pending stable (overlap=${Math.round((check.overlapRatio ?? 0) * 100)}%) fieldLen=${fieldText.length}`,
+            );
+            return false;
+          }
+          if (Date.now() - pendingModifiedSince < CORRECTION_STABLE_MS) {
+            return false;
+          }
+
+          analysisStarted = true;
+          // 停侦测（轮询/键盘），但分析必须 await 完成，保证学词不会被 fire-and-forget 丢掉
+          stopCorrectionDetectionSession();
+          writeInfoLog(`[correction] trigger=${trigger}`);
+          try {
+            // 先让出当前 IPC 回调帧，再跑完整学习链路（内部已 runAfterPaint）
+            await yieldToMain();
+            await analyzeCorrectionAndLearn(
+              pastedText,
+              fieldText,
+              transcriptionId,
+              apiKey,
+            );
+          } catch (err) {
+            writeErrorLog(
+              `useVoiceFlowStore: correction analysis failed: ${extractErrorMessage(err)}`,
+            );
+            captureError(err, {
+              source: "voice-flow",
+              step: "correction-analysis",
+            });
+          }
+          return true;
+        };
+
+        // 主：轮询（有赞：先等 paste settle，再按目标 PID 读字段）
+        const startPolling = () => {
+          correctionSnapshotTimer = setInterval(() => {
+            // 上一轮 AX 还没回来就跳过，避免 IPC 堆积拖垮渲染
+            if (pollInFlight || !correctionSessionActive || analysisStarted) {
+              return;
+            }
+            pollInFlight = true;
+            void (async () => {
+              try {
+                if (!correctionSessionActive || analysisStarted) return;
+                pollCount += 1;
+                const text = await invoke<string | null>(
+                  "read_focused_text_field_for_learning",
+                  { pasteHint: pastedText },
+                );
+                if (!text?.trim()) {
+                  emptyReadCount += 1;
+                  if (emptyReadCount === 1 || emptyReadCount % 4 === 0) {
+                    writeInfoLog(
+                      `[correction] poll#${pollCount} field empty/unreadable (count=${emptyReadCount}) — 检查辅助功能权限；目标 App 需暴露 AX 输入框`,
+                    );
+                  }
+                  return;
+                }
+                if (emptyReadCount > 0) {
+                  writeInfoLog(
+                    `[correction] poll#${pollCount} field readable len=${text.length}`,
+                  );
+                  emptyReadCount = 0;
+                }
+                latestSnapshot = text;
+                await tryAnalyze(text, "poll");
+              } catch (err) {
+                emptyReadCount += 1;
+                if (emptyReadCount === 1 || emptyReadCount % 4 === 0) {
+                  writeErrorLog(
+                    `[correction] poll#${pollCount} read error: ${extractErrorMessage(err)}`,
+                  );
+                }
+              } finally {
+                pollInFlight = false;
+              }
+            })();
+          }, SNAPSHOT_POLL_INTERVAL_MS);
+        };
+        // 延迟首轮读取，避免粘贴尚未落入目标输入框
+        setTimeout(startPolling, CORRECTION_INITIAL_DELAY_MS);
+
+        // 键盘结果：有按键且进入 idle/enter 时再冲一次
         correctionMonitorUnlisten =
           await listenToEvent<CorrectionMonitorResultPayload>(
             CORRECTION_MONITOR_RESULT,
             (event) => {
-              cleanupCorrectionMonitorListener();
-              stopCorrectionSnapshotPolling();
-
               void (async () => {
+                if (!correctionSessionActive || analysisStarted) return;
+                const result = event.payload;
+                writeInfoLog(
+                  `[correction] keyboard result anyKey=${result.anyKeyPressed} enter=${result.enterPressed} idle=${result.idleTimeout}`,
+                );
+
+                let fieldText: string | null = latestSnapshot;
                 try {
-                  const result = event.payload;
-
-                  if (!result.anyKeyPressed) {
-                    writeInfoLog(
-                      "[correction] no key pressed — skipping analysis",
-                    );
-                    return;
-                  }
-
-                  writeInfoLog(
-                    `[correction] keys detected (enter=${result.enterPressed}) — reading field text`,
+                  const fresh = await invoke<string | null>(
+                    "read_focused_text_field_for_learning",
+                    { pasteHint: pastedText },
                   );
-
-                  let fieldText: string | null = null;
-
-                  if (result.enterPressed) {
-                    // Enter 触发：先尝试即时读取（IME 确认后文字可能已更新）
-                    // 读不到（如 LINE 按 Enter 送出后已清空）才 fallback 到 snapshot
-                    try {
-                      const freshText = await invoke<string | null>(
-                        "read_focused_text_field",
-                      );
-                      if (freshText && freshText.trim()) {
-                        fieldText = freshText;
-                      } else {
-                        fieldText = latestSnapshot;
-                      }
-                    } catch {
-                      fieldText = latestSnapshot;
-                    }
-                  } else {
-                    // Idle timeout 或硬上限：做最后一次读取
-                    try {
-                      fieldText = await invoke<string | null>(
-                        "read_focused_text_field",
-                      );
-                    } catch {
-                      // fallback to snapshot
-                      fieldText = latestSnapshot;
-                    }
-                  }
-
-                  if (!fieldText || !fieldText.trim()) {
-                    writeInfoLog(
-                      "[correction] field text is null or empty — skipping analysis",
-                    );
-                    return;
-                  }
-                  // fieldText 为游标附近的「excerpt」（非整栏文字），故需双向比对：
-                  // 整栏仍含 pasted（短输入）→ includes；或 excerpt 是 pasted 的子字串（长输入未改）→ 反向 includes。
-                  const trimmedField = fieldText.trim();
-                  if (
-                    fieldText.includes(pastedText) ||
-                    pastedText.includes(trimmedField)
-                  ) {
-                    writeInfoLog(
-                      "[correction] text unchanged — skipping analysis",
-                    );
-                    return;
-                  }
-
-                  // 相似度检查：以 excerpt 为基准（excerpt 多数字元应来自 pasted 区域）。
-                  // 若 excerpt 与 pasted 几乎无关（AX/UIA 读到错的栏位），跳过。
-                  const overlapCharCount = [...trimmedField].filter((ch) =>
-                    pastedText.includes(ch),
-                  ).length;
-                  const overlapRatio =
-                    trimmedField.length > 0
-                      ? overlapCharCount / trimmedField.length
-                      : 0;
-                  if (overlapRatio < 0.3) {
-                    writeInfoLog(
-                      `[correction] field text unrelated to original (overlap=${Math.round(overlapRatio * 100)}%) — skipping analysis`,
-                    );
-                    return;
-                  }
-
-                  writeInfoLog(
-                    `[correction] text modified (overlap=${Math.round(overlapRatio * 100)}%) — sending to AI analysis\n  original:  ${pastedText.slice(0, 80)}\n  corrected: ${fieldText.slice(0, 80)}`,
-                  );
-
-                  const analysisResult = await analyzeCorrections(
-                    pastedText,
-                    fieldText,
-                    apiKey,
-                    {
-                      modelId: settingsStore.selectedLlmModelId,
-                      baseUrl: settingsStore.getLlmBaseUrl(),
-                    },
-                  );
-
-                  writeInfoLog(
-                    `[correction] AI raw: ${analysisResult.rawResponse}`,
-                  );
-                  writeInfoLog(
-                    `[correction] AI result: ${JSON.stringify(analysisResult.suggestedTermList)} (tokens: ${analysisResult.usage?.totalTokens ?? "??"})`,
-                  );
-
-                  if (analysisResult.suggestedTermList.length === 0) return;
-
-                  const vocabularyStore = useVocabularyStore();
-                  const newTermList: string[] = [];
-
-                  for (const term of analysisResult.suggestedTermList) {
-                    if (vocabularyStore.isDuplicateTerm(term)) {
-                      // 已存在的词 weight +1
-                      const existingEntry = vocabularyStore.termList.find(
-                        (e) =>
-                          e.term.trim().toLowerCase() ===
-                          term.trim().toLowerCase(),
-                      );
-                      if (existingEntry) {
-                        void vocabularyStore
-                          .batchIncrementWeights([existingEntry.id])
-                          .catch((err) =>
-                            writeErrorLog(
-                              `useVoiceFlowStore: batchIncrementWeights failed: ${extractErrorMessage(err)}`,
-                            ),
-                          );
-                      }
-                    } else {
-                      await vocabularyStore.addAiSuggestedTerm(term);
-                      newTermList.push(term);
-                    }
-                  }
-
-                  // 记录 API 用量
-                  if (analysisResult.usage) {
-                    const historyStore = useHistoryStore();
-                    void historyStore
-                      .addApiUsage({
-                        id: crypto.randomUUID(),
-                        transcriptionId,
-                        apiType: "vocabulary_analysis",
-                        model: settingsStore.selectedLlmModelId,
-                        promptTokens: analysisResult.usage.promptTokens,
-                        completionTokens: analysisResult.usage.completionTokens,
-                        totalTokens: analysisResult.usage.totalTokens,
-                        promptTimeMs: analysisResult.usage.promptTimeMs ?? null,
-                        completionTimeMs: analysisResult.usage.completionTimeMs ?? null,
-                        totalTimeMs: analysisResult.usage.totalTimeMs ?? null,
-                        audioDurationMs: null,
-                        estimatedCostCeiling: calculateChatCostCeiling(
-                          analysisResult.usage.totalTokens,
-                          settingsStore.selectedLlmModelId,
-                        ),
-                      })
-                      .catch((err) =>
-                        writeErrorLog(
-                          `useVoiceFlowStore: addApiUsage(vocabulary_analysis) failed: ${extractErrorMessage(err)}`,
-                        ),
-                      );
-                  }
-
-                  // 通知 HUD 新学习的词（只包含新增的，不包含已存在的）
-                  if (newTermList.length > 0) {
-                    writeInfoLog(
-                      `useVoiceFlowStore: emitting VOCABULARY_LEARNED: ${newTermList.join(", ")}`,
-                    );
-                    try {
-                      await emitEvent(VOCABULARY_LEARNED, {
-                        termList: newTermList,
-                      } satisfies VocabularyLearnedPayload);
-                      writeInfoLog(
-                        "useVoiceFlowStore: VOCABULARY_LEARNED emitted successfully",
-                      );
-
-                      // HUD 视窗在 idle 后已被 hideHud() 隐藏，需重新显示才看得到通知
-                      clearLearnedHideTimer();
-                      const appWindow = getAppWindow();
-                      await invoke("present_hud_window");
-                      await appWindow.setIgnoreCursorEvents(true);
-                      learnedHideTimer = setTimeout(() => {
-                        learnedHideTimer = null;
-                        if (status.value === "idle") {
-                          hideHud().catch((err) =>
-                            writeErrorLog(
-                              `useVoiceFlowStore: learned hideHud failed: ${extractErrorMessage(err)}`,
-                            ),
-                          );
-                        }
-                      }, LEARNED_NOTIFICATION_TOTAL_DURATION_MS);
-                    } catch (emitErr) {
-                      writeErrorLog(
-                        `useVoiceFlowStore: VOCABULARY_LEARNED emit failed: ${extractErrorMessage(emitErr)}`,
-                      );
-                    }
-                  }
-                } catch (err) {
-                  writeErrorLog(
-                    `useVoiceFlowStore: correction analysis failed: ${extractErrorMessage(err)}`,
-                  );
-                  captureError(err, {
-                    source: "voice-flow",
-                    step: "correction-analysis",
-                  });
+                  if (fresh?.trim()) fieldText = fresh;
+                } catch {
+                  // keep snapshot
                 }
+
+                if (!fieldText?.trim()) {
+                  writeInfoLog(
+                    "[correction] keyboard done but field unreadable — keep polling until watch ends",
+                  );
+                  return;
+                }
+
+                if (!result.anyKeyPressed) {
+                  // Phase1 超时无按键：不立刻结束，轮询仍会继续到 CORRECTION_WATCH_MS
+                  return;
+                }
+
+                await tryAnalyze(fieldText, "keyboard");
               })();
             },
           );
+
+        // 总窗口结束
+        correctionWatchTimer = setTimeout(() => {
+          void (async () => {
+            if (!correctionSessionActive || analysisStarted) return;
+            writeInfoLog("[correction] watch window ended");
+            if (latestSnapshot) {
+              const analyzed = await tryAnalyze(latestSnapshot, "timeout");
+              if (analyzed) return;
+            }
+            stopCorrectionDetectionSession();
+            writeInfoLog(
+              "[correction] no learnable edit in window (need AX-readable field + edit within 30s)",
+            );
+          })();
+        }, CORRECTION_WATCH_MS);
       } catch (err) {
-        stopCorrectionSnapshotPolling();
-        cleanupCorrectionMonitorListener();
+        stopCorrectionDetectionSession();
         writeErrorLog(
           `useVoiceFlowStore: correction detection failed: ${extractErrorMessage(err)}`,
         );
@@ -854,8 +1111,20 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
   }) {
     try {
       const settingsStore = useSettingsStore();
+      // 贴上前：字典规范词归一（大小写 / CamelCase / 近似拼写）
+      let textToPaste = params.text;
+      try {
+        const vocabularyStore = useVocabularyStore();
+        const terms = await vocabularyStore.getTopTermListByWeight(100);
+        if (terms.length > 0) {
+          textToPaste = canonicalizeTranscription(params.text, terms);
+        }
+      } catch {
+        // 归一失败不阻断贴上
+      }
+
       await invoke("paste_text", {
-        text: params.text,
+        text: textToPaste,
         restoreClipboard: !settingsStore.isCopyTranscriptionToClipboardEnabled,
       });
       isRecording.value = false;
@@ -873,11 +1142,23 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       const finalText = params.record.processedText ?? params.record.rawText;
       updateVocabularyWeightsAfterPaste(finalText);
 
-      // 修正侦测（fire-and-forget，需 LLM API key）
-      const llmApiKey = settingsStore.getLlmApiKey();
-      if (llmApiKey) {
-        startCorrectionDetectionFlow(params.text, params.record.id, llmApiKey);
+      // 修正侦测：等 success 动画结束后再启动，避免 AX/差分抢渲染线程导致卡顿
+      if (settingsStore.isSmartDictionaryEnabled) {
+        const llmApiKey = settingsStore.getLlmApiKey();
+        clearCorrectionStartTimer();
+        correctionStartTimer = setTimeout(() => {
+          correctionStartTimer = null;
+          startCorrectionDetectionFlow(
+            textToPaste,
+            params.record.id,
+            llmApiKey || null,
+          );
+        }, CORRECTION_START_AFTER_SUCCESS_MS);
       }
+
+      // 清理当次截图上下文
+      pendingScreenContext = null;
+      void invoke("cleanup_screen_context_temp").catch(() => {});
     } catch (pasteError) {
       isRecording.value = false;
       failRecordingFlow(
@@ -1120,8 +1401,45 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     lastFailedRmsEnergyLevel.value = 0;
     isRetryAttempt.value = false;
 
-    // 捕获当前前景视窗（Windows: HUD show 前记住目标，贴上前恢复焦点）
-    void invoke("capture_target_window").catch(() => {});
+    // 热键触发时锁定接收粘贴的应用 PID，并让 HUD 立刻显示。
+    void invoke<number>("capture_target_window")
+      .then((targetId) => {
+        writeInfoLog(
+          `useVoiceFlowStore: capture_target_window ok id=${targetId} (before HUD)`,
+        );
+      })
+      .catch((err) => {
+        writeErrorLog(
+          `useVoiceFlowStore: capture_target_window failed: ${extractErrorMessage(err)}`,
+        );
+      });
+
+    // 屏幕上下文：录音开始时截一帧（默认关闭；失败静默）
+    pendingScreenContext = null;
+    {
+      const settingsForScreen = useSettingsStore();
+      if (settingsForScreen.isScreenContextEnabled) {
+        void invoke<{
+          imageBase64: string | null;
+          appName: string | null;
+          captureMode: string;
+        }>("capture_screen_context")
+          .then((ctx) => {
+            pendingScreenContext = {
+              imageBase64: ctx.imageBase64,
+              appName: ctx.appName,
+            };
+            writeInfoLog(
+              `useVoiceFlowStore: screen context captured mode=${ctx.captureMode} app=${ctx.appName ?? "?"} hasImage=${Boolean(ctx.imageBase64)}`,
+            );
+          })
+          .catch((err) => {
+            writeErrorLog(
+              `useVoiceFlowStore: capture_screen_context failed: ${extractErrorMessage(err)}`,
+            );
+          });
+      }
+    }
 
     transitionTo("recording", t("voiceFlow.recording"));
     playSoundIfEnabled("play_start_sound");
@@ -1516,6 +1834,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
 
           const enhancementTermList =
             await vocabularyStore.getTopTermListByWeight(50);
+          const screenCtx = pendingScreenContext;
           const enhanceOptions = {
             systemPrompt: settingsStore.getAiPrompt(),
             vocabularyTermList:
@@ -1523,6 +1842,12 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
             modelId: settingsStore.selectedLlmModelId,
             baseUrl: settingsStore.getLlmBaseUrl(),
             signal: abortController?.signal,
+            screenContext: screenCtx
+              ? {
+                  imageBase64: screenCtx.imageBase64,
+                  appName: screenCtx.appName,
+                }
+              : undefined,
           };
 
           let enhanceResult = await enhanceText(
@@ -1530,7 +1855,11 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
             llmApiKey,
             enhanceOptions,
           );
-          if (isAborted.value) return;
+          // 中止时也要离开「整理中」，否则 HUD 会一直卡住
+          if (isAborted.value) {
+            transitionTo("cancelled", t("voiceFlow.cancelled"));
+            return;
+          }
 
           // 增强后长度爆炸侦测（含重试机制）
           let retryCount = 0;
@@ -1550,7 +1879,10 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
               llmApiKey,
               enhanceOptions,
             );
-            if (isAborted.value) return;
+            if (isAborted.value) {
+              transitionTo("cancelled", t("voiceFlow.cancelled"));
+              return;
+            }
           }
 
           // 重试后仍异常（长度爆炸）或语意飘走（#43）→ fallback 到 rawText
@@ -1602,7 +1934,10 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
             )}, enhancementDurationMs=${Math.round(enhancementDurationMs)}${retryCount > 0 ? `, enhancementRetryCount=${retryCount}` : ""}`,
           );
         } catch (enhanceError) {
-          if (isAborted.value) return;
+          if (isAborted.value) {
+            transitionTo("cancelled", t("voiceFlow.cancelled"));
+            return;
+          }
           const fallbackEnhancementDurationMs =
             performance.now() - enhancementStartTime;
           const enhanceErrorDetail = getEnhancementErrorMessage(enhanceError);
@@ -1719,12 +2054,19 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         `${basePrompt}\n\n<instruction>\n${params.voiceInstruction}\n</instruction>`,
       );
 
+      const editScreenCtx = pendingScreenContext;
       const editResult = await enhanceText(params.selectedText, llmApiKey, {
         systemPrompt,
         modelId: settingsStore.selectedLlmModelId,
         baseUrl: settingsStore.getLlmBaseUrl(),
         signal: abortController?.signal,
         maxTokens: EDIT_MODE_MAX_TOKENS,
+        screenContext: editScreenCtx
+          ? {
+              imageBase64: editScreenCtx.imageBase64,
+              appName: editScreenCtx.appName,
+            }
+          : undefined,
       });
       if (isAborted.value) return;
 
@@ -1874,6 +2216,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
 
           const enhancementTermList =
             await vocabularyStore.getTopTermListByWeight(50);
+          const resendScreenCtx = pendingScreenContext;
           let enhanceResult = await enhanceText(result.rawText, llmApiKey, {
             systemPrompt: settingsStore.getAiPrompt(),
             vocabularyTermList:
@@ -1881,6 +2224,12 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
             modelId: settingsStore.selectedLlmModelId,
             baseUrl: settingsStore.getLlmBaseUrl(),
             signal: abortController?.signal,
+            screenContext: resendScreenCtx
+              ? {
+                  imageBase64: resendScreenCtx.imageBase64,
+                  appName: resendScreenCtx.appName,
+                }
+              : undefined,
           });
           if (isAborted.value) return;
 
@@ -2149,8 +2498,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     clearModeSwitchLabelTimer();
     stopMonitorPolling();
     stopElapsedTimer();
-    stopCorrectionSnapshotPolling();
-    cleanupCorrectionMonitorListener();
+    stopCorrectionDetectionSession();
 
     for (const unlisten of unlistenFunctions) {
       unlisten();

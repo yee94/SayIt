@@ -179,9 +179,16 @@
     },
     "smartDictionary": {
       "title": "スマート辞書学習",
-      "description": "貼り付け後に修正を自動検出し、AI 分析で新語を学習",
-      "privacyNote": "有効にすると、AI 分析のためにカーソル付近のテキストを読み取ります。原文は保存されません",
+      "description": "貼り付け後約 30 秒間、入力欄の修正を監視し、学習可能な変更を検出したらすぐ辞書へ追加します（必要時のみ AI 補助）。アクセシビリティで読める入力欄（メモなど）で修正してください",
+      "privacyNote": "フォーカス中の入力欄を読むには macOS のアクセシビリティ許可が必要です。原文は保存しません。一部 IM/ゲーム等は読めず学習できません",
       "analysisModelUpdated": "辞書分析モデルを更新しました"
+    },
+    "screenContext": {
+      "title": "画面コンテキスト認識",
+      "description": "録音時にスクリーンショット 1 枚と前面アプリ名を取得し、AI 整理時に一緒に送信して UI 上の固有名詞や文脈を補正します",
+      "llmRequirement": "必要条件：上記の LLM はマルチモーダル（Vision / 画像入力）に対応している必要があります（例：GPT-4o、GPT-4o mini、Gemini）。テキスト専用モデルはスクリーンショットを扱えません。非対応モデルで有効にすると整理リクエストが失敗する可能性があります。アプリ名のみならテキストモデルでも送れますが、効果は限定的です。",
+      "privacyNote": "スクリーンショットは当回の AI 整理リクエストのみに使い、ASR には送らず長期保存もしません。既定はオフです。macOS では画面収録の許可が必要です",
+      "permissionHint": "取得に失敗した場合は、システム設定で SayIt に画面収録を許可してください"
     }
   },
   "dashboard": {
@@ -235,15 +242,27 @@
     "loadingMore": "さらに読み込み中...",
     "playRecording": "録音を再生",
     "noRecordingFile": "録音ファイルがありません",
-    "failedBadge": "認識失敗"
+    "failedBadge": "認識失敗",
+    "retranscribe": "再認識",
+    "retranscribing": "認識中…",
+    "retranscribeHint": "認識に失敗しました。保存済みの録音で再転写できます。",
+    "retranscribeNoAudio": "認識に失敗し、再試行できる録音ファイルがありません。",
+    "retranscribeFailed": "再認識に失敗しました。しばらくしてからお試しください",
+    "retranscribeEmpty": "再認識で有効なテキストが得られませんでした",
+    "retranscribeNotFailed": "認識失敗の記録のみ再認識できます"
   },
   "dictionary": {
     "termCount": "{count} 語",
     "inputPlaceholder": "新しい語彙を入力...",
     "duplicateEntry": "この語彙はすでに存在します",
+    "emptyTerm": "語彙を空にできません",
     "add": "追加",
     "added": "「{term}」を追加しました",
+    "updated": "「{term}」に更新しました",
     "removed": "「{term}」を削除しました",
+    "edit": "編集",
+    "save": "保存",
+    "cancelEdit": "キャンセル",
     "loading": "読み込み中...",
     "emptyState": "カスタム語彙はまだありません。よく使う用語を追加して認識精度を向上させましょう",
     "termHeader": "語彙",
@@ -293,9 +312,9 @@
     "editSuccess": "編集完了 ✓",
     "editFailed": "編集失敗",
     "recordingTooShort": "録音時間が短すぎます",
-    "vocabularyLearnedLabel": "辞書に追加",
-    "vocabularyLearned": "{terms}",
-    "vocabularyLearnedTruncated": "{terms} 他 {count} 語",
+    "vocabularyLearnedLabel": "学習済み",
+    "vocabularyLearned": "学習済み：{terms}",
+    "vocabularyLearnedTruncated": "学習済み：{terms} 他{count}",
     "retryFailed": "認識失敗、もう一度録音してください",
     "cancelled": "キャンセル",
     "modeSwitched": "{mode}モードに切り替えました",
@@ -389,7 +408,9 @@
     },
     "upgradeNotice": {
       "title": "SayIt 更新情報",
-      "item1": "フルスクリーンでもノッチ表示：他アプリの全画面中でもホットキー録音時にノッチ HUD が正しく表示されるようになりました。",
+      "item1": "スマート辞書が修正から学習：転写文を貼り付けてから約 30 秒以内に編集すると、変更内容から新しい語句を学習し、よく使う言葉の認識精度を高めます。",
+      "item2": "画面コンテキスト認識：録音中にスクリーンショット 1 枚と前面アプリ名を取得し、AI 整理時に UI 固有名詞や文脈を補正します。",
+      "item3": "認識失敗を再試行：録音が保存された失敗記録は、元の音声から直接再転写できます。",
       "dismiss": "OK"
     }
   },

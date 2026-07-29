@@ -32,6 +32,7 @@ export default tseslint.config(
   {
     ignores: [
       'src/components/ui/**',
+      'docs/youzanvoice-reference/**',
       'dist/**',
       'src-tauri/**',
     ],

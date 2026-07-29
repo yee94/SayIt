@@ -179,9 +179,16 @@
     },
     "smartDictionary": {
       "title": "스마트 사전 학습",
-      "description": "붙여넣기 후 수정을 자동 감지하고 AI 분석으로 새 용어 학습",
-      "privacyNote": "활성화하면 AI 분석을 위해 커서 주변의 텍스트를 읽습니다. 원문은 저장되지 않습니다",
+      "description": "붙여넣기 후 약 30초 동안 입력란 수정을 감시하고, 학습 가능한 변경이 감지되면 즉시 사전에 추가합니다(필요 시 AI 보조). 손쉬운 사용으로 읽을 수 있는 입력란(메모 등)에서 수정하세요",
+      "privacyNote": "포커스된 입력란을 읽으려면 macOS 손쉬운 사용 권한이 필요합니다. 원문은 저장하지 않습니다. 일부 IM/게임 등은 읽을 수 없어 학습되지 않습니다",
       "analysisModelUpdated": "사전 분석 모델이 업데이트되었습니다"
+    },
+    "screenContext": {
+      "title": "화면 컨텍스트 인식",
+      "description": "녹음 시 스크린샷 한 장과 전면 앱 이름을 캡처해 AI 정리 시 함께 전송하여 UI의 고유명사와 맥락을 보정합니다",
+      "llmRequirement": "필수 조건: 위에서 설정한 LLM이 멀티모달 Vision(이미지 입력)을 지원해야 합니다(예: GPT-4o, GPT-4o mini, Gemini). 텍스트 전용 모델은 스크린샷을 처리할 수 없으며, 비지원 모델에서 켜면 정리 요청이 실패할 수 있습니다. 앱 이름만 보내는 것은 텍스트 모델도 가능하지만 효과는 제한적입니다.",
+      "privacyNote": "스크린샷은 해당 AI 정리 요청에만 사용되며 ASR로 보내지 않고 장기 저장하지 않습니다. 기본값은 꺼짐입니다. macOS에서는 화면 기록 권한이 필요합니다",
+      "permissionHint": "캡처에 실패하면 시스템 설정에서 SayIt에 화면 기록을 허용해 주세요"
     }
   },
   "dashboard": {
@@ -235,15 +242,27 @@
     "loadingMore": "더 불러오는 중...",
     "playRecording": "녹음 재생",
     "noRecordingFile": "녹음 파일이 없습니다",
-    "failedBadge": "인식 실패"
+    "failedBadge": "인식 실패",
+    "retranscribe": "다시 인식",
+    "retranscribing": "인식 중…",
+    "retranscribeHint": "인식에 실패했습니다. 저장된 녹음으로 다시 전사할 수 있습니다.",
+    "retranscribeNoAudio": "인식에 실패했고 재시도할 녹음 파일이 없습니다.",
+    "retranscribeFailed": "다시 인식에 실패했습니다. 잠시 후 다시 시도하세요",
+    "retranscribeEmpty": "다시 인식에서 유효한 텍스트를 얻지 못했습니다",
+    "retranscribeNotFailed": "인식 실패한 기록만 다시 인식할 수 있습니다"
   },
   "dictionary": {
     "termCount": "{count} 단어",
     "inputPlaceholder": "새 단어 입력...",
     "duplicateEntry": "이미 존재하는 단어입니다",
+    "emptyTerm": "단어를 비울 수 없습니다",
     "add": "추가",
     "added": "'{term}'이(가) 추가되었습니다",
+    "updated": "'{term}'(으)로 수정되었습니다",
     "removed": "'{term}'이(가) 삭제되었습니다",
+    "edit": "편집",
+    "save": "저장",
+    "cancelEdit": "취소",
     "loading": "로딩 중...",
     "emptyState": "사용자 정의 단어가 없습니다. 자주 쓰는 용어를 추가하여 인식률을 높이세요",
     "termHeader": "단어",
@@ -293,9 +312,9 @@
     "editSuccess": "편집 완료 ✓",
     "editFailed": "편집 실패",
     "recordingTooShort": "녹음 시간이 너무 짧습니다",
-    "vocabularyLearnedLabel": "사전에 추가",
-    "vocabularyLearned": "{terms}",
-    "vocabularyLearnedTruncated": "{terms} 외 {count}개",
+    "vocabularyLearnedLabel": "학습됨",
+    "vocabularyLearned": "학습됨: {terms}",
+    "vocabularyLearnedTruncated": "학습됨: {terms} 외{count}",
     "retryFailed": "인식 실패, 다시 녹음해 주세요",
     "cancelled": "취소됨",
     "modeSwitched": "{mode} 모드로 전환되었습니다",
@@ -389,7 +408,9 @@
     },
     "upgradeNotice": {
       "title": "SayIt 업데이트 안내",
-      "item1": "전체 화면에서도 노치 HUD 표시: 다른 앱이 전체 화면일 때도 단축키 녹음 시 상단 노치 HUD가 정상적으로 나타납니다.",
+      "item1": "스마트 사전이 수정 내용을 학습합니다: 전사문을 붙여넣은 뒤 약 30초 안에 글을 수정하면 변경 내용에서 새 용어를 학습하여 자주 쓰는 단어의 인식 정확도를 높입니다.",
+      "item2": "화면 컨텍스트 인식: 녹음 중 스크린샷 한 장과 전면 앱 이름을 캡처해 AI 정리 시 UI 고유명사와 맥락을 보정합니다.",
+      "item3": "인식 실패 재시도: 녹음이 저장된 실패 기록은 원본 음성에서 바로 다시 전사할 수 있습니다.",
       "dismiss": "확인"
     }
   },

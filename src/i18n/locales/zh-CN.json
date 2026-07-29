@@ -179,9 +179,16 @@
     },
     "smartDictionary": {
       "title": "智能字典学习",
-      "description": "转录粘贴后自动检测修正，通过 AI 分析学习新词汇",
-      "privacyNote": "启用后，系统会读取光标附近的文字用于 AI 分析，不存储原文",
+      "description": "粘贴转写后约 30 秒内监听你对输入框的修改，检测到可学习的改动后立即写入字典；必要时再用 AI 辅助分析。请在可被辅助功能读取的输入框中改字（如备忘录、多数网页）",
+      "privacyNote": "需要 macOS「辅助功能」权限以读取焦点输入框；原文不落盘。本地差分无需联网。部分 App（如部分 IM / 游戏）无法读取则不会学习",
       "analysisModelUpdated": "字典分析模型已更新"
+    },
+    "screenContext": {
+      "title": "屏幕上下文感知",
+      "description": "录音时截取一帧屏幕，并读取前台应用名，在 AI 整理时一并发送，帮助纠正界面上的专有名词与场景用语",
+      "llmRequirement": "依赖要求：上方配置的 LLM 接口必须支持多模态（Vision / 看图），例如 GPT-4o、GPT-4o mini、Gemini 等。纯文本模型无法处理截图；开启后若模型不支持，整理请求可能失败。仅传前台应用名不需要多模态，但收益有限。",
+      "privacyNote": "截图仅用于当次 AI 整理请求，不会发给 ASR，也不长期保存；默认关闭。macOS 需授予「屏幕录制」权限",
+      "permissionHint": "若截图失败，请在系统设置中允许 SayIt 屏幕录制"
     }
   },
   "dashboard": {
@@ -235,15 +242,27 @@
     "loadingMore": "加载更多...",
     "playRecording": "播放录音",
     "noRecordingFile": "录音文件不存在",
-    "failedBadge": "识别失败"
+    "failedBadge": "识别失败",
+    "retranscribe": "重新识别",
+    "retranscribing": "识别中…",
+    "retranscribeHint": "本次识别失败，可使用已保存的录音重新转录。",
+    "retranscribeNoAudio": "识别失败，且没有可重试的录音文件。",
+    "retranscribeFailed": "重新识别失败，请稍后重试",
+    "retranscribeEmpty": "重新识别未得到有效文字",
+    "retranscribeNotFailed": "仅识别失败的记录可重新识别"
   },
   "dictionary": {
     "termCount": "{count} 词汇",
     "inputPlaceholder": "输入新词汇...",
     "duplicateEntry": "此词汇已存在",
+    "emptyTerm": "词汇不能为空",
     "add": "新增",
     "added": "已新增「{term}」",
+    "updated": "已更新为「{term}」",
     "removed": "已删除「{term}」",
+    "edit": "编辑",
+    "save": "保存",
+    "cancelEdit": "取消",
     "loading": "加载中...",
     "emptyState": "尚无自定义词汇，新增常用术语以提升识别率",
     "termHeader": "词汇",
@@ -293,9 +312,9 @@
     "editSuccess": "已编辑 ✓",
     "editFailed": "编辑失败",
     "recordingTooShort": "录音时间太短",
-    "vocabularyLearnedLabel": "新增字典",
-    "vocabularyLearned": "{terms}",
-    "vocabularyLearnedTruncated": "{terms} 等 {count} 个",
+    "vocabularyLearnedLabel": "已学习",
+    "vocabularyLearned": "已学习：{terms}",
+    "vocabularyLearnedTruncated": "已学习：{terms} 等{count}个",
     "retryFailed": "识别失败，请重新录音",
     "cancelled": "已取消",
     "modeSwitched": "已切换至{mode}模式",
@@ -389,7 +408,9 @@
     },
     "upgradeNotice": {
       "title": "SayIt 更新摘要",
-      "item1": "全屏也能看到刘海提示：其他应用全屏时按快捷键录音，顶部刘海 HUD 会正常显示录音状态，不再“按了没反应”",
+      "item1": "智能字典自动学习修正：转写粘贴后约 30 秒内修改文字，SayIt 会从改动中学习新词，让后续识别更贴合你的常用词。",
+      "item2": "屏幕上下文感知：可在录音时截取一帧屏幕并读取前台应用名，帮助 AI 整理纠正界面专有名词与场景用语。",
+      "item3": "失败记录可重新识别：历史记录保留了录音时，可直接使用原始音频再次转录，无需重新录制。",
       "dismiss": "了解"
     }
   },

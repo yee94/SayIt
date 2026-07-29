@@ -3,6 +3,7 @@ pub mod audio_recorder;
 pub mod clipboard_paste;
 pub mod hotkey_listener;
 pub mod keyboard_monitor;
+pub mod screen_context;
 pub mod sound_feedback;
 pub mod text_field_reader;
 pub mod transcription;

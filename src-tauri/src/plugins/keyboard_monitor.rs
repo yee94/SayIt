@@ -8,10 +8,11 @@ use tauri::{AppHandle, Emitter, Manager, Runtime};
 const MONITOR_DURATION_MS: u64 = 5000;
 const CANCEL_CHECK_INTERVAL_MS: u64 = 100;
 
-// Correction monitor constants
-const CORRECTION_PHASE1_TIMEOUT_MS: u64 = 5000;
-const CORRECTION_IDLE_TIMEOUT_MS: u64 = 3000;
-const CORRECTION_HARD_LIMIT_MS: u64 = 15000;
+// Correction monitor constants（对齐约 30s 自动学习窗）
+// Phase1：贴上后等待用户开始改字的最长时间（此前 8s 太短，用户常来不及改）
+const CORRECTION_PHASE1_TIMEOUT_MS: u64 = 30_000;
+const CORRECTION_IDLE_TIMEOUT_MS: u64 = 4_000;
+const CORRECTION_HARD_LIMIT_MS: u64 = 45_000;
 const CORRECTION_ENTER_DEBOUNCE_MS: u64 = 500;
 
 #[derive(Serialize, Clone)]

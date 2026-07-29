@@ -19,10 +19,23 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, ChevronDown, Copy, Check, Trash2, Play, Pause } from "lucide-vue-next";
+import {
+  Search,
+  ChevronDown,
+  Copy,
+  Check,
+  Trash2,
+  Play,
+  Pause,
+  RotateCcw,
+  Loader2,
+} from "lucide-vue-next";
 import { captureError } from "../lib/sentry";
+import { extractErrorMessage } from "../lib/errorUtils";
+import { useI18n } from "vue-i18n";
 
 const historyStore = useHistoryStore();
+const { t } = useI18n();
 
 const searchInput = ref("");
 const expandedRecordId = ref<string | null>(null);
@@ -30,6 +43,9 @@ const copiedRecordId = ref<string | null>(null);
 const copiedRawRecordId = ref<string | null>(null);
 const sentinelRef = ref<HTMLElement | null>(null);
 const playingRecordId = ref<string | null>(null);
+/** 正在重新识别的记录 id */
+const retranscribingRecordId = ref<string | null>(null);
+const retranscribeErrorById = ref<Record<string, string>>({});
 let currentAudio: HTMLAudioElement | null = null;
 let currentBlobUrl: string | null = null;
 
@@ -89,6 +105,34 @@ async function handleDeleteRecord(record: TranscriptionRecord) {
     }
   } catch {
     // DB 删除失败，静默处理（Sentry 已在 store 层捕获）
+  }
+}
+
+function canRetranscribe(record: TranscriptionRecord): boolean {
+  return record.status === "failed" && Boolean(record.audioFilePath);
+}
+
+async function handleRetranscribe(record: TranscriptionRecord) {
+  if (!canRetranscribe(record) || retranscribingRecordId.value) return;
+
+  retranscribingRecordId.value = record.id;
+  const nextErrors = { ...retranscribeErrorById.value };
+  delete nextErrors[record.id];
+  retranscribeErrorById.value = nextErrors;
+
+  try {
+    await historyStore.retranscribeFailedRecord(record);
+  } catch (err) {
+    const message = extractErrorMessage(err);
+    retranscribeErrorById.value = {
+      ...retranscribeErrorById.value,
+      [record.id]: message || t("history.retranscribeFailed"),
+    };
+    captureError(err, { source: "history-view", step: "retranscribe" });
+  } finally {
+    if (retranscribingRecordId.value === record.id) {
+      retranscribingRecordId.value = null;
+    }
   }
 }
 
@@ -266,6 +310,21 @@ onBeforeUnmount(() => {
                     {{ formatDuration(record.recordingDurationMs) }}
                   </span>
                   <Button
+                    v-if="canRetranscribe(record)"
+                    variant="ghost"
+                    size="icon"
+                    class="h-7 w-7"
+                    :disabled="retranscribingRecordId === record.id"
+                    :title="$t('history.retranscribe')"
+                    @click.stop="handleRetranscribe(record)"
+                  >
+                    <Loader2
+                      v-if="retranscribingRecordId === record.id"
+                      class="h-3.5 w-3.5 animate-spin"
+                    />
+                    <RotateCcw v-else class="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
                     variant="ghost"
                     size="icon"
                     class="h-7 w-7"
@@ -337,6 +396,44 @@ onBeforeUnmount(() => {
                 </span>
                 <span>{{ $t("history.charCountLabel") }}{{ record.charCount }}</span>
                 <span>{{ $t("history.modeLabel") }}{{ record.triggerMode === "hold" ? $t("history.holdMode") : $t("history.toggleMode") }}</span>
+              </div>
+
+              <!-- 识别失败：重新识别 -->
+              <div
+                v-if="record.status === 'failed'"
+                class="rounded-md border border-border bg-muted/30 px-3 py-2.5 space-y-2"
+              >
+                <p class="text-xs text-muted-foreground leading-relaxed">
+                  {{
+                    record.audioFilePath
+                      ? $t("history.retranscribeHint")
+                      : $t("history.retranscribeNoAudio")
+                  }}
+                </p>
+                <Button
+                  v-if="canRetranscribe(record)"
+                  variant="default"
+                  size="sm"
+                  :disabled="retranscribingRecordId === record.id"
+                  @click.stop="handleRetranscribe(record)"
+                >
+                  <Loader2
+                    v-if="retranscribingRecordId === record.id"
+                    class="h-3.5 w-3.5 mr-1.5 animate-spin"
+                  />
+                  <RotateCcw v-else class="h-3.5 w-3.5 mr-1.5" />
+                  {{
+                    retranscribingRecordId === record.id
+                      ? $t("history.retranscribing")
+                      : $t("history.retranscribe")
+                  }}
+                </Button>
+                <p
+                  v-if="retranscribeErrorById[record.id]"
+                  class="text-xs text-destructive"
+                >
+                  {{ retranscribeErrorById[record.id] }}
+                </p>
               </div>
 
               <!-- 操作按钮 -->

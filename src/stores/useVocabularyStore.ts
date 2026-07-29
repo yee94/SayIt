@@ -33,10 +33,12 @@ export const useVocabularyStore = defineStore("vocabulary", () => {
 
   const termCount = computed(() => termList.value.length);
 
-  function isDuplicateTerm(term: string): boolean {
+  function isDuplicateTerm(term: string, excludeId?: string): boolean {
     const normalizedInput = term.trim().toLowerCase();
     return termList.value.some(
-      (entry) => entry.term.trim().toLowerCase() === normalizedInput,
+      (entry) =>
+        entry.id !== excludeId &&
+        entry.term.trim().toLowerCase() === normalizedInput,
     );
   }
 
@@ -109,6 +111,45 @@ export const useVocabularyStore = defineStore("vocabulary", () => {
         `[vocabulary-store] removeTerm failed: ${extractErrorMessage(error)}`,
       );
       captureError(error, { source: "vocabulary", step: "remove" });
+      throw error;
+    }
+  }
+
+  async function updateTerm(id: string, term: string) {
+    const trimmedTerm = term.trim();
+    if (!trimmedTerm) {
+      throw new Error(i18n.global.t("dictionary.emptyTerm"));
+    }
+
+    const entry = termList.value.find((e) => e.id === id);
+    if (!entry) return;
+
+    if (entry.term === trimmedTerm) return;
+
+    if (isDuplicateTerm(trimmedTerm, id)) {
+      throw new Error(i18n.global.t("dictionary.duplicateEntry"));
+    }
+
+    try {
+      const db = getDatabase();
+      await db.execute("UPDATE vocabulary SET term = $1 WHERE id = $2", [
+        trimmedTerm,
+        id,
+      ]);
+      await fetchTermList();
+      void emitEvent(VOCABULARY_CHANGED, {
+        action: "updated",
+        term: trimmedTerm,
+      } satisfies VocabularyChangedPayload);
+    } catch (error) {
+      const message = extractErrorMessage(error);
+      if (message.includes("UNIQUE")) {
+        throw new Error(i18n.global.t("dictionary.duplicateEntry"), {
+          cause: error,
+        });
+      }
+      console.error(`[vocabulary-store] updateTerm failed: ${message}`);
+      captureError(error, { source: "vocabulary", step: "update" });
       throw error;
     }
   }
@@ -275,5 +316,6 @@ export const useVocabularyStore = defineStore("vocabulary", () => {
     importTerms,
     importFromTypeless,
     removeTerm,
+    updateTerm,
   };
 });

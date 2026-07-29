@@ -179,9 +179,16 @@
     },
     "smartDictionary": {
       "title": "Smart Dictionary Learning",
-      "description": "Auto-detect corrections after paste and learn new terms via AI analysis",
-      "privacyNote": "When enabled, the system reads text near the cursor for AI analysis. No original text is stored",
+      "description": "For about 30 seconds after paste, watch your edits in the focused field and auto-add dictionary terms as soon as a learnable change is detected (AI is only a fallback). Edit in an Accessibility-readable field (e.g. Notes, most web pages)",
+      "privacyNote": "Requires macOS Accessibility permission to read the focused field; originals are not stored. Local diff works offline. Some apps (certain IM/games clients) cannot be read and will not learn",
       "analysisModelUpdated": "Dictionary analysis model updated"
+    },
+    "screenContext": {
+      "title": "Screen Context Awareness",
+      "description": "During recording, capture one screenshot and the frontmost app name, then send them with the transcript during AI cleanup so the model can fix UI-specific names and context",
+      "llmRequirement": "Requirement: your LLM above must support multimodal vision (image input), e.g. GPT-4o, GPT-4o mini, or Gemini. Text-only models cannot use screenshots; enabling this with a non-vision model may cause cleanup requests to fail. App name alone works with text models, but with limited benefit.",
+      "privacyNote": "Screenshots are used only for the current AI cleanup request—never sent to ASR and not stored long-term. Off by default. macOS needs Screen Recording permission",
+      "permissionHint": "If capture fails, allow Screen Recording for SayIt in System Settings"
     }
   },
   "dashboard": {
@@ -235,15 +242,27 @@
     "loadingMore": "Loading more...",
     "playRecording": "Play recording",
     "noRecordingFile": "Recording file not available",
-    "failedBadge": "Failed"
+    "failedBadge": "Failed",
+    "retranscribe": "Retry recognition",
+    "retranscribing": "Recognizing…",
+    "retranscribeHint": "Recognition failed. You can re-transcribe using the saved audio.",
+    "retranscribeNoAudio": "Recognition failed and no audio file is available to retry.",
+    "retranscribeFailed": "Retry recognition failed. Please try again later.",
+    "retranscribeEmpty": "Retry produced no usable text",
+    "retranscribeNotFailed": "Only failed records can be re-transcribed"
   },
   "dictionary": {
     "termCount": "{count} terms",
     "inputPlaceholder": "Enter a new term...",
     "duplicateEntry": "This term already exists",
+    "emptyTerm": "Term cannot be empty",
     "add": "Add",
     "added": "Added \"{term}\"",
+    "updated": "Updated to \"{term}\"",
     "removed": "Removed \"{term}\"",
+    "edit": "Edit",
+    "save": "Save",
+    "cancelEdit": "Cancel",
     "loading": "Loading...",
     "emptyState": "No custom terms yet. Add frequently used terms to improve recognition accuracy",
     "termHeader": "Term",
@@ -293,9 +312,9 @@
     "editSuccess": "Edited ✓",
     "editFailed": "Edit failed",
     "recordingTooShort": "Recording too short",
-    "vocabularyLearnedLabel": "Added to dictionary",
-    "vocabularyLearned": "{terms}",
-    "vocabularyLearnedTruncated": "{terms} +{count} more",
+    "vocabularyLearnedLabel": "Learned",
+    "vocabularyLearned": "Learned: {terms}",
+    "vocabularyLearnedTruncated": "Learned: {terms} +{count}",
     "retryFailed": "Recognition failed, please record again",
     "cancelled": "Cancelled",
     "modeSwitched": "Switched to {mode} mode",
@@ -389,7 +408,9 @@
     },
     "upgradeNotice": {
       "title": "What's New in SayIt",
-      "item1": "Fullscreen HUD fixed: when another app is in fullscreen, the notch recording HUD now appears normally instead of staying invisible.",
+      "item1": "Smart Dictionary learns your corrections: edit pasted text within about 30 seconds and SayIt learns new terms from the changes, improving recognition of the words you use most.",
+      "item2": "Screen Context Awareness: capture one screenshot and the frontmost app name while recording to help AI cleanup recognize UI-specific names and context.",
+      "item3": "Retry failed recognition: when a failed history record has saved audio, re-transcribe it directly from the original recording.",
       "dismiss": "Got it"
     }
   },

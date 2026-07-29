@@ -115,6 +115,11 @@
 - [`CHANGELOG.md`](../CHANGELOG.md) — 版本变更纪录
 - [`tests/README.md`](../tests/README.md) — 测试结构说明
 
+### 4.4 有赞语音输入参考与实施设计
+
+- [`youzanvoice-reference/README.md`](./youzanvoice-reference/README.md) — 自定义词学习、截图上下文助手、ASR/LLM 上下文与实施路线
+- [`youzanvoice-reference/reference/README.md`](./youzanvoice-reference/reference/README.md) — 有赞语音输入 3.2.3 静态参考源码说明与安全约束
+
 ---
 
 ## 五、I want to… (Decision Tree)

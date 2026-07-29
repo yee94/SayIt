@@ -19,7 +19,7 @@ const i18n = createI18n({
     "zh-CN": {
       voiceFlow: {
         vocabularyLearned: "已学习：{terms}",
-        vocabularyLearnedTruncated: "已学习：{terms} 等 {count} 个词",
+        vocabularyLearnedTruncated: "已学习：{terms} 等{count}个",
       },
     },
   },

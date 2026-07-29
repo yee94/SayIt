@@ -10,11 +10,14 @@ const RESTORE_DELAY_MS: u64 = 200;
 
 // ========== Focus State ==========
 
-/// 储存使用者启动录音前的前景视窗，贴上时恢复焦点。
-/// Windows 上 SendInput 会送到当前前景视窗，若 HUD 抢了焦点，Ctrl+V 会进 HUD 而非目标 app。
+/// 储存使用者启动录音前的前景目标，贴上后 / 学习读取时恢复。
+/// - Windows: HWND（SendInput 依赖前景窗）
+/// - macOS: 目标 App 的 PID（HUD 抢焦点后，AX 需按 PID 读目标 App 的输入框）
 pub struct FocusState {
     #[cfg(target_os = "windows")]
     target_hwnd: std::sync::Mutex<isize>,
+    #[cfg(target_os = "macos")]
+    target_pid: std::sync::Mutex<i32>,
 }
 
 impl FocusState {
@@ -22,7 +25,15 @@ impl FocusState {
         Self {
             #[cfg(target_os = "windows")]
             target_hwnd: std::sync::Mutex::new(0),
+            #[cfg(target_os = "macos")]
+            target_pid: std::sync::Mutex::new(0),
         }
+    }
+
+    /// macOS: 取得录音开始时记下的目标 App PID（0 = 未知）
+    #[cfg(target_os = "macos")]
+    pub fn macos_target_pid(&self) -> i32 {
+        self.target_pid.lock().map(|g| *g).unwrap_or(0)
     }
 }
 
@@ -238,22 +249,57 @@ fn restore_target_window(hwnd_value: isize) {
 
 /// 捕获当前前景视窗，供后续 paste_text 恢复焦点。
 /// 应在 hotkey 触发时（HUD 显示前）呼叫。
+/// 回传目标标识：macOS = PID；Windows = HWND 的 isize；其它 = 0。
 #[tauri::command]
-pub fn capture_target_window(state: State<'_, FocusState>) {
+pub fn capture_target_window(state: State<'_, FocusState>) -> Result<i64, String> {
     #[cfg(target_os = "windows")]
     {
         use windows::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
         unsafe {
             let hwnd = GetForegroundWindow();
+            let raw = hwnd.0 as isize;
             if let Ok(mut guard) = state.target_hwnd.lock() {
-                *guard = hwnd.0 as isize;
+                *guard = raw;
             }
             println!("[clipboard-paste] Captured target window: {:?}", hwnd);
+            return Ok(raw as i64);
         }
     }
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "macos")]
+    {
+        // 记录录音开始时的前台 App PID，供智能字典学习在 HUD 抢焦点后仍能读到目标输入框
+        let pid = macos_frontmost_pid().unwrap_or(0);
+        if let Ok(mut guard) = state.target_pid.lock() {
+            *guard = pid;
+        }
+        println!("[clipboard-paste] Captured target app pid={pid}");
+        return Ok(i64::from(pid));
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     {
         let _ = state;
+        Ok(0)
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn macos_frontmost_pid() -> Option<i32> {
+    use objc::{class, msg_send, runtime::Object, sel, sel_impl};
+    unsafe {
+        let workspace: *mut Object = msg_send![class!(NSWorkspace), sharedWorkspace];
+        if workspace.is_null() {
+            return None;
+        }
+        let app: *mut Object = msg_send![workspace, frontmostApplication];
+        if app.is_null() {
+            return None;
+        }
+        let pid: i32 = msg_send![app, processIdentifier];
+        if pid > 0 {
+            Some(pid)
+        } else {
+            None
+        }
     }
 }
 

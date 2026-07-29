@@ -3,21 +3,95 @@
 /// Windows: 透过 UI Automation（IUIAutomation + TextPattern/ValuePattern，跑在专用 MTA 执行绪）。
 ///
 /// 契约：回传「游标附近、有上限」的文字（非整份文件）；读不到一律回 `Ok(None)`。
+///
+/// 可选 `preferred_pid`：macOS 上当系统焦点被 HUD 抢走时，改从录音前记录的目标 App PID 读取。
 #[tauri::command]
-pub fn read_focused_text_field() -> Result<Option<String>, String> {
+pub fn read_focused_text_field(
+    preferred_pid: Option<i32>,
+) -> Result<Option<String>, String> {
     #[cfg(target_os = "macos")]
     {
-        macos::read_focused_text_field_impl()
+        macos::read_focused_text_field_impl(preferred_pid)
     }
 
     #[cfg(target_os = "windows")]
     {
+        let _ = preferred_pid;
         windows_impl::read_focused_text_field_impl()
     }
 
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
+        let _ = preferred_pid;
         Ok(None)
+    }
+}
+
+/// 供智能字典学习使用：自动带上 capture_target_window 记下的目标 PID。
+/// `paste_hint`：刚贴上的原文，用于在目标 App 窗口树中定位含该文的输入框（焦点被 HUD 抢走时）。
+#[tauri::command]
+pub fn read_focused_text_field_for_learning(
+    focus_state: tauri::State<'_, super::clipboard_paste::FocusState>,
+    paste_hint: Option<String>,
+) -> Result<Option<String>, String> {
+    #[cfg(target_os = "macos")]
+    {
+        let pid = focus_state.macos_target_pid();
+        let preferred = if pid > 0 { Some(pid) } else { None };
+        macos::read_for_learning_impl(preferred, paste_hint.as_deref())
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let _ = focus_state;
+        let _ = paste_hint;
+        windows_impl::read_focused_text_field_impl()
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        let _ = focus_state;
+        let _ = paste_hint;
+        Ok(None)
+    }
+}
+
+/// 诊断：辅助功能是否授权 + 当前记录的目标 PID（写进日志，前端也会拿到）。
+#[derive(serde::Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct LearningAxDiagnostics {
+    pub ax_trusted: bool,
+    pub target_pid: i32,
+    pub frontmost_pid: i32,
+    pub our_pid: i32,
+    pub sample_read: Option<String>,
+    pub note: String,
+}
+
+#[tauri::command]
+pub fn diagnose_learning_ax(
+    focus_state: tauri::State<'_, super::clipboard_paste::FocusState>,
+    paste_hint: Option<String>,
+) -> Result<LearningAxDiagnostics, String> {
+    #[cfg(target_os = "macos")]
+    {
+        Ok(macos::diagnose_learning_ax_impl(
+            focus_state.macos_target_pid(),
+            paste_hint.as_deref(),
+        ))
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = focus_state;
+        let _ = paste_hint;
+        Ok(LearningAxDiagnostics {
+            ax_trusted: false,
+            target_pid: 0,
+            frontmost_pid: 0,
+            our_pid: std::process::id() as i32,
+            sample_read: None,
+            note: "diagnostics only implemented on macOS".into(),
+        })
     }
 }
 
@@ -227,7 +301,13 @@ mod macos {
     fn is_text_input_role(role: &str) -> bool {
         matches!(
             role,
-            "AXTextField" | "AXTextArea" | "AXComboBox" | "AXWebArea"
+            "AXTextField"
+                | "AXTextArea"
+                | "AXComboBox"
+                | "AXWebArea"
+                | "AXSearchField"
+                | "AXScrollArea"
+                | "AXGroup" // Electron / CodeMirror 常见容器
         )
     }
 
@@ -237,6 +317,8 @@ mod macos {
         app: AXUIElementRef,
         element: AXUIElementRef,
         target_element: AXUIElementRef,
+        /// system_wide 是否为占位（按 PID 创建 app 时 system_wide 仍要释放）
+        owns_system_wide: bool,
     }
 
     impl FocusedElementContext {
@@ -247,33 +329,31 @@ mod macos {
                 }
                 CFRelease(self.element);
                 CFRelease(self.app);
-                CFRelease(self.system_wide);
+                if self.owns_system_wide {
+                    CFRelease(self.system_wide);
+                }
             }
         }
     }
 
-    /// 走访 AX 树取得当前聚焦的文字输入元素。
-    /// 共用逻辑：system-wide → focused app → focused element → role check → WebArea child。
-    fn resolve_focused_text_element() -> Option<FocusedElementContext> {
-        let system_wide = unsafe { AXUIElementCreateSystemWide() };
-        if system_wide.is_null() {
-            return None;
-        }
+    extern "C" {
+        fn AXUIElementCreateApplication(pid: i32) -> AXUIElementRef;
+    }
 
-        let app = match get_ax_attribute(system_wide, K_AX_FOCUSED_APPLICATION_ATTRIBUTE) {
-            Some(a) => a,
-            None => {
-                unsafe { CFRelease(system_wide) };
-                return None;
-            }
-        };
-
+    /// 从指定 app 元素解析 focused text element。
+    fn resolve_text_element_from_app(
+        app: AXUIElementRef,
+        system_wide: AXUIElementRef,
+        owns_system_wide: bool,
+    ) -> Option<FocusedElementContext> {
         let element = match get_ax_attribute(app, K_AX_FOCUSED_UI_ELEMENT_ATTRIBUTE) {
             Some(e) => e,
             None => {
                 unsafe {
                     CFRelease(app);
-                    CFRelease(system_wide);
+                    if owns_system_wide {
+                        CFRelease(system_wide);
+                    }
                 }
                 return None;
             }
@@ -282,7 +362,8 @@ mod macos {
         let role = get_ax_string_attribute(element, K_AX_ROLE_ATTRIBUTE);
         let target_element = match role.as_deref() {
             Some(r) if is_text_input_role(r) => {
-                if r == "AXWebArea" {
+                if r == "AXWebArea" || r == "AXGroup" || r == "AXScrollArea" {
+                    // 尝试深入一层拿真正的输入子元素
                     match get_ax_attribute(element, K_AX_FOCUSED_UI_ELEMENT_ATTRIBUTE) {
                         Some(child) => child,
                         None => element,
@@ -291,44 +372,432 @@ mod macos {
                     element
                 }
             }
-            _ => {
-                unsafe {
-                    CFRelease(element);
-                    CFRelease(app);
-                    CFRelease(system_wide);
-                }
-                return None;
-            }
+            // 角色未知：仍尝试读 AXValue（Cursor / 自定义控件）
+            Some(_) | None => element,
         };
 
+        // 若 target 没有 value，且我们深入失败，仍返回让呼叫端尝试
         Some(FocusedElementContext {
             system_wide,
             app,
             element,
             target_element,
+            owns_system_wide,
         })
     }
 
-    pub fn read_focused_text_field_impl() -> Result<Option<String>, String> {
-        let ctx = match resolve_focused_text_element() {
-            Some(c) => c,
-            None => return Ok(None),
-        };
+    fn frontmost_pid_via_nsworkspace() -> Option<i32> {
+        use objc::{class, msg_send, runtime::Object, sel, sel_impl};
+        unsafe {
+            let workspace: *mut Object = msg_send![class!(NSWorkspace), sharedWorkspace];
+            if workspace.is_null() {
+                return None;
+            }
+            let app: *mut Object = msg_send![workspace, frontmostApplication];
+            if app.is_null() {
+                return None;
+            }
+            let pid: i32 = msg_send![app, processIdentifier];
+            if pid > 0 {
+                Some(pid)
+            } else {
+                None
+            }
+        }
+    }
 
+    /// 走访 AX 树取得当前聚焦的文字输入元素。
+    /// preferred_pid：录音前捕获的目标 App；当系统焦点落在 SayIt 自身时改读该 PID。
+    fn resolve_focused_text_element(preferred_pid: Option<i32>) -> Option<FocusedElementContext> {
+        let our_pid = std::process::id() as i32;
+        let front_pid = frontmost_pid_via_nsworkspace();
+
+        // HUD / 托盘抢焦点时 frontmost 是自己 → 优先读录音前目标 App
+        let prefer_target_first = preferred_pid.is_some_and(|p| p > 0)
+            && front_pid.is_some_and(|fp| fp == our_pid || preferred_pid == Some(fp));
+
+        if prefer_target_first {
+            if let Some(pid) = preferred_pid {
+                let app = unsafe { AXUIElementCreateApplication(pid) };
+                if !app.is_null() {
+                    let dummy = std::ptr::null();
+                    if let Some(ctx) = resolve_text_element_from_app(app, dummy, false) {
+                        return Some(ctx);
+                    }
+                }
+            }
+        }
+
+        let system_wide = unsafe { AXUIElementCreateSystemWide() };
+        if system_wide.is_null() {
+            return try_preferred_pid_only(preferred_pid);
+        }
+
+        // 系统焦点 App（非自身时）
+        if front_pid != Some(our_pid) {
+            if let Some(app) = get_ax_attribute(system_wide, K_AX_FOCUSED_APPLICATION_ATTRIBUTE) {
+                if let Some(ctx) = resolve_text_element_from_app(app, system_wide, true) {
+                    return Some(ctx);
+                }
+                // resolve 失败已释放 system_wide
+            } else {
+                unsafe { CFRelease(system_wide) };
+            }
+        } else {
+            unsafe { CFRelease(system_wide) };
+        }
+
+        try_preferred_pid_only(preferred_pid)
+    }
+
+    fn try_preferred_pid_only(preferred_pid: Option<i32>) -> Option<FocusedElementContext> {
+        if let Some(pid) = preferred_pid.filter(|p| *p > 0) {
+            let app = unsafe { AXUIElementCreateApplication(pid) };
+            if !app.is_null() {
+                let dummy = std::ptr::null();
+                if let Some(ctx) = resolve_text_element_from_app(app, dummy, false) {
+                    println!("[text-field] resolve via preferred_pid={pid}");
+                    return Some(ctx);
+                }
+            }
+        }
+        None
+    }
+
+    fn read_value_from_ctx(ctx: FocusedElementContext) -> Option<String> {
         let cursor_pos = get_cursor_position(ctx.target_element);
-        let full_text = get_ax_string_attribute(ctx.target_element, K_AX_VALUE_ATTRIBUTE);
+        let full_text = get_ax_string_attribute(ctx.target_element, K_AX_VALUE_ATTRIBUTE)
+            .or_else(|| {
+                // 部分控件 value 在 element 而非深入后的 child
+                get_ax_string_attribute(ctx.element, K_AX_VALUE_ATTRIBUTE)
+            });
         ctx.cleanup();
 
         match full_text {
             Some(text) if !text.is_empty() => {
                 let excerpt = extract_excerpt(&text, cursor_pos, CONTEXT_CHARS);
                 if excerpt.is_empty() {
-                    Ok(None)
+                    None
                 } else {
-                    Ok(Some(excerpt))
+                    Some(excerpt)
                 }
             }
-            _ => Ok(None),
+            _ => None,
+        }
+    }
+
+    pub fn read_focused_text_field_impl(preferred_pid: Option<i32>) -> Result<Option<String>, String> {
+        // 首次尝试
+        if let Some(ctx) = resolve_focused_text_element(preferred_pid) {
+            if let Some(text) = read_value_from_ctx(ctx) {
+                return Ok(Some(text));
+            }
+        }
+
+        // Electron / 惰性 AX 树：戳醒后重试
+        poke_focused_app_manual_accessibility();
+        if let Some(pid) = preferred_pid.filter(|p| *p > 0) {
+            poke_app_manual_accessibility(pid);
+        }
+        std::thread::sleep(std::time::Duration::from_millis(POKE_SETTLE_MS));
+
+        if let Some(ctx) = resolve_focused_text_element(preferred_pid) {
+            if let Some(text) = read_value_from_ctx(ctx) {
+                println!("[text-field] read ok after poke (preferred_pid={preferred_pid:?})");
+                return Ok(Some(text));
+            }
+        }
+
+        Ok(None)
+    }
+
+    /// 学习专用读取（对齐有赞 textEditMonitor）：
+    /// 1. 按目标 PID 设置 AXEnhancedUserInterface（仅一次，避免每次 poll 卡主线程）
+    /// 2. 带超时的 osascript 按 PID 读焦点控件
+    /// 3. 失败再走轻量 C API（不再每次做重窗口树扫描）
+    pub fn read_for_learning_impl(
+        preferred_pid: Option<i32>,
+        paste_hint: Option<&str>,
+    ) -> Result<Option<String>, String> {
+        let _ = paste_hint; // 树扫描仅在诊断路径使用，避免 poll 卡死
+        let trusted = is_ax_trusted();
+        if !trusted {
+            eprintln!(
+                "[text-field] AXIsProcessTrusted=false — 系统未授权辅助功能，无法读取输入框"
+            );
+            return Ok(None);
+        }
+
+        if let Some(pid) = preferred_pid.filter(|p| *p > 0) {
+            // 每个 PID 只 enable 一次，避免 500ms poll 反复起 osascript
+            enable_ax_enhanced_user_interface_once(pid);
+            if let Some(text) = read_field_value_by_pid_osascript(pid) {
+                let trimmed = text.trim();
+                if !trimmed.is_empty() {
+                    return Ok(Some(extract_excerpt(trimmed, None, 200)));
+                }
+            }
+        }
+
+        // C API 轻量路径（无 sleep、无树扫描）
+        if let Some(ctx) = resolve_focused_text_element(preferred_pid) {
+            if let Some(text) = read_value_from_ctx(ctx) {
+                return Ok(Some(text));
+            }
+        }
+
+        Ok(None)
+    }
+
+    /// 每个 PID 只设置一次 AXEnhancedUserInterface，避免轮询卡死主线程。
+    fn enable_ax_enhanced_user_interface_once(pid: i32) {
+        use std::collections::HashSet;
+        use std::sync::Mutex;
+        static ENABLED: Mutex<Option<HashSet<i32>>> = Mutex::new(None);
+        let mut guard = match ENABLED.lock() {
+            Ok(g) => g,
+            Err(_) => return,
+        };
+        if guard.is_none() {
+            *guard = Some(HashSet::new());
+        }
+        let set = guard.as_mut().unwrap();
+        if set.contains(&pid) {
+            return;
+        }
+        set.insert(pid);
+        drop(guard);
+
+        let script = format!(
+            r#"tell application "System Events"
+  try
+    set targetProc to first application process whose unix id is {pid}
+    try
+      set value of attribute "AXEnhancedUserInterface" of targetProc to true
+    end try
+  end try
+end tell"#
+        );
+        let _ = run_osascript_with_timeout(&script, 1_200);
+    }
+
+    /// 有赞同款：按 PID 读该进程当前焦点 UI 的 AXValue（不依赖 frontmost）
+    /// 硬超时：osascript 无超时会堵死 Tauri 主线程，导致 HUD 卡在「整理中」。
+    fn read_field_value_by_pid_osascript(pid: i32) -> Option<String> {
+        let script = format!(
+            r#"tell application "System Events"
+  try
+    set targetProc to first application process whose unix id is {pid}
+    set focAttr to value of attribute "AXFocusedUIElement" of targetProc
+    if focAttr is missing value then return ""
+    try
+      set val to value of attribute "AXValue" of focAttr
+      if val is not missing value and val is not "" then return val as text
+    end try
+    try
+      set selectedVal to value of attribute "AXSelectedText" of focAttr
+      if selectedVal is not missing value and selectedVal is not "" then return selectedVal as text
+    end try
+    return ""
+  on error
+    return ""
+  end try
+end tell"#
+        );
+        run_osascript_with_timeout(&script, 1_500)
+    }
+
+    /// 在后台线程跑 osascript，超时返回 None，避免阻塞主线程过久。
+    fn run_osascript_with_timeout(script: &str, timeout_ms: u64) -> Option<String> {
+        use std::sync::mpsc;
+        use std::time::Duration;
+
+        let (tx, rx) = mpsc::channel();
+        let script = script.to_string();
+        std::thread::Builder::new()
+            .name("sayit-osascript".into())
+            .spawn(move || {
+                let output = std::process::Command::new("osascript")
+                    .args(["-e", &script])
+                    .output();
+                let _ = tx.send(output);
+            })
+            .ok()?;
+
+        match rx.recv_timeout(Duration::from_millis(timeout_ms)) {
+            Ok(Ok(output)) if output.status.success() => {
+                let text = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                if text.is_empty() {
+                    None
+                } else {
+                    Some(text)
+                }
+            }
+            Ok(Ok(output)) => {
+                let err = String::from_utf8_lossy(&output.stderr);
+                if !err.trim().is_empty() {
+                    eprintln!("[text-field] osascript failed: {err}");
+                }
+                None
+            }
+            Ok(Err(e)) => {
+                eprintln!("[text-field] osascript spawn/output error: {e}");
+                None
+            }
+            Err(_) => {
+                eprintln!("[text-field] osascript timeout after {timeout_ms}ms");
+                None
+            }
+        }
+    }
+
+    pub fn diagnose_learning_ax_impl(
+        target_pid: i32,
+        paste_hint: Option<&str>,
+    ) -> super::LearningAxDiagnostics {
+        let _ = paste_hint;
+        // 诊断必须极轻：禁止树扫描 / 长 sleep，否则会把 HUD 卡在「整理中」
+        let ax_trusted = is_ax_trusted();
+        let our_pid = std::process::id() as i32;
+        let frontmost_pid = frontmost_pid_via_nsworkspace().unwrap_or(0);
+        let sample_read = if ax_trusted && target_pid > 0 {
+            enable_ax_enhanced_user_interface_once(target_pid);
+            read_field_value_by_pid_osascript(target_pid)
+                .map(|s| s.chars().take(80).collect())
+        } else {
+            None
+        };
+        let note = if !ax_trusted {
+            "辅助功能未授权：请在 系统设置→隐私与安全性→辅助功能 中勾选 SayIt".into()
+        } else if target_pid <= 0 {
+            "target_pid=0：录音开始时未捕获到前台 App（可能已是 SayIt 自己）".into()
+        } else if sample_read.is_none() {
+            format!(
+                "AX 已授权但读不到输入框 (target_pid={target_pid} frontmost={frontmost_pid} our={our_pid})"
+            )
+        } else {
+            "读取成功".into()
+        };
+        super::LearningAxDiagnostics {
+            ax_trusted,
+            target_pid,
+            frontmost_pid,
+            our_pid,
+            sample_read,
+            note,
+        }
+    }
+
+    fn is_ax_trusted() -> bool {
+        extern "C" {
+            fn AXIsProcessTrusted() -> bool;
+        }
+        unsafe { AXIsProcessTrusted() }
+    }
+
+    fn poke_app_manual_accessibility(pid: i32) {
+        let app = unsafe { AXUIElementCreateApplication(pid) };
+        if app.is_null() {
+            return;
+        }
+        let attr = CFString::new("AXManualAccessibility");
+        let value = core_foundation::boolean::CFBoolean::true_value();
+        unsafe {
+            AXUIElementSetAttributeValue(app, attr.as_CFTypeRef(), value.as_CFTypeRef());
+            CFRelease(app);
+        }
+    }
+
+    /// 扫描目标 App 窗口树（诊断/后续用；poll 热路径不再调用以免卡主线程）
+    #[allow(dead_code)]
+    fn scan_app_text_fields(pid: i32, paste_hint: Option<&str>) -> Option<String> {
+        let app = unsafe { AXUIElementCreateApplication(pid) };
+        if app.is_null() {
+            return None;
+        }
+
+        let mut values: Vec<String> = Vec::new();
+        collect_text_values(app, 0, &mut values);
+        unsafe { CFRelease(app) };
+
+        if values.is_empty() {
+            return None;
+        }
+
+        let hint = paste_hint.unwrap_or("").trim();
+        if !hint.is_empty() {
+            // 优先：包含 hint 的字段（用户改字后仍可能包含大部分原文）
+            let mut best: Option<String> = None;
+            let mut best_score = 0usize;
+            for v in &values {
+                let score = overlap_score(hint, v);
+                if score > best_score {
+                    best_score = score;
+                    best = Some(v.clone());
+                }
+            }
+            // 至少有 30% 字符重合才采用
+            if best_score * 10 >= hint.chars().count() * 3 {
+                return best.map(|t| extract_excerpt(&t, None, 200));
+            }
+        }
+
+        // 否则取最长的非空 value（弱后备）
+        values
+            .into_iter()
+            .max_by_key(|s| s.chars().count())
+            .map(|t| extract_excerpt(&t, None, 200))
+    }
+
+    #[allow(dead_code)]
+    fn overlap_score(hint: &str, field: &str) -> usize {
+        hint.chars().filter(|c| field.contains(*c)).count()
+    }
+
+    #[allow(dead_code)]
+    fn collect_text_values(element: AXUIElementRef, depth: usize, out: &mut Vec<String>) {
+        const MAX_DEPTH: usize = 10;
+        const MAX_VALUES: usize = 50;
+        if depth > MAX_DEPTH || out.len() >= MAX_VALUES || element.is_null() {
+            return;
+        }
+
+        if let Some(role) = get_ax_string_attribute(element, K_AX_ROLE_ATTRIBUTE) {
+            if is_text_input_role(&role)
+                || role == "AXStaticText"
+                || role.contains("Text")
+                || role.contains("Field")
+                || role.contains("Area")
+            {
+                if let Some(v) = get_ax_string_attribute(element, K_AX_VALUE_ATTRIBUTE) {
+                    if !v.trim().is_empty() && v.chars().count() >= 2 {
+                        out.push(v);
+                    }
+                }
+            }
+        }
+
+        // AXChildren
+        if let Some(children_ref) = get_ax_attribute(element, "AXChildren") {
+            // children is CFArray of AXUIElement
+            extern "C" {
+                fn CFArrayGetCount(array: CFTypeRef) -> isize;
+                fn CFArrayGetValueAtIndex(array: CFTypeRef, idx: isize) -> CFTypeRef;
+            }
+            let count = unsafe { CFArrayGetCount(children_ref) };
+            let limit = count.min(40);
+            for i in 0..limit {
+                let child = unsafe { CFArrayGetValueAtIndex(children_ref, i) };
+                if child.is_null() {
+                    continue;
+                }
+                // CFArrayGetValueAtIndex does not retain; do not release child
+                collect_text_values(child, depth + 1, out);
+                if out.len() >= MAX_VALUES {
+                    break;
+                }
+            }
+            unsafe { CFRelease(children_ref) };
         }
     }
 
@@ -393,12 +862,12 @@ mod macos {
     /// 阻塞式选取侦测：第一次解析失败时戳醒 Electron 树再试一次。
     /// 全程只做被动 AX 查询，不模拟任何按键。
     fn selection_probe_blocking() -> SelectionState {
-        if let Some(ctx) = resolve_focused_text_element() {
+        if let Some(ctx) = resolve_focused_text_element(None) {
             return classify_selection(ctx);
         }
         poke_focused_app_manual_accessibility();
         std::thread::sleep(Duration::from_millis(POKE_SETTLE_MS));
-        match resolve_focused_text_element() {
+        match resolve_focused_text_element(None) {
             Some(ctx) => classify_selection(ctx),
             None => SelectionState::unavailable(),
         }

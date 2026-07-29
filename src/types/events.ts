@@ -28,6 +28,7 @@ export type SettingsKey =
   | "whisperModel"
   | "muteOnRecording"
   | "smartDictionaryEnabled"
+  | "screenContextEnabled"
   | "locale"
   | "transcriptionLocale"
   | "soundEffectsEnabled"
@@ -41,7 +42,7 @@ export interface SettingsUpdatedPayload {
 }
 
 export interface VocabularyChangedPayload {
-  action: "added" | "removed";
+  action: "added" | "removed" | "updated";
   term: string;
 }
 

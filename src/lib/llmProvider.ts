@@ -8,9 +8,15 @@ export const DEFAULT_LLM_MAX_TOKENS = 8192;
 
 // ── 统一型别 ──────────────────────────────────────────────
 
+/** OpenAI 兼容多模态 content part（文字 / 图片） */
+export type LlmContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } };
+
 export interface LlmChatMessage {
   role: "system" | "user" | "assistant";
-  content: string;
+  /** 纯文字，或 vision 模型用的 content parts */
+  content: string | LlmContentPart[];
 }
 
 export interface LlmChatRequest {

@@ -67,7 +67,8 @@ const STORE_NAME = "settings.json";
 export const DEFAULT_ENHANCEMENT_THRESHOLD_ENABLED = false;
 export const DEFAULT_ENHANCEMENT_THRESHOLD_CHAR_COUNT = 10;
 export const DEFAULT_MUTE_ON_RECORDING = true;
-const DEFAULT_SMART_DICTIONARY_ENABLED = navigator.userAgent.includes("Mac"); // macOS only — Windows 尚未支援 text field 读取
+const DEFAULT_SMART_DICTIONARY_ENABLED = true; // 本地差分学习，跨平台（macOS AX / Windows UIA）
+const DEFAULT_SCREEN_CONTEXT_ENABLED = false; // 隐私：默认关闭，截图仅用于当次 AI 整理
 const DEFAULT_SOUND_EFFECTS_ENABLED = true;
 const DEFAULT_PROMPT_MODE: PromptMode = "minimal";
 const DEFAULT_RECORDING_AUTO_CLEANUP_ENABLED = false;
@@ -126,6 +127,7 @@ export const useSettingsStore = defineStore("settings", () => {
   const isSmartDictionaryEnabled = ref<boolean>(
     DEFAULT_SMART_DICTIONARY_ENABLED,
   );
+  const isScreenContextEnabled = ref<boolean>(DEFAULT_SCREEN_CONTEXT_ENABLED);
   const customTriggerKeyDomCode = ref<string>("");
   const selectedLocale = ref<SupportedLocale>(FALLBACK_LOCALE);
   const selectedTranscriptionLocale = ref<TranscriptionLocale>(FALLBACK_LOCALE);
@@ -327,6 +329,12 @@ export const useSettingsStore = defineStore("settings", () => {
       );
       isSmartDictionaryEnabled.value =
         savedSmartDictionary ?? DEFAULT_SMART_DICTIONARY_ENABLED;
+
+      const savedScreenContext = await store.get<boolean>(
+        "screenContextEnabled",
+      );
+      isScreenContextEnabled.value =
+        savedScreenContext ?? DEFAULT_SCREEN_CONTEXT_ENABLED;
 
       const savedRecordingAutoCleanup = await store.get<boolean>(
         "recordingAutoCleanupEnabled",
@@ -1038,6 +1046,37 @@ export const useSettingsStore = defineStore("settings", () => {
     }
   }
 
+  async function saveScreenContextEnabled(enabled: boolean) {
+    try {
+      const store = await load(STORE_NAME);
+      await store.set("screenContextEnabled", enabled);
+      await store.save();
+      isScreenContextEnabled.value = enabled;
+
+      const payload: SettingsUpdatedPayload = {
+        key: "screenContextEnabled",
+        value: enabled,
+      };
+      await emitEvent(SETTINGS_UPDATED, payload);
+      console.log(
+        `[useSettingsStore] screenContextEnabled saved: ${enabled}`,
+      );
+      if (!enabled) {
+        void invoke("cleanup_screen_context_temp").catch(() => {});
+      }
+    } catch (err) {
+      console.error(
+        "[useSettingsStore] saveScreenContextEnabled failed:",
+        extractErrorMessage(err),
+      );
+      captureError(err, {
+        source: "settings",
+        step: "save-screen-context",
+      });
+      throw err;
+    }
+  }
+
   async function saveRecordingAutoCleanup(enabled: boolean, days: number) {
     const validatedDays =
       !Number.isInteger(days) || days < 1
@@ -1235,6 +1274,12 @@ export const useSettingsStore = defineStore("settings", () => {
       isSmartDictionaryEnabled.value =
         savedSmartDictionary ?? DEFAULT_SMART_DICTIONARY_ENABLED;
 
+      const savedScreenContext = await store.get<boolean>(
+        "screenContextEnabled",
+      );
+      isScreenContextEnabled.value =
+        savedScreenContext ?? DEFAULT_SCREEN_CONTEXT_ENABLED;
+
       const savedRecCleanup = await store.get<boolean>(
         "recordingAutoCleanupEnabled",
       );
@@ -1361,6 +1406,8 @@ export const useSettingsStore = defineStore("settings", () => {
     saveSoundEffectsEnabled,
     isSmartDictionaryEnabled,
     saveSmartDictionaryEnabled,
+    isScreenContextEnabled,
+    saveScreenContextEnabled,
     isRecordingAutoCleanupEnabled,
     recordingAutoCleanupDays,
     saveRecordingAutoCleanup,

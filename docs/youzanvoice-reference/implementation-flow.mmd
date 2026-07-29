@@ -1,0 +1,53 @@
+%%{init: {"theme": "base", "themeVariables": {"fontFamily": "PingFang SC, Microsoft YaHei, sans-serif", "primaryColor": "#E6F4EA", "primaryTextColor": "#173A2A", "primaryBorderColor": "#4C9B72", "lineColor": "#587169", "secondaryColor": "#E8F0FE", "tertiaryColor": "#FFF4D6", "clusterBkg": "#FAFCFB", "clusterBorder": "#AAC7B5"}}}%%
+flowchart TD
+    H["用户发起语音操作"]
+
+    subgraph D["普通听写"]
+        R["录音与实时 ASR"] --> T["文本整理"] --> P["显式粘贴到目标输入框"]
+    end
+
+    subgraph V["本地词典学习"]
+        P --> M["15 秒编辑监控<br/>键盘信号 + AX/UIA 摘录"]
+        M --> C["本地差分与候选评分"]
+        C --> Q{"高置信度词条"}
+        Q -->|"是"| W["写入词典或提升权重"]
+        Q -->|"待复核"| L["可选 LLM 复核"]
+        L --> W
+    end
+
+    subgraph A["截图上下文助手"]
+        S["专用热键"] --> G["记录前台目标与范围"]
+        G --> AR["录音与 ASR 指令"]
+        AR --> X["临时截图<br/>窗口优先 / 显示器回退"]
+        X --> I["视觉模型请求<br/>语音指令 + 截图"]
+        I --> O["结果预览卡"]
+        O --> U["用户复制或显式插入"]
+        I --> CL["清理临时截图"]
+        X --> CL
+    end
+
+    H -->|"普通热键"| R
+    H -->|"助手热键"| S
+
+    subgraph B["数据与安全边界"]
+        K["本地：路由、差分、截图租约"]
+        N["网络：用户已配置的 ASR / LLM"]
+        Z["日志：长度、计数、耗时、错误类别"]
+    end
+
+    C -.-> K
+    X -.-> K
+    T -.-> N
+    I -.-> N
+    W -.-> Z
+    CL -.-> Z
+
+    classDef local fill:#E6F4EA,stroke:#4C9B72,color:#173A2A;
+    classDef network fill:#E8F0FE,stroke:#5C89D6,color:#173A5E;
+    classDef user fill:#FFF4D6,stroke:#C58A24,color:#5A420E;
+    classDef safety fill:#F5F0FF,stroke:#8560B7,color:#372451;
+
+    class H,S,U user;
+    class M,C,Q,W,L,G,X,CL,K,Z local;
+    class R,T,P,AR,I,N network;
+    class O safety;

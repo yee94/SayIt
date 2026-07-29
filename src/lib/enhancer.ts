@@ -30,6 +30,13 @@ export function getDefaultSystemPrompt(): string {
   return getMinimalPromptForLocale(i18n.global.locale.value as SupportedLocale);
 }
 
+export interface ScreenContextOptions {
+  /** PNG base64，无 data: 前缀 */
+  imageBase64?: string | null;
+  /** 前台应用名 */
+  appName?: string | null;
+}
+
 export interface EnhanceOptions {
   systemPrompt?: string;
   vocabularyTermList?: string[];
@@ -37,46 +44,8 @@ export interface EnhanceOptions {
   baseUrl?: string;
   signal?: AbortSignal;
   maxTokens?: number;
-}
-
-async function withTimeout<T>(
-  promise: Promise<T>,
-  ms: number,
-  signal?: AbortSignal,
-): Promise<T> {
-  let timeoutId: ReturnType<typeof setTimeout> | undefined;
-  const raceList: Promise<T>[] = [promise];
-
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => {
-      const err = new Error("Enhancement timeout");
-      (err as Error & { code: string }).code = "ENHANCEMENT_TIMEOUT";
-      reject(err);
-    }, ms);
-  });
-  raceList.push(timeoutPromise as Promise<T>);
-
-  let abortHandler: (() => void) | undefined;
-  if (signal) {
-    const abortPromise = new Promise<never>((_, reject) => {
-      if (signal.aborted) {
-        reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
-        return;
-      }
-      abortHandler = () =>
-        reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
-      signal.addEventListener("abort", abortHandler, { once: true });
-    });
-    raceList.push(abortPromise as Promise<T>);
-  }
-
-  try {
-    return await Promise.race(raceList);
-  } finally {
-    if (timeoutId !== undefined) clearTimeout(timeoutId);
-    if (abortHandler && signal)
-      signal.removeEventListener("abort", abortHandler);
-  }
+  /** 屏幕上下文（可选）：附带应用名 + 截图给 vision 模型 */
+  screenContext?: ScreenContextOptions;
 }
 
 export function buildSystemPrompt(
@@ -101,6 +70,32 @@ export function stripReasoningTags(text: string): string {
   return text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
 }
 
+function buildUserContent(
+  rawText: string,
+  screenContext?: ScreenContextOptions,
+): LlmChatRequest["messages"][number]["content"] {
+  const contextLines: string[] = [];
+  if (screenContext?.appName?.trim()) {
+    contextLines.push(`前台应用：${screenContext.appName.trim()}`);
+  }
+  const textBody =
+    contextLines.length > 0
+      ? `${contextLines.join("\n")}\n\n请结合屏幕上下文整理以下语音转写（只输出整理后的文字）：\n${rawText}`
+      : rawText;
+
+  const imageBase64 = screenContext?.imageBase64?.trim();
+  if (imageBase64) {
+    return [
+      { type: "text", text: textBody },
+      {
+        type: "image_url",
+        image_url: { url: `data:image/png;base64,${imageBase64}` },
+      },
+    ];
+  }
+  return textBody;
+}
+
 export async function enhanceText(
   rawText: string,
   apiKey: string,
@@ -114,13 +109,17 @@ export async function enhanceText(
   const baseUrl = options?.baseUrl ?? DEFAULT_LLM_BASE_URL;
 
   const basePrompt = options?.systemPrompt || getDefaultSystemPrompt();
-  const fullPrompt = buildSystemPrompt(basePrompt, options?.vocabularyTermList);
+  let fullPrompt = buildSystemPrompt(basePrompt, options?.vocabularyTermList);
+  if (options?.screenContext?.imageBase64 || options?.screenContext?.appName) {
+    fullPrompt +=
+      "\n\n用户可能附带屏幕截图或前台应用名作为上下文。请利用可见 UI / 应用场景理解专有名词与意图，但仍只输出整理后的转写文字，不要描述截图。";
+  }
 
   const request: LlmChatRequest = {
     model: modelId,
     messages: [
       { role: "system", content: fullPrompt },
-      { role: "user", content: rawText },
+      { role: "user", content: buildUserContent(rawText, options?.screenContext) },
     ],
     temperature: 0.1,
     maxTokens: options?.maxTokens ?? DEFAULT_LLM_MAX_TOKENS,
@@ -128,14 +127,37 @@ export async function enhanceText(
 
   const { url, init } = buildFetchParams(request, apiKey, baseUrl);
 
-  const response = await withTimeout(
-    fetch(url, {
-      ...init,
-      signal: options?.signal,
-    }),
-    DEFAULT_LLM_TIMEOUT_MS,
-    options?.signal,
-  );
+  // 超时必须 abort 请求：仅 Promise.race 会留下挂起的 fetch，UI 可能一直停在「整理中」
+  const timeoutController = new AbortController();
+  const externalSignal = options?.signal;
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      timeoutController.abort();
+      const timeoutErr = new Error("Enhancement timeout");
+      (timeoutErr as Error & { code: string }).code = "ENHANCEMENT_TIMEOUT";
+      reject(timeoutErr);
+    }, DEFAULT_LLM_TIMEOUT_MS);
+  });
+
+  let response: Awaited<ReturnType<typeof fetch>>;
+  try {
+    response = await Promise.race([
+      fetch(url, {
+        ...init,
+        signal: externalSignal ?? timeoutController.signal,
+      }),
+      timeoutPromise,
+    ]);
+  } catch (err) {
+    if (timeoutId) clearTimeout(timeoutId);
+    if (timeoutController.signal.aborted) {
+      throw err;
+    }
+    throw err;
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
 
   if (!response.ok) {
     let errorBody = "";

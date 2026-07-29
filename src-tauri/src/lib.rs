@@ -145,13 +145,102 @@ fn request_app_restart<R: Runtime>(app: AppHandle<R>) {
     app.exit(0);
 }
 
+/// 将调试日志追加到 Application Support，便于正式版（无终端）排查。
+/// macOS: ~/Library/Application Support/<bundle-id>/logs/sayit.log
+fn append_debug_log_file(level: &str, message: &str) {
+    use std::io::Write;
+    let Some(home) = dirs_next_home() else {
+        return;
+    };
+    // 正式版 com.sayit.app / dev com.sayit.dev — 两个都写，避免装错目录看不到
+    let log_dirs = [
+        home.join("Library/Application Support/com.sayit.app/logs"),
+        home.join("Library/Application Support/com.sayit.dev/logs"),
+    ];
+    let ts = chrono_like_timestamp();
+    let line = format!("{ts} [{level}] {message}\n");
+    for log_dir in &log_dirs {
+        if let Err(e) = std::fs::create_dir_all(log_dir) {
+            eprintln!("[debug_log] create_dir_all failed ({log_dir:?}): {e}");
+            continue;
+        }
+        let path = log_dir.join("sayit.log");
+        if let Ok(mut file) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+        {
+            let _ = file.write_all(line.as_bytes());
+        }
+    }
+}
+
+fn dirs_next_home() -> Option<std::path::PathBuf> {
+    std::env::var_os("HOME").map(std::path::PathBuf::from)
+}
+
+fn chrono_like_timestamp() -> String {
+    // 本地时间 YYYY-MM-DD HH:MM:SS（依赖系统 localtime）
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let Ok(dur) = SystemTime::now().duration_since(UNIX_EPOCH) else {
+        return "unknown".to_string();
+    };
+    let secs = dur.as_secs() as i64;
+    // 简单用 UTC 偏移：东八区 +8h，避免引入 chrono 依赖
+    let local = secs + 8 * 3600;
+    let days = local.div_euclid(86400);
+    let tod = local.rem_euclid(86400) as u32;
+    let h = tod / 3600;
+    let m = (tod % 3600) / 60;
+    let s = tod % 60;
+    // 1970-01-01 起算的粗日期（够用；精确日历不必须）
+    // 使用 civil from days algorithm (Howard Hinnant)
+    let z = days + 719468;
+    let era = z.div_euclid(146097);
+    let doe = (z - era * 146097) as u32;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let y = yoe as i64 + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let mth = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = if mth <= 2 { y + 1 } else { y };
+    format!("{year:04}-{mth:02}-{d:02} {h:02}:{m:02}:{s:02}")
+}
+
 #[command]
 fn debug_log(level: String, message: String) {
+    let line_level = match level.as_str() {
+        "error" => "ERROR",
+        "warn" => "WARN",
+        _ => "INFO",
+    };
     match level.as_str() {
         "error" => eprintln!("[webview:ERROR] {message}"),
         "warn" => println!("[webview:WARN] {message}"),
         _ => println!("[webview] {message}"),
     }
+    append_debug_log_file(line_level, &message);
+}
+
+/// 回传当前调试日志文件路径（方便前端/用户定位）
+#[command]
+fn get_debug_log_path() -> Result<String, String> {
+    let home = dirs_next_home().ok_or_else(|| "HOME not set".to_string())?;
+    // 哪个 logs 目录有 sayit.log 就回哪个，否则默认正式版路径
+    for id in ["com.sayit.app", "com.sayit.dev"] {
+        let path = home
+            .join("Library/Application Support")
+            .join(id)
+            .join("logs/sayit.log");
+        if path.exists() {
+            return Ok(path.display().to_string());
+        }
+    }
+    Ok(home
+        .join("Library/Application Support/com.sayit.app/logs/sayit.log")
+        .display()
+        .to_string())
 }
 
 #[command]
@@ -475,10 +564,13 @@ pub fn run() {
         .plugin(plugins::hotkey_listener::init())
         .invoke_handler(tauri::generate_handler![
             debug_log,
+            get_debug_log_path,
             request_app_restart,
             update_hotkey_config,
             get_hud_target_position,
             present_hud_window,
+            plugins::screen_context::capture_screen_context,
+            plugins::screen_context::cleanup_screen_context_temp,
             plugins::audio_control::mute_system_audio,
             plugins::audio_control::restore_system_audio,
             plugins::clipboard_paste::capture_target_window,
@@ -493,6 +585,8 @@ pub fn run() {
             plugins::keyboard_monitor::start_quality_monitor,
             plugins::keyboard_monitor::start_correction_monitor,
             plugins::text_field_reader::read_focused_text_field,
+            plugins::text_field_reader::read_focused_text_field_for_learning,
+            plugins::text_field_reader::diagnose_learning_ax,
             plugins::text_field_reader::read_selected_text,
             plugins::text_field_reader::read_selection_state,
             plugins::audio_recorder::get_default_input_device_name,
