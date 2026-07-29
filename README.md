@@ -1,5 +1,9 @@
 # SayIt
 
+<p align="center">
+  <img src="docs/Banner.png" alt="SayIt" width="100%" />
+</p>
+
 > 按住说话，松开粘贴 — 跨平台语音输入桌面工具
 
 在任意应用中按快捷键说话，松开后自动转写、AI 整理，并粘贴到光标位置。
