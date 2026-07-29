@@ -273,7 +273,7 @@ pub fn capture_target_window(state: State<'_, FocusState>) -> Result<i64, String
             *guard = pid;
         }
         println!("[clipboard-paste] Captured target app pid={pid}");
-        return Ok(i64::from(pid));
+        Ok(i64::from(pid))
     }
     #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     {
