@@ -20,7 +20,13 @@ use tauri::{
 /// `RunEvent::Exit` handler 在 `_exit(0)` 前检查并 spawn 新 process。
 static RESTART_REQUESTED: AtomicBool = AtomicBool::new(false);
 
-/// 设定 macOS 视窗为浏海覆盖层级（与 BoringNotch 相同）
+/// 设定 macOS 视窗为刘海覆盖层级（与 BoringNotch 相同）
+///
+/// 注意：必须在每次 `show` 后重新套用。
+/// Tauri/tao 的 `Window::show` 走 `makeKeyAndOrderFront`，且 `alwaysOnTop`
+/// 会把 level 重置为 `NSFloatingWindowLevel(3)`，导致：
+/// 1. 无法出现在其他 app 的全屏 Space 上（缺 fullScreenAuxiliary）
+/// 2. 层级被压回普通 floating，盖不住全屏内容
 #[cfg(target_os = "macos")]
 fn configure_macos_notch_window(window: &tauri::WebviewWindow) {
     match window.ns_window() {
@@ -30,20 +36,69 @@ fn configure_macos_notch_window(window: &tauri::WebviewWindow) {
                 // 视窗层级: NSMainMenuWindowLevel(24) + 3 = 27
                 let _: () = objc::msg_send![ns_win, setLevel: 27_i64];
 
-                // collectionBehavior: 出现在所有桌面、桌面切换时不移动
+                // collectionBehavior:
                 // canJoinAllSpaces(1) | stationary(16) | ignoresCycle(64) | fullScreenAuxiliary(256)
+                // fullScreenAuxiliary 是关键：允许出现在其他 app 的全屏 Space
                 let behavior: u64 = 1 | 16 | 64 | 256;
                 let _: () = objc::msg_send![ns_win, setCollectionBehavior: behavior];
+
+                // 应用失去焦点时不隐藏（全屏 app 拥有焦点时 HUD 仍须可见）
+                let _: () = objc::msg_send![ns_win, setHidesOnDeactivate: false];
 
                 // 防止视窗被拖动
                 let _: () = objc::msg_send![ns_win, setMovable: false];
             }
-            println!("[macos] Notch window configured: level=27");
+            println!("[macos] Notch window configured: level=27 fullScreenAuxiliary");
         }
         Err(e) => {
             eprintln!("[macos] Failed to get NSWindow: {e}");
         }
     }
+}
+
+/// 在所有 Spaces（含全屏 app）前置显示 HUD，并重新套用 overlay 设定。
+///
+/// 不走 Tauri `show()`（内部 `makeKeyAndOrderFront` 会抢焦点、切 Space），
+/// 改用 `orderFrontRegardless`，即使本 app 非 active 也能盖在全屏内容上。
+#[command]
+fn present_hud_window(app: tauri::AppHandle) -> Result<(), String> {
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| "HUD window (main) not found".to_string())?;
+
+    #[cfg(target_os = "macos")]
+    {
+        // 先套用 behavior/level，再 orderFront；show 后可能再被 alwaysOnTop 冲掉，故双次套用
+        configure_macos_notch_window(&window);
+
+        match window.ns_window() {
+            Ok(ns_ptr) => {
+                let ns_win = ns_ptr as *mut objc::runtime::Object;
+                unsafe {
+                    // 不激活 app、不抢 key window，强制排到当前 Space最前（含全屏）
+                    let _: () = objc::msg_send![ns_win, orderFrontRegardless];
+                }
+                // orderFront 后再次锁定 level/behavior（对抗 alwaysOnTop 异步 setLevel）
+                configure_macos_notch_window(&window);
+                println!("[macos] HUD presented via orderFrontRegardless");
+            }
+            Err(e) => {
+                // fallback：至少保证可见
+                eprintln!("[macos] orderFrontRegardless failed ({e}), fallback to show()");
+                window.show().map_err(|err| err.to_string())?;
+                configure_macos_notch_window(&window);
+            }
+        }
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        window.show().map_err(|e| e.to_string())?;
+        #[cfg(target_os = "windows")]
+        configure_windows_topmost_window(&window);
+    }
+
+    Ok(())
 }
 
 /// 设定 Windows 视窗为工作列覆盖层级（对应 macOS 的 setLevel:27）
@@ -423,6 +478,7 @@ pub fn run() {
             request_app_restart,
             update_hotkey_config,
             get_hud_target_position,
+            present_hud_window,
             plugins::audio_control::mute_system_audio,
             plugins::audio_control::restore_system_audio,
             plugins::clipboard_paste::capture_target_window,

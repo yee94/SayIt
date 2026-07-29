@@ -250,7 +250,9 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     const window = getAppWindow();
     const presentationEpoch = ++hudPresentationEpoch;
     lastMonitorKey = "";
-    await window.show();
+    // 走 Rust present_hud_window：在 macOS 用 orderFrontRegardless + fullScreenAuxiliary，
+    // 确保全屏 app 场景下刘海 HUD 仍可见（Tauri show() 的 makeKeyAndOrderFront 不够）
+    await invoke("present_hud_window");
     if (presentationEpoch !== hudPresentationEpoch) return;
     if (shouldIgnoreCursorEvents) {
       void window.setIgnoreCursorEvents(true).catch((err) => {
@@ -799,7 +801,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
                       // HUD 视窗在 idle 后已被 hideHud() 隐藏，需重新显示才看得到通知
                       clearLearnedHideTimer();
                       const appWindow = getAppWindow();
-                      await appWindow.show();
+                      await invoke("present_hud_window");
                       await appWindow.setIgnoreCursorEvents(true);
                       learnedHideTimer = setTimeout(() => {
                         learnedHideTimer = null;

@@ -389,7 +389,7 @@
     },
     "upgradeNotice": {
       "title": "What's New in SayIt",
-      "item1": "Faster hotkey feedback: the recording HUD appears immediately, while microphone startup, window positioning, and live recognition continue in the background. Early releases and cancellations are handled in order.",
+      "item1": "Fullscreen HUD fixed: when another app is in fullscreen, the notch recording HUD now appears normally instead of staying invisible.",
       "dismiss": "Got it"
     }
   },

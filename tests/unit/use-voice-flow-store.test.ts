@@ -68,6 +68,8 @@ const {
           };
         case "get_hud_target_position":
           return { monitorKey: "test", x: 100, y: 0 };
+        case "present_hud_window":
+          return undefined;
         default:
           return undefined;
       }
@@ -316,6 +318,8 @@ function createMockInvokeHandler(options?: {
         return DEFAULT_TRANSCRIBE_RESULT;
       case "get_hud_target_position":
         return { monitorKey: "test", x: 100, y: 0 };
+      case "present_hud_window":
+        return undefined;
       default:
         return undefined;
     }
@@ -448,15 +452,18 @@ describe("useVoiceFlowStore", () => {
     triggerHotkeyEvent("hotkey:pressed");
 
     expect(store.status).toBe("recording");
-    expect(mockHudWindowShow).toHaveBeenCalledTimes(1);
+    expect(mockInvoke).toHaveBeenCalledWith("present_hud_window");
     await vi.waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith("get_hud_target_position");
     });
 
+    const presentCallIndex = mockInvoke.mock.calls.findIndex(
+      ([command]) => command === "present_hud_window",
+    );
     const positionCallIndex = mockInvoke.mock.calls.findIndex(
       ([command]) => command === "get_hud_target_position",
     );
-    expect(mockHudWindowShow.mock.invocationCallOrder[0]).toBeLessThan(
+    expect(mockInvoke.mock.invocationCallOrder[presentCallIndex]).toBeLessThan(
       mockInvoke.mock.invocationCallOrder[positionCallIndex],
     );
     expect(mockHudWindowSetPosition).not.toHaveBeenCalled();

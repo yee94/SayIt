@@ -2,6 +2,12 @@
 
 SayIt 版本更新纪录。
 
+## [0.12.4] - 2026-07-29
+
+### Fixed
+
+- 全屏应用下刘海 HUD 不显示：其他应用进入 macOS 全屏后，原先用 Tauri `show()`（`makeKeyAndOrderFront`）无法可靠出现在全屏 Space；改为每次展示时重新套用 `fullScreenAuxiliary` / 高层级，并以 `orderFrontRegardless` 前置，录音与词汇学习通知在全屏场景下也能看到刘海状态
+
 ## [0.12.3] - 2026-07-29
 
 ### Fixed
