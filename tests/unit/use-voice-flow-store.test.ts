@@ -461,7 +461,7 @@ describe("useVoiceFlowStore", () => {
     expect(store.status).toBe("idle");
     expect(mockHudWindowHide).not.toHaveBeenCalled();
 
-    vi.advanceTimersByTime(200);
+    vi.advanceTimersByTime(280);
     await Promise.resolve();
 
     expect(mockHudWindowHide).toHaveBeenCalledTimes(1);
@@ -481,7 +481,7 @@ describe("useVoiceFlowStore", () => {
 
     store.transitionTo("recording", "voiceFlow.recording");
     window.dispatchEvent(new CustomEvent("sayit:hud-collapse-complete"));
-    vi.advanceTimersByTime(200);
+    vi.advanceTimersByTime(280);
     await Promise.resolve();
 
     expect(store.status).toBe("recording");
@@ -1197,7 +1197,7 @@ describe("useVoiceFlowStore", () => {
     expect(store.message).toBe("errors.hotkey.accessibilityPermission");
   });
 
-  it("[P1] success 应立即广播 idle 并隐藏 HUD", async () => {
+  it("[P1] success 应立即广播 idle 并走顶部缩回", async () => {
     const store = useVoiceFlowStore();
 
     store.transitionTo("success", "voiceFlow.pasteSuccess");
@@ -1207,7 +1207,8 @@ describe("useVoiceFlowStore", () => {
       status: "idle",
       message: "",
     });
-    expect(mockHudWindowHide).toHaveBeenCalled();
+    // hide 由 collapse complete / 安全延迟触发，不在状态切换当下执行
+    expect(mockHudWindowHide).not.toHaveBeenCalled();
   });
 
   it("[P0] cleanup 应清除 timer 并解除所有事件监听", async () => {

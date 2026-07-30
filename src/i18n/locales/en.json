@@ -420,8 +420,8 @@
     },
     "upgradeNotice": {
       "title": "What's New in SayIt",
-      "item1": "Custom LLM request headers: add JSON headers in Settings for self-hosted gateways, proxies, and compatible services. SayIt keeps essential authorization and content-type headers in place.",
-      "item2": "More stable live transcripts: confirmed sentences stay fixed while the actively corrected tail is underlined, making voice input easier to follow.",
+      "item1": "A crisper HUD exit: after text is pasted or an action is cancelled, the notch retracts upward immediately without a success checkmark or cancelled label.",
+      "item2": "",
       "dismiss": "Got it"
     }
   },

@@ -66,7 +66,7 @@ const pendingLearnedTermList = ref<string[][]>([]);
 const learnedDisplayText = ref("");
 /** 当前正在展示的词条（被录音打断时可重新入队） */
 const activeLearnedTermList = ref<string[]>([]);
-const COLLAPSE_ANIMATION_DURATION_MS = 160;
+const COLLAPSE_ANIMATION_DURATION_MS = 220;
 const LEARNED_DISPLAY_DURATION_MS = 2000;
 const MAX_DISPLAY_TERM_COUNT = 3;
 
@@ -696,7 +696,8 @@ onUnmounted(() => {
 }
 
 .notch-wrapper-collapsing {
-  animation: notchExit 0.16s cubic-bezier(0.36, 0, 0.66, -0.56) forwards;
+  /* 从顶部原点向上缩回，而不是淡出 */
+  animation: notchExit 0.22s cubic-bezier(0.32, 0.72, 0, 1) forwards;
 }
 
 .notch-hud {
@@ -729,8 +730,9 @@ onUnmounted(() => {
     transform: scaleX(1) scaleY(1);
   }
   to {
+    /* scaleY → 0：贴着顶部原点收回；略收窄 scaleX 更像缩进刘海 */
     opacity: 0;
-    transform: scaleX(0.6) scaleY(0.3);
+    transform: scaleX(0.72) scaleY(0);
   }
 }
 
@@ -1136,8 +1138,9 @@ onUnmounted(() => {
 .notch-collapsing .learned-terms-row,
 .notch-collapsing .learned-terms-inner,
 .notch-collapsing .live-transcript-row {
+  /* 内容先收掉，主体交给顶部 scale 缩回 */
   opacity: 0;
-  transition: opacity 0.08s ease;
+  transition: opacity 0.06s ease;
 }
 
 .notch-collapsing {

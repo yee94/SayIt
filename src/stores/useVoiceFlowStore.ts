@@ -76,7 +76,7 @@ const ERROR_WITH_RETRY_DISPLAY_DURATION_MS = 6000;
 const START_SOUND_DURATION_MS = 400;
 const EDIT_MODE_MAX_TOKENS = 4096;
 const HUD_COLLAPSE_COMPLETE_EVENT = "sayit:hud-collapse-complete";
-const HUD_COLLAPSE_SAFE_HIDE_DELAY_MS = 200;
+const HUD_COLLAPSE_SAFE_HIDE_DELAY_MS = 280;
 
 /**
  * 判断转录结果是否为空（无内容可粘贴）。
@@ -480,20 +480,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     liveUnstableTranscript.value = (payload.unstableText ?? "").trim();
   }
 
-  function hideHudImmediately() {
-    hideHud().catch((err) => {
-      writeErrorLog(
-        `useVoiceFlowStore: hideHud failed: ${extractErrorMessage(err)}`,
-      );
-      captureError(err, { source: "voice-flow", step: "hideHud" });
-    });
-  }
-
-  function transitionTo(
-    nextStatus: HudStatus,
-    nextMessage = "",
-    options: { hideImmediately?: boolean } = {},
-  ) {
+  function transitionTo(nextStatus: HudStatus, nextMessage = "") {
     clearAutoHideTimer();
     clearCollapseHideTimer();
     status.value = nextStatus;
@@ -510,12 +497,9 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     emitVoiceFlowStateChanged(nextStatus, nextMessage);
 
     if (nextStatus === "idle") {
+      // 进入 idle → NotchHud 播放顶部缩回动画，动画完成后再 hide 窗口
       hudPresentationEpoch += 1;
       stopMonitorPolling();
-      if (options.hideImmediately) {
-        hideHudImmediately();
-        return;
-      }
       pendingHudCollapseEpoch = hudPresentationEpoch;
       collapseHideTimer = setTimeout(() => {
         completePendingHudHide();
@@ -539,14 +523,14 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     }
 
     if (nextStatus === "success") {
-      // 贴上成功：不展示对勾，直接收掉
-      transitionTo("idle", "", { hideImmediately: true });
+      // 贴上成功：不展示对勾，直接走顶部缩回
+      transitionTo("idle");
       return;
     }
 
     if (nextStatus === "cancelled") {
-      // 取消：不展示「已取消」文案，直接收掉
-      transitionTo("idle", "", { hideImmediately: true });
+      // 取消：不展示「已取消」文案，直接走顶部缩回
+      transitionTo("idle");
       return;
     }
 
@@ -1219,8 +1203,8 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         restoreClipboard: !settingsStore.isCopyTranscriptionToClipboardEnabled,
       });
       isRecording.value = false;
-      // 贴上完成：立刻隐藏 HUD，不对勾、不停留
-      transitionTo("idle", "", { hideImmediately: true });
+      // 贴上完成：不对勾、不停留，直接顶部缩回
+      transitionTo("idle");
       startQualityMonitorAfterPaste();
       // api_usage FK 依赖 transcriptions — 必须等 transcription 写入后才存 usage
       // retry 路径使用 updateTranscriptionOnRetrySuccess，不走 INSERT
@@ -1470,7 +1454,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     // 重置 toggle 模式状态
     void invoke("reset_hotkey_state").catch(() => {});
 
-    transitionTo("idle", "", { hideImmediately: true });
+    transitionTo("idle");
   }
 
   async function handleStartRecording() {
@@ -1971,7 +1955,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
           );
           // 中止时也要离开「整理中」，否则 HUD 会一直卡住
           if (isAborted.value) {
-            transitionTo("idle", "", { hideImmediately: true });
+            transitionTo("idle");
             return;
           }
 
@@ -1994,7 +1978,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
               enhanceOptions,
             );
             if (isAborted.value) {
-              transitionTo("idle", "", { hideImmediately: true });
+              transitionTo("idle");
               return;
             }
           }
@@ -2049,7 +2033,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
           );
         } catch (enhanceError) {
           if (isAborted.value) {
-            transitionTo("idle", "", { hideImmediately: true });
+            transitionTo("idle");
             return;
           }
           const fallbackEnhancementDurationMs =
