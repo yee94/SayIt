@@ -66,7 +66,7 @@ const pendingLearnedTermList = ref<string[][]>([]);
 const learnedDisplayText = ref("");
 /** 当前正在展示的词条（被录音打断时可重新入队） */
 const activeLearnedTermList = ref<string[]>([]);
-const COLLAPSE_ANIMATION_DURATION_MS = 400;
+const COLLAPSE_ANIMATION_DURATION_MS = 160;
 const LEARNED_DISPLAY_DURATION_MS = 2000;
 const MAX_DISPLAY_TERM_COUNT = 3;
 
@@ -696,7 +696,7 @@ onUnmounted(() => {
 }
 
 .notch-wrapper-collapsing {
-  animation: notchExit 0.4s cubic-bezier(0.36, 0, 0.66, -0.56) forwards;
+  animation: notchExit 0.16s cubic-bezier(0.36, 0, 0.66, -0.56) forwards;
 }
 
 .notch-hud {
@@ -1137,7 +1137,7 @@ onUnmounted(() => {
 .notch-collapsing .learned-terms-inner,
 .notch-collapsing .live-transcript-row {
   opacity: 0;
-  transition: opacity 0.15s ease;
+  transition: opacity 0.08s ease;
 }
 
 .notch-collapsing {

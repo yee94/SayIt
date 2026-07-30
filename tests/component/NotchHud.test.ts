@@ -252,7 +252,7 @@ describe("NotchHud", () => {
     expect(wrapper.find(".error-message").text()).toBe("API Key 未设置");
 
     // 动画结束后隐藏
-    vi.advanceTimersByTime(400);
+    vi.advanceTimersByTime(160);
     await wrapper.vm.$nextTick();
     expect(wrapper.find(".notch-wrapper").exists()).toBe(false);
   });
@@ -273,7 +273,7 @@ describe("NotchHud", () => {
     expect(wrapper.find(".notch-wrapper").exists()).toBe(true);
     expect(wrapper.find(".notch-hud").classes()).toContain("notch-collapsing");
 
-    vi.advanceTimersByTime(400);
+    vi.advanceTimersByTime(160);
     await wrapper.vm.$nextTick();
     expect(wrapper.find(".notch-wrapper").exists()).toBe(false);
   });
@@ -299,7 +299,7 @@ describe("NotchHud", () => {
     );
 
     // 推进时间后不应隐藏
-    vi.advanceTimersByTime(400);
+    vi.advanceTimersByTime(160);
     await wrapper.vm.$nextTick();
     expect(wrapper.find(".notch-wrapper").exists()).toBe(true);
   });
@@ -495,7 +495,7 @@ describe("NotchHud", () => {
     expect(wrapper.find(".notch-hud").classes()).toContain("notch-collapsing");
     expect(wrapper.find(".cancelled-label").exists()).toBe(true);
 
-    vi.advanceTimersByTime(400);
+    vi.advanceTimersByTime(160);
     await wrapper.vm.$nextTick();
 
     expect(dispatchEventSpy).toHaveBeenCalledWith(

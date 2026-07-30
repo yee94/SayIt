@@ -422,9 +422,6 @@ describe("useVoiceFlowStore", () => {
     expect(store.message).toBe("voiceFlow.recording");
 
     store.transitionTo("success", "voiceFlow.pasteSuccess");
-    expect(store.status).toBe("success");
-    vi.advanceTimersByTime(1000);
-    await Promise.resolve();
     expect(store.status).toBe("idle");
 
     store.transitionTo("error", "网路异常");
@@ -441,8 +438,9 @@ describe("useVoiceFlowStore", () => {
     const store = useVoiceFlowStore();
     await store.initialize();
 
-    store.transitionTo("success", "voiceFlow.pasteSuccess");
-    vi.advanceTimersByTime(1000);
+    // error 仍走 collapse 路径；success 已改为立即隐藏
+    store.transitionTo("error", "网路异常");
+    vi.advanceTimersByTime(3000);
     expect(store.status).toBe("idle");
     expect(mockHudWindowHide).not.toHaveBeenCalled();
 
@@ -463,7 +461,7 @@ describe("useVoiceFlowStore", () => {
     expect(store.status).toBe("idle");
     expect(mockHudWindowHide).not.toHaveBeenCalled();
 
-    vi.advanceTimersByTime(500);
+    vi.advanceTimersByTime(200);
     await Promise.resolve();
 
     expect(mockHudWindowHide).toHaveBeenCalledTimes(1);
@@ -476,13 +474,14 @@ describe("useVoiceFlowStore", () => {
     const store = useVoiceFlowStore();
     await store.initialize();
 
-    store.transitionTo("cancelled", "voiceFlow.cancelled");
-    vi.advanceTimersByTime(1000);
+    // error 仍走 collapse 路径；cancelled 已改为立即隐藏
+    store.transitionTo("error", "网路异常");
+    vi.advanceTimersByTime(3000);
     expect(store.status).toBe("idle");
 
     store.transitionTo("recording", "voiceFlow.recording");
     window.dispatchEvent(new CustomEvent("sayit:hud-collapse-complete"));
-    vi.advanceTimersByTime(500);
+    vi.advanceTimersByTime(200);
     await Promise.resolve();
 
     expect(store.status).toBe("recording");
@@ -657,7 +656,7 @@ describe("useVoiceFlowStore", () => {
       });
     });
     triggerHotkeyEvent("escape:pressed");
-    expect(store.status).toBe("cancelled");
+    expect(store.status).toBe("idle");
     triggerHotkeyEvent("hotkey:pressed");
 
     expect(
@@ -745,7 +744,7 @@ describe("useVoiceFlowStore", () => {
     });
   });
 
-  it("[P0] HOTKEY_RELEASED 应完成 录音→转录→贴上→success 并广播事件", async () => {
+  it("[P0] HOTKEY_RELEASED 应完成录音→转录→贴上并立即隐藏 HUD", async () => {
     const store = useVoiceFlowStore();
     await store.initialize();
 
@@ -772,12 +771,11 @@ describe("useVoiceFlowStore", () => {
       language: "zh",
     });
     await vi.waitFor(() => {
-      expect(store.status).toBe("success");
+      expect(store.status).toBe("idle");
     });
-    expect(store.message).toBe("voiceFlow.pasteSuccess");
-    expect(mockEmit).toHaveBeenCalledWith("voice-flow:state-changed", {
-      status: "success",
-      message: "voiceFlow.pasteSuccess",
+        expect(mockEmit).toHaveBeenCalledWith("voice-flow:state-changed", {
+      status: "idle",
+      message: "",
     });
   });
 
@@ -979,7 +977,7 @@ describe("useVoiceFlowStore", () => {
       expect(mockInvoke).toHaveBeenCalledWith("paste_text", expect.anything());
     });
 
-    expect(store.status).toBe("success");
+    expect(store.status).toBe("idle");
   });
 
   it("[P0] 已知幻觉短语有文字时应正常贴上（让使用者自行判断）", async () => {
@@ -1008,7 +1006,7 @@ describe("useVoiceFlowStore", () => {
       expect(mockInvoke).toHaveBeenCalledWith("paste_text", expect.anything());
     });
 
-    expect(store.status).toBe("success");
+    expect(store.status).toBe("idle");
   });
 
   it("[P0] 正常语音应正常贴上", async () => {
@@ -1040,7 +1038,7 @@ describe("useVoiceFlowStore", () => {
       });
     });
 
-    expect(store.status).toBe("success");
+    expect(store.status).toBe("idle");
   });
 
   it("[P1] 纯空白字串应视为空转录，触发「未侦测到语音」", async () => {
@@ -1143,7 +1141,7 @@ describe("useVoiceFlowStore", () => {
     });
 
     await vi.waitFor(() => {
-      expect(store.status).toBe("success");
+      expect(store.status).toBe("idle");
     });
   });
 
@@ -1199,23 +1197,17 @@ describe("useVoiceFlowStore", () => {
     expect(store.message).toBe("errors.hotkey.accessibilityPermission");
   });
 
-  it("[P1] success auto-hide 应广播 idle 事件", async () => {
-    vi.useFakeTimers();
+  it("[P1] success 应立即广播 idle 并隐藏 HUD", async () => {
     const store = useVoiceFlowStore();
 
     store.transitionTo("success", "voiceFlow.pasteSuccess");
-    mockEmit.mockClear();
-
-    vi.advanceTimersByTime(1000);
-    await Promise.resolve();
 
     expect(store.status).toBe("idle");
     expect(mockEmit).toHaveBeenCalledWith("voice-flow:state-changed", {
       status: "idle",
       message: "",
     });
-
-    vi.useRealTimers();
+    expect(mockHudWindowHide).toHaveBeenCalled();
   });
 
   it("[P0] cleanup 应清除 timer 并解除所有事件监听", async () => {
@@ -1223,11 +1215,11 @@ describe("useVoiceFlowStore", () => {
     const store = useVoiceFlowStore();
     await store.initialize();
 
-    store.transitionTo("success", "voiceFlow.pasteSuccess");
+    store.transitionTo("error", "网路异常");
     store.cleanup();
-    vi.advanceTimersByTime(1000);
+    vi.advanceTimersByTime(3000);
 
-    expect(store.status).toBe("success");
+    expect(store.status).toBe("error");
     unlistenFunctionList.forEach((unlisten) => {
       expect(unlisten).toHaveBeenCalledTimes(1);
     });
@@ -1239,7 +1231,7 @@ describe("useVoiceFlowStore", () => {
   // ==========================================================================
 
   describe("AI 文字整理", () => {
-    it("[P0] >= 10 字应走 AI 整理流程：recording → transcribing → enhancing → success", async () => {
+    it("[P0] >= 10 字应走 AI 整理流程并在贴上后立即隐藏 HUD", async () => {
       const longText = "这是一段超过十个字的测试转录文字内容";
       mockInvoke.mockImplementation(
         createMockInvokeHandler({
@@ -1280,16 +1272,15 @@ describe("useVoiceFlowStore", () => {
           systemPrompt: "自订 prompt 内容",
         }),
       );
-      expect(store.status).toBe("success");
-      expect(store.message).toBe("voiceFlow.pasteSuccess");
-
+      expect(store.status).toBe("idle");
+      
       expect(mockEmit).toHaveBeenCalledWith("voice-flow:state-changed", {
         status: "enhancing",
         message: "voiceFlow.enhancing",
       });
       expect(mockEmit).toHaveBeenCalledWith("voice-flow:state-changed", {
-        status: "success",
-        message: "voiceFlow.pasteSuccess",
+        status: "idle",
+        message: "",
       });
     });
 
@@ -1323,9 +1314,8 @@ describe("useVoiceFlowStore", () => {
       });
 
       expect(mockEnhanceText).not.toHaveBeenCalled();
-      expect(store.status).toBe("success");
-      expect(store.message).toBe("voiceFlow.pasteSuccess");
-
+      expect(store.status).toBe("idle");
+      
       const enhancingCalls = mockEmit.mock.calls.filter(
         (call: unknown[]) =>
           call[0] === "voice-flow:state-changed" &&
@@ -1365,9 +1355,8 @@ describe("useVoiceFlowStore", () => {
         });
       });
 
-      expect(store.status).toBe("success");
-      expect(store.message).toBe("voiceFlow.pasteSuccessUnenhanced");
-    });
+      expect(store.status).toBe("idle");
+          });
 
     it("[P0] AI 整理 API 错误应 fallback 贴原始文字并显示「已贴上（未整理）」", async () => {
       const longText = "这是一段超过十个字的测试转录文字内容";
@@ -1400,11 +1389,10 @@ describe("useVoiceFlowStore", () => {
         });
       });
 
-      expect(store.status).toBe("success");
-      expect(store.message).toBe("voiceFlow.pasteSuccessUnenhanced");
-      expect(mockEmit).toHaveBeenCalledWith("voice-flow:state-changed", {
-        status: "success",
-        message: "voiceFlow.pasteSuccessUnenhanced",
+      expect(store.status).toBe("idle");
+            expect(mockEmit).toHaveBeenCalledWith("voice-flow:state-changed", {
+        status: "idle",
+        message: "",
       });
     });
 
@@ -2238,7 +2226,7 @@ describe("useVoiceFlowStore", () => {
       });
 
       // 主流程仍然成功
-      expect(store.status).toBe("success");
+      expect(store.status).toBe("idle");
       expect(mockAddTranscription).toHaveBeenCalledTimes(1);
     });
   });
@@ -2462,7 +2450,7 @@ describe("useVoiceFlowStore", () => {
         });
       });
 
-      expect(store.status).toBe("success");
+      expect(store.status).toBe("idle");
       expect(store.canRetry).toBe(false);
 
       // DB 应被 UPDATE
@@ -2679,9 +2667,9 @@ describe("useVoiceFlowStore", () => {
         });
       });
 
-      // 选取侦测后备（250ms）拉长了贴上→success 的时序，改用 waitFor 断言终态
+      // 选取侦测后备（250ms）拉长贴上后的时序，改用 waitFor 断言终态
       await vi.waitFor(() => {
-        expect(store.status).toBe("success");
+        expect(store.status).toBe("idle");
       });
     });
 
@@ -2802,7 +2790,7 @@ describe("useVoiceFlowStore", () => {
         usage: null,
       });
       await vi.waitFor(() => {
-        expect(store.status).toMatch(/success|error/);
+        expect(store.status).toMatch(/idle|error/);
       });
     });
 
@@ -2819,7 +2807,7 @@ describe("useVoiceFlowStore", () => {
       });
       triggerHotkeyEvent("hotkey:released");
       await vi.waitFor(() => {
-        expect(store.status).toBe("success");
+        expect(store.status).toBe("idle");
       });
 
       // 新一轮录音

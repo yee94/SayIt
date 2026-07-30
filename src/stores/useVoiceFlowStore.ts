@@ -74,10 +74,9 @@ const ERROR_DISPLAY_DURATION_MS = 3000;
 const MAX_ENHANCEMENT_RETRY_COUNT = 3;
 const ERROR_WITH_RETRY_DISPLAY_DURATION_MS = 6000;
 const START_SOUND_DURATION_MS = 400;
-const CANCELLED_DISPLAY_DURATION_MS = 1000;
 const EDIT_MODE_MAX_TOKENS = 4096;
 const HUD_COLLAPSE_COMPLETE_EVENT = "sayit:hud-collapse-complete";
-const HUD_COLLAPSE_SAFE_HIDE_DELAY_MS = 500;
+const HUD_COLLAPSE_SAFE_HIDE_DELAY_MS = 200;
 
 /**
  * 判断转录结果是否为空（无内容可粘贴）。
@@ -481,7 +480,20 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     liveUnstableTranscript.value = (payload.unstableText ?? "").trim();
   }
 
-  function transitionTo(nextStatus: HudStatus, nextMessage = "") {
+  function hideHudImmediately() {
+    hideHud().catch((err) => {
+      writeErrorLog(
+        `useVoiceFlowStore: hideHud failed: ${extractErrorMessage(err)}`,
+      );
+      captureError(err, { source: "voice-flow", step: "hideHud" });
+    });
+  }
+
+  function transitionTo(
+    nextStatus: HudStatus,
+    nextMessage = "",
+    options: { hideImmediately?: boolean } = {},
+  ) {
     clearAutoHideTimer();
     clearCollapseHideTimer();
     status.value = nextStatus;
@@ -500,6 +512,10 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     if (nextStatus === "idle") {
       hudPresentationEpoch += 1;
       stopMonitorPolling();
+      if (options.hideImmediately) {
+        hideHudImmediately();
+        return;
+      }
       pendingHudCollapseEpoch = hudPresentationEpoch;
       collapseHideTimer = setTimeout(() => {
         completePendingHudHide();
@@ -523,28 +539,14 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     }
 
     if (nextStatus === "success") {
-      showHud().catch((err) => {
-        writeErrorLog(
-          `useVoiceFlowStore: showHud failed: ${extractErrorMessage(err)}`,
-        );
-        captureError(err, { source: "voice-flow", step: "showHud" });
-      });
-      autoHideTimer = setTimeout(() => {
-        transitionTo("idle");
-      }, SUCCESS_DISPLAY_DURATION_MS);
+      // 贴上成功：不展示对勾，直接收掉
+      transitionTo("idle", "", { hideImmediately: true });
       return;
     }
 
     if (nextStatus === "cancelled") {
-      showHud().catch((err) => {
-        writeErrorLog(
-          `useVoiceFlowStore: showHud failed: ${extractErrorMessage(err)}`,
-        );
-        captureError(err, { source: "voice-flow", step: "showHud" });
-      });
-      autoHideTimer = setTimeout(() => {
-        transitionTo("idle");
-      }, CANCELLED_DISPLAY_DURATION_MS);
+      // 取消：不展示「已取消」文案，直接收掉
+      transitionTo("idle", "", { hideImmediately: true });
       return;
     }
 
@@ -664,7 +666,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
    * 仅延后「启动侦测」；窗口仍是完整 30s，且用户在延时期间的修改会在首轮轮询读到。
    * 不用再等 collapse，以免缩短可学习窗口。
    */
-  const CORRECTION_START_AFTER_SUCCESS_MS = SUCCESS_DISPLAY_DURATION_MS;
+  const CORRECTION_START_AFTER_PASTE_MS = SUCCESS_DISPLAY_DURATION_MS;
   /** 有赞：等粘贴落入目标输入框后再开始首轮 AX 读取 */
   const CORRECTION_INITIAL_DELAY_MS = 500;
   let correctionStartTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1217,7 +1219,8 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         restoreClipboard: !settingsStore.isCopyTranscriptionToClipboardEnabled,
       });
       isRecording.value = false;
-      transitionTo("success", params.successMessage);
+      // 贴上完成：立刻隐藏 HUD，不对勾、不停留
+      transitionTo("idle", "", { hideImmediately: true });
       startQualityMonitorAfterPaste();
       // api_usage FK 依赖 transcriptions — 必须等 transcription 写入后才存 usage
       // retry 路径使用 updateTranscriptionOnRetrySuccess，不走 INSERT
@@ -1231,7 +1234,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       const finalText = params.record.processedText ?? params.record.rawText;
       updateVocabularyWeightsAfterPaste(finalText);
 
-      // 修正侦测：等 success 动画结束后再启动，避免 AX/差分抢渲染线程导致卡顿
+      // 修正侦测延后启动，避免 AX/差分抢占贴上后的渲染线程
       if (settingsStore.isSmartDictionaryEnabled) {
         const llmApiKey = settingsStore.getLlmApiKey();
         clearCorrectionStartTimer();
@@ -1242,7 +1245,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
             params.record.id,
             llmApiKey || null,
           );
-        }, CORRECTION_START_AFTER_SUCCESS_MS);
+        }, CORRECTION_START_AFTER_PASTE_MS);
       }
 
       // 清理当次截图上下文
@@ -1467,7 +1470,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     // 重置 toggle 模式状态
     void invoke("reset_hotkey_state").catch(() => {});
 
-    transitionTo("cancelled", t("voiceFlow.cancelled"));
+    transitionTo("idle", "", { hideImmediately: true });
   }
 
   async function handleStartRecording() {
@@ -1968,7 +1971,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
           );
           // 中止时也要离开「整理中」，否则 HUD 会一直卡住
           if (isAborted.value) {
-            transitionTo("cancelled", t("voiceFlow.cancelled"));
+            transitionTo("idle", "", { hideImmediately: true });
             return;
           }
 
@@ -1991,7 +1994,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
               enhanceOptions,
             );
             if (isAborted.value) {
-              transitionTo("cancelled", t("voiceFlow.cancelled"));
+              transitionTo("idle", "", { hideImmediately: true });
               return;
             }
           }
@@ -2046,7 +2049,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
           );
         } catch (enhanceError) {
           if (isAborted.value) {
-            transitionTo("cancelled", t("voiceFlow.cancelled"));
+            transitionTo("idle", "", { hideImmediately: true });
             return;
           }
           const fallbackEnhancementDurationMs =
