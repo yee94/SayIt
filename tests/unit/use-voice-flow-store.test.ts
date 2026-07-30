@@ -96,6 +96,7 @@ const {
       doubaoAccessKey: "test-access-key",
       llmApiKey: "test-llm-key-123",
       llmBaseUrl: "https://api.openai.com/v1/chat/completions",
+      llmCustomHeaders: {} as Record<string, string>,
       aiPrompt: "自订 prompt 内容",
       triggerMode: "hold" as string,
       isEnhancementThresholdEnabled: true,
@@ -194,6 +195,7 @@ vi.mock("../../src/stores/useSettingsStore", () => ({
     getDoubaoAccessKey: () => mockSettingsState.doubaoAccessKey,
     getLlmApiKey: () => mockSettingsState.llmApiKey,
     getLlmBaseUrl: () => mockSettingsState.llmBaseUrl,
+    getLlmCustomHeaders: () => ({ ...mockSettingsState.llmCustomHeaders }),
     getAiPrompt: () => mockSettingsState.aiPrompt,
     refreshApiKey: vi.fn().mockResolvedValue(undefined),
     refreshLlmApiKey: vi.fn().mockResolvedValue(undefined),
@@ -348,6 +350,7 @@ describe("useVoiceFlowStore", () => {
     mockSettingsState.doubaoAppId = "test-app-id";
     mockSettingsState.doubaoAccessKey = "test-access-key";
     mockSettingsState.llmApiKey = "test-llm-key-123";
+    mockSettingsState.llmCustomHeaders = {};
     mockSettingsState.llmBaseUrl =
       "https://api.openai.com/v1/chat/completions";
     mockSettingsState.aiPrompt = "自订 prompt 内容";
@@ -430,6 +433,61 @@ describe("useVoiceFlowStore", () => {
     await Promise.resolve();
     expect(store.status).toBe("idle");
 
+    vi.useRealTimers();
+  });
+
+  it("[P0] HUD 收缩完成信号应立即隐藏窗口", async () => {
+    vi.useFakeTimers();
+    const store = useVoiceFlowStore();
+    await store.initialize();
+
+    store.transitionTo("success", "voiceFlow.pasteSuccess");
+    vi.advanceTimersByTime(1000);
+    expect(store.status).toBe("idle");
+    expect(mockHudWindowHide).not.toHaveBeenCalled();
+
+    window.dispatchEvent(new CustomEvent("sayit:hud-collapse-complete"));
+    await Promise.resolve();
+
+    expect(mockHudWindowHide).toHaveBeenCalledTimes(1);
+    store.cleanup();
+    vi.useRealTimers();
+  });
+
+  it("[P0] HUD 收缩完成信号缺失时应通过安全延迟隐藏窗口", async () => {
+    vi.useFakeTimers();
+    const store = useVoiceFlowStore();
+
+    store.transitionTo("error", "网络异常");
+    vi.advanceTimersByTime(3000);
+    expect(store.status).toBe("idle");
+    expect(mockHudWindowHide).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(500);
+    await Promise.resolve();
+
+    expect(mockHudWindowHide).toHaveBeenCalledTimes(1);
+    store.cleanup();
+    vi.useRealTimers();
+  });
+
+  it("[P0] HUD 收缩期间快速重触发应保留窗口", async () => {
+    vi.useFakeTimers();
+    const store = useVoiceFlowStore();
+    await store.initialize();
+
+    store.transitionTo("cancelled", "voiceFlow.cancelled");
+    vi.advanceTimersByTime(1000);
+    expect(store.status).toBe("idle");
+
+    store.transitionTo("recording", "voiceFlow.recording");
+    window.dispatchEvent(new CustomEvent("sayit:hud-collapse-complete"));
+    vi.advanceTimersByTime(500);
+    await Promise.resolve();
+
+    expect(store.status).toBe("recording");
+    expect(mockHudWindowHide).not.toHaveBeenCalled();
+    store.cleanup();
     vi.useRealTimers();
   });
 
@@ -2661,6 +2719,125 @@ describe("useVoiceFlowStore", () => {
         });
       });
       expect(mockInvoke).not.toHaveBeenCalledWith("play_stop_sound");
+    });
+  });
+
+  describe("live transcript partial / final", () => {
+    it("[P0] initialize 应注册 transcription:partial", async () => {
+      const store = useVoiceFlowStore();
+      await store.initialize();
+      expect(mockListen).toHaveBeenCalledWith(
+        "transcription:partial",
+        expect.any(Function),
+      );
+    });
+
+    it("[P0] recording 时 partial 应更新 stable/unstable 分段", async () => {
+      const store = useVoiceFlowStore();
+      await store.initialize();
+      store.transitionTo("recording", "voiceFlow.recording");
+
+      triggerHotkeyEvent("transcription:partial", {
+        text: "你好世界",
+        stableText: "你好",
+        unstableText: "世界",
+      });
+
+      expect(store.liveTranscript).toBe("你好世界");
+      expect(store.liveStableTranscript).toBe("你好");
+      expect(store.liveUnstableTranscript).toBe("世界");
+    });
+
+    it("[P0] final 全文写入后迟到的 partial 不得覆盖", async () => {
+      // enhance 挂起，保持 enhancing 可写状态，验证 final 标记挡 partial
+      // 返回接近原文的润饰结果，避免 anomaly 重试把 deferred 吃掉
+      const enhanceDeferred = createDeferredPromise<{
+        text: string;
+        usage: null;
+      }>();
+      mockEnhanceText.mockReturnValue(enhanceDeferred.promise);
+      mockSettingsState.isEnhancementThresholdEnabled = false;
+
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("start_recording", {
+          deviceName: "",
+        });
+      });
+
+      // 录音中先有 partial
+      triggerHotkeyEvent("transcription:partial", {
+        text: "短 partial",
+        stableText: "",
+        unstableText: "短 partial",
+      });
+      expect(store.liveTranscript).toBe("短 partial");
+
+      triggerHotkeyEvent("hotkey:released");
+
+      // finish 后 setLiveTranscript("测试转录")，随后进入 enhancing
+      await vi.waitFor(() => {
+        expect(mockEnhanceText).toHaveBeenCalled();
+      });
+      expect(store.liveTranscript).toBe("测试转录");
+      expect(store.liveStableTranscript).toBe("测试转录");
+      expect(store.liveUnstableTranscript).toBe("");
+      expect(store.status).toBe("enhancing");
+
+      // 迟到 partial：状态仍可写，但 final 标记应忽略
+      triggerHotkeyEvent("transcription:partial", {
+        text: "迟到的短文",
+        stableText: "迟到",
+        unstableText: "的短文",
+      });
+      expect(store.liveTranscript).toBe("测试转录");
+      expect(store.liveStableTranscript).toBe("测试转录");
+      expect(store.liveUnstableTranscript).toBe("");
+
+      enhanceDeferred.resolvePromise({
+        text: "测试转录整理",
+        usage: null,
+      });
+      await vi.waitFor(() => {
+        expect(store.status).toMatch(/success|error/);
+      });
+    });
+
+    it("[P0] 新录音开始应复位 final 标记并允许 partial", async () => {
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      // 先走完一轮，写入 final
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("start_recording", {
+          deviceName: "",
+        });
+      });
+      triggerHotkeyEvent("hotkey:released");
+      await vi.waitFor(() => {
+        expect(store.status).toBe("success");
+      });
+
+      // 新一轮录音
+      mockInvoke.mockClear().mockImplementation(createMockInvokeHandler());
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => {
+        expect(store.status).toBe("recording");
+      });
+      expect(store.liveTranscript).toBe("");
+
+      triggerHotkeyEvent("transcription:partial", {
+        text: "新会话 partial",
+        stableText: "新会话",
+        unstableText: " partial",
+      });
+      expect(store.liveTranscript).toBe("新会话 partial");
+      expect(store.liveStableTranscript).toBe("新会话");
+      expect(store.liveUnstableTranscript).toBe("partial");
     });
   });
 });

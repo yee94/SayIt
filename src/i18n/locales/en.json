@@ -65,6 +65,17 @@
       "baseUrlHint": "Full chat/completions URL, or base ending at /v1",
       "apiKey": "API Key"
     },
+    "customHeaders": {
+      "title": "Custom Headers",
+      "description": "Extra HTTP headers as a JSON object (non-empty string keys and values). Authorization and Content-Type are set by the app and take priority.",
+      "placeholder": "e.g. \"HTTP-Referer\": \"https://example.com\"",
+      "hint": "Validated on save; invalid JSON will not overwrite saved headers.",
+      "invalidJson": "Custom headers must be valid JSON object",
+      "mustBeObject": "Custom headers must be a JSON object, not an array",
+      "emptyKey": "Custom header keys cannot be empty",
+      "emptyValue": "Custom header values cannot be empty",
+      "valueMustBeString": "Custom header values must be strings"
+    },
     "providerApiKey": {
       "openaiTitle": "OpenAI API Key",
       "anthropicTitle": "Anthropic API Key",
@@ -409,7 +420,8 @@
     },
     "upgradeNotice": {
       "title": "What's New in SayIt",
-      "item1": "Clearer microphone connection status: after you press the hotkey, the HUD shows “Connecting microphone” so you know recording is starting.",
+      "item1": "Custom LLM request headers: add JSON headers in Settings for self-hosted gateways, proxies, and compatible services. SayIt keeps essential authorization and content-type headers in place.",
+      "item2": "More stable live transcripts: confirmed sentences stay fixed while the actively corrected tail is underlined, making voice input easier to follow.",
       "dismiss": "Got it"
     }
   },

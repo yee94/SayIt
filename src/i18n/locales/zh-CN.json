@@ -65,6 +65,17 @@
       "baseUrlHint": "可填完整 chat/completions 地址，或仅填到 /v1",
       "apiKey": "API Key"
     },
+    "customHeaders": {
+      "title": "自定义 Header",
+      "description": "以 JSON 对象填写额外 HTTP Header（键与值均为非空字符串）。Authorization 与 Content-Type 由应用自动生成并优先。",
+      "placeholder": "示例： \"HTTP-Referer\": \"https://example.com\"",
+      "hint": "保存时校验；非法 JSON 不会覆盖已保存的 Header。",
+      "invalidJson": "自定义 Header 必须是合法 JSON 对象",
+      "mustBeObject": "自定义 Header 必须是 JSON 对象，不能是数组",
+      "emptyKey": "自定义 Header 的键不能为空",
+      "emptyValue": "自定义 Header 的值不能为空",
+      "valueMustBeString": "自定义 Header 的值必须是字符串"
+    },
     "providerApiKey": {
       "openaiTitle": "OpenAI API Key",
       "anthropicTitle": "Anthropic API Key",
@@ -409,7 +420,8 @@
     },
     "upgradeNotice": {
       "title": "SayIt 更新摘要",
-      "item1": "麦克风连接状态更清晰：按下快捷键后，顶部 HUD 会先提示“正在连接麦克风”，让你清楚知道录音正在启动。",
+      "item1": "LLM 自定义请求 Header：可在设置中填写 JSON Header，用于接入自建网关、代理和兼容服务；应用会保留鉴权与内容类型等核心请求头。",
+      "item2": "实时识别字幕更稳定：已确认的语句会保持稳定，正在修正的尾段以辅助下划线显示，让你更容易跟读语音输入。",
       "dismiss": "了解"
     }
   },

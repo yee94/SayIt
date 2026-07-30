@@ -407,6 +407,125 @@ describe("useSettingsStore", () => {
   });
 
   // ==========================================================================
+  // LLM custom headers
+  // ==========================================================================
+
+  describe("llmCustomHeaders", () => {
+    it("[P0] 有效 JSON 对象应保存并可读回", async () => {
+      const { useSettingsStore } = await import(
+        "../../src/stores/useSettingsStore"
+      );
+      const store = useSettingsStore();
+
+      await store.saveLlmCustomHeadersFromJson(
+        '{"HTTP-Referer":"https://example.com","X-Title":"SayIt"}',
+      );
+
+      expect(mockStoreSet).toHaveBeenCalledWith("llmCustomHeaders", {
+        "HTTP-Referer": "https://example.com",
+        "X-Title": "SayIt",
+      });
+      expect(store.getLlmCustomHeaders()).toEqual({
+        "HTTP-Referer": "https://example.com",
+        "X-Title": "SayIt",
+      });
+    });
+
+    it("[P0] 非法 JSON 应保留旧设置并抛本地化错误", async () => {
+      const { useSettingsStore } = await import(
+        "../../src/stores/useSettingsStore"
+      );
+      const store = useSettingsStore();
+      await store.saveLlmCustomHeaders({
+        "HTTP-Referer": "https://keep.example",
+      });
+      mockStoreSet.mockClear();
+
+      await expect(
+        store.saveLlmCustomHeadersFromJson("{not-json"),
+      ).rejects.toThrow();
+      expect(store.getLlmCustomHeaders()).toEqual({
+        "HTTP-Referer": "https://keep.example",
+      });
+      // 无效输入不得写入 store
+      expect(
+        mockStoreSet.mock.calls.some(
+          (call) => (call as [string, unknown])[0] === "llmCustomHeaders",
+        ),
+      ).toBe(false);
+    });
+
+    it("[P0] 数组 / 空键 / 空值 / 非字符串值应拒绝", async () => {
+      const { useSettingsStore } = await import(
+        "../../src/stores/useSettingsStore"
+      );
+      const store = useSettingsStore();
+      await store.saveLlmCustomHeaders({ Keep: "yes" });
+
+      await expect(store.saveLlmCustomHeadersFromJson("[]")).rejects.toThrow();
+      await expect(
+        store.saveLlmCustomHeadersFromJson('{"":"x"}'),
+      ).rejects.toThrow();
+      await expect(
+        store.saveLlmCustomHeadersFromJson('{"A":""}'),
+      ).rejects.toThrow();
+      await expect(
+        store.saveLlmCustomHeadersFromJson('{"A":1}'),
+      ).rejects.toThrow();
+      expect(store.getLlmCustomHeaders()).toEqual({ Keep: "yes" });
+    });
+
+    it("[P0] 空字串应保存为空对象", async () => {
+      const { useSettingsStore } = await import(
+        "../../src/stores/useSettingsStore"
+      );
+      const store = useSettingsStore();
+      await store.saveLlmCustomHeaders({ Old: "v" });
+      await store.saveLlmCustomHeadersFromJson("   ");
+      expect(store.getLlmCustomHeaders()).toEqual({});
+    });
+
+    it("[P0] loadSettings 与 refreshCrossWindowSettings 应读取 headers", async () => {
+      mockStoreData.set("llmCustomHeaders", {
+        "X-Title": "SayIt",
+      });
+
+      const { useSettingsStore } = await import(
+        "../../src/stores/useSettingsStore"
+      );
+      const store = useSettingsStore();
+      await store.loadSettings();
+      expect(store.getLlmCustomHeaders()).toEqual({ "X-Title": "SayIt" });
+
+      mockStoreData.set("llmCustomHeaders", {
+        "HTTP-Referer": "https://sync.example",
+      });
+      await store.refreshCrossWindowSettings();
+      expect(store.getLlmCustomHeaders()).toEqual({
+        "HTTP-Referer": "https://sync.example",
+      });
+    });
+
+    it("[P1] parseLlmCustomHeadersJson 不应在错误中包含 header 值", async () => {
+      const { useSettingsStore } = await import(
+        "../../src/stores/useSettingsStore"
+      );
+      const store = useSettingsStore();
+      const result = store.parseLlmCustomHeadersJson(
+        '{"secret":"should-not-appear"}',
+      );
+      // 合法输入
+      expect(result.ok).toBe(true);
+      const bad = store.parseLlmCustomHeadersJson('{"x":123}');
+      expect(bad.ok).toBe(false);
+      if (!bad.ok) {
+        expect(bad.errorKey).not.toContain("123");
+        expect(bad.errorKey).toMatch(/customHeaders/);
+      }
+    });
+  });
+
+  // ==========================================================================
   // refreshCrossWindowSettings
   // ==========================================================================
 
@@ -420,6 +539,9 @@ describe("useSettingsStore", () => {
       mockStoreData.set("doubaoAccessKey", "  ak_sync  ");
       mockStoreData.set("llmApiKey", "sk_sync");
       mockStoreData.set("llmBaseUrl", "https://example.com/v1");
+      mockStoreData.set("llmCustomHeaders", {
+        "HTTP-Referer": "https://sync.example",
+      });
       mockStoreData.set("aiPrompt", "  同步后 prompt  ");
       mockStoreData.set("promptMode", "custom");
       mockStoreData.set("enhancementThresholdEnabled", true);
@@ -442,6 +564,9 @@ describe("useSettingsStore", () => {
       expect(store.customTriggerKeyDomCode).toBe("F13");
       expect(store.getDoubaoAccessKey()).toBe("ak_sync");
       expect(store.getLlmApiKey()).toBe("sk_sync");
+      expect(store.getLlmCustomHeaders()).toEqual({
+        "HTTP-Referer": "https://sync.example",
+      });
       expect(store.getAiPrompt()).toBe("同步后 prompt");
       expect(store.isEnhancementThresholdEnabled).toBe(true);
       expect(store.enhancementThresholdCharCount).toBe(42);
@@ -577,7 +702,7 @@ describe("useSettingsStore", () => {
       // When a saved locale exists, loadSettings should NOT re-set it
       // (the "first launch" path calls store.set("selectedLocale", detected))
       const selectedLocaleSetCallList = mockStoreSet.mock.calls.filter(
-        ([key]: [string]) => key === "selectedLocale",
+        (call) => call[0] === "selectedLocale",
       );
       expect(selectedLocaleSetCallList).toHaveLength(0);
     });

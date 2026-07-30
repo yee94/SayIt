@@ -76,6 +76,8 @@ const ERROR_WITH_RETRY_DISPLAY_DURATION_MS = 6000;
 const START_SOUND_DURATION_MS = 400;
 const CANCELLED_DISPLAY_DURATION_MS = 1000;
 const EDIT_MODE_MAX_TOKENS = 4096;
+const HUD_COLLAPSE_COMPLETE_EVENT = "sayit:hud-collapse-complete";
+const HUD_COLLAPSE_SAFE_HIDE_DELAY_MS = 500;
 
 /**
  * 判断转录结果是否为空（无内容可粘贴）。
@@ -97,8 +99,17 @@ const MONITOR_POLL_INTERVAL_MS = 250;
 export const useVoiceFlowStore = defineStore("voice-flow", () => {
   const status = ref<HudStatus>("idle");
   const message = ref("");
-  /** ASR 串流中间文本（HUD 留海下方即时字幕） */
+  /** ASR 串流中间文本（HUD 留海下方即时字幕；兼容旧 text 全量） */
   const liveTranscript = ref("");
+  /** 句级已确定前缀（无下划线） */
+  const liveStableTranscript = ref("");
+  /** 仍在修正的尾段（HUD 下划线呈现） */
+  const liveUnstableTranscript = ref("");
+  /**
+   * 本会话已写入 final 全文后置位；迟到的 partial 不得覆盖。
+   * 开始录音 / 清空字幕时复位。
+   */
+  let liveTranscriptFinalized = false;
   const isRecording = ref<boolean>(false);
   let pendingRecordingStart: Promise<void> | null = null;
   let isRecorderStopPending = false;
@@ -109,7 +120,8 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
   const unlistenFunctions: UnlistenFn[] = [];
   let autoHideTimer: ReturnType<typeof setTimeout> | null = null;
   let collapseHideTimer: ReturnType<typeof setTimeout> | null = null;
-  const COLLAPSE_HIDE_DELAY_MS = 400;
+  let pendingHudCollapseEpoch: number | null = null;
+  let isHudCollapseListenerActive = false;
   const lastWasModified = ref<boolean | null>(null);
   let monitorPollTimer: ReturnType<typeof setInterval> | null = null;
   let delayedMuteTimer: ReturnType<typeof setTimeout> | null = null;
@@ -189,6 +201,33 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       clearTimeout(collapseHideTimer);
       collapseHideTimer = null;
     }
+    pendingHudCollapseEpoch = null;
+  }
+
+  function completePendingHudHide() {
+    const collapseEpoch = pendingHudCollapseEpoch;
+    if (
+      collapseEpoch === null ||
+      status.value !== "idle" ||
+      collapseEpoch !== hudPresentationEpoch
+    ) {
+      return;
+    }
+    if (collapseHideTimer) {
+      clearTimeout(collapseHideTimer);
+      collapseHideTimer = null;
+    }
+    pendingHudCollapseEpoch = null;
+    hideHud().catch((err) => {
+      writeErrorLog(
+        `useVoiceFlowStore: hideHud failed: ${extractErrorMessage(err)}`,
+      );
+      captureError(err, { source: "voice-flow", step: "hideHud" });
+    });
+  }
+
+  function handleHudCollapseComplete() {
+    completePendingHudHide();
   }
 
   function startElapsedTimer() {
@@ -386,21 +425,60 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
 
   function clearLiveTranscript() {
     liveTranscript.value = "";
+    liveStableTranscript.value = "";
+    liveUnstableTranscript.value = "";
+    liveTranscriptFinalized = false;
+  }
+
+  function isLiveTranscriptWritable(): boolean {
+    // 录音 / 转写 / 重送期间才更新，避免过期 partial 污染其他状态
+    return (
+      status.value === "recording" ||
+      status.value === "transcribing" ||
+      status.value === "enhancing" ||
+      status.value === "editing"
+    );
   }
 
   function setLiveTranscript(text: string) {
     const trimmed = text.trim();
     if (!trimmed) return;
-    // 录音 / 转写 / 重送期间才更新，避免过期 partial 污染其他状态
-    if (
-      status.value !== "recording" &&
-      status.value !== "transcribing" &&
-      status.value !== "enhancing" &&
-      status.value !== "editing"
-    ) {
+    if (!isLiveTranscriptWritable()) {
       return;
     }
     liveTranscript.value = trimmed;
+    // 终态全文：全部视为已稳定，清空待定段
+    liveStableTranscript.value = trimmed;
+    liveUnstableTranscript.value = "";
+    // 阻止 finish 后迟到的 partial 覆盖完整稳定字幕
+    liveTranscriptFinalized = true;
+  }
+
+  function setLiveTranscriptPartial(payload: {
+    text: string;
+    stableText?: string;
+    unstableText?: string;
+  }) {
+    const full = payload.text.trim();
+    if (!full) return;
+    if (!isLiveTranscriptWritable()) {
+      return;
+    }
+    // final 全文已写入后忽略迟到 partial（transcribing/enhancing/editing 仍可写，但不再被 partial 覆盖）
+    if (liveTranscriptFinalized) {
+      return;
+    }
+    liveTranscript.value = full;
+    const hasSegmentFields =
+      payload.stableText !== undefined || payload.unstableText !== undefined;
+    if (!hasSegmentFields) {
+      // 旧 payload 兼容：无分段时整段作为待定
+      liveStableTranscript.value = "";
+      liveUnstableTranscript.value = full;
+      return;
+    }
+    liveStableTranscript.value = (payload.stableText ?? "").trim();
+    liveUnstableTranscript.value = (payload.unstableText ?? "").trim();
   }
 
   function transitionTo(nextStatus: HudStatus, nextMessage = "") {
@@ -422,14 +500,10 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     if (nextStatus === "idle") {
       hudPresentationEpoch += 1;
       stopMonitorPolling();
+      pendingHudCollapseEpoch = hudPresentationEpoch;
       collapseHideTimer = setTimeout(() => {
-        hideHud().catch((err) => {
-          writeErrorLog(
-            `useVoiceFlowStore: hideHud failed: ${extractErrorMessage(err)}`,
-          );
-          captureError(err, { source: "voice-flow", step: "hideHud" });
-        });
-      }, COLLAPSE_HIDE_DELAY_MS);
+        completePendingHudHide();
+      }, HUD_COLLAPSE_SAFE_HIDE_DELAY_MS);
       return;
     }
 
@@ -849,6 +923,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         {
           modelId: settingsStore.selectedLlmModelId,
           baseUrl: settingsStore.getLlmBaseUrl(),
+          headers: settingsStore.getLlmCustomHeaders(),
         },
       );
       await yieldToMain();
@@ -1489,6 +1564,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       })
       .catch(() => {});
 
+    const firstFrameWaitStartedAt = performance.now();
     const recordingStartPromise = invoke<void>("start_recording", {
       deviceName: useSettingsStore().selectedAudioInputDeviceName,
     });
@@ -1496,6 +1572,12 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
 
     try {
       await recordingStartPromise;
+      const firstFrameWaitMs = Math.round(
+        performance.now() - firstFrameWaitStartedAt,
+      );
+      writeInfoLog(
+        `useVoiceFlowStore: first-frame-ready waitMs=${firstFrameWaitMs}`,
+      );
       if (
         currentRecordingEpoch !== recordingEpoch ||
         isAborted.value ||
@@ -1511,6 +1593,12 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       // 边说边出：录音开始后立刻挂上 live ASR（失败不阻断录音）
       void startLiveAsrIfPossible();
     } catch (error) {
+      const firstFrameWaitMs = Math.round(
+        performance.now() - firstFrameWaitStartedAt,
+      );
+      writeInfoLog(
+        `useVoiceFlowStore: first-frame-ready waitMs=${firstFrameWaitMs} (failed)`,
+      );
       if (
         currentRecordingEpoch !== recordingEpoch ||
         isAborted.value ||
@@ -1863,6 +1951,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
               enhancementTermList.length > 0 ? enhancementTermList : undefined,
             modelId: settingsStore.selectedLlmModelId,
             baseUrl: settingsStore.getLlmBaseUrl(),
+            headers: settingsStore.getLlmCustomHeaders(),
             signal: abortController?.signal,
             screenContext: screenCtx
               ? {
@@ -2081,6 +2170,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         systemPrompt,
         modelId: settingsStore.selectedLlmModelId,
         baseUrl: settingsStore.getLlmBaseUrl(),
+        headers: settingsStore.getLlmCustomHeaders(),
         signal: abortController?.signal,
         maxTokens: EDIT_MODE_MAX_TOKENS,
         screenContext: editScreenCtx
@@ -2245,6 +2335,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
               enhancementTermList.length > 0 ? enhancementTermList : undefined,
             modelId: settingsStore.selectedLlmModelId,
             baseUrl: settingsStore.getLlmBaseUrl(),
+            headers: settingsStore.getLlmCustomHeaders(),
             signal: abortController?.signal,
             screenContext: resendScreenCtx
               ? {
@@ -2445,6 +2536,14 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
 
     await settingsStore.loadSettings();
 
+    if (!isHudCollapseListenerActive) {
+      window.addEventListener(
+        HUD_COLLAPSE_COMPLETE_EVENT,
+        handleHudCollapseComplete,
+      );
+      isHudCollapseListenerActive = true;
+    }
+
     const listeners = await Promise.all([
       listenToEvent(ESCAPE_PRESSED, () => {
         handleEscapeAbort();
@@ -2480,7 +2579,11 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       listenToEvent<TranscriptionPartialPayload>(
         TRANSCRIPTION_PARTIAL,
         (event) => {
-          setLiveTranscript(event.payload.text);
+          setLiveTranscriptPartial({
+            text: event.payload.text,
+            stableText: event.payload.stableText,
+            unstableText: event.payload.unstableText,
+          });
         },
       ),
       listenToEvent<HotkeyErrorPayload>(HOTKEY_ERROR, (event) => {
@@ -2521,6 +2624,13 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     stopMonitorPolling();
     stopElapsedTimer();
     stopCorrectionDetectionSession();
+    if (isHudCollapseListenerActive) {
+      window.removeEventListener(
+        HUD_COLLAPSE_COMPLETE_EVENT,
+        handleHudCollapseComplete,
+      );
+      isHudCollapseListenerActive = false;
+    }
 
     for (const unlisten of unlistenFunctions) {
       unlisten();
@@ -2532,6 +2642,8 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     status,
     message,
     liveTranscript,
+    liveStableTranscript,
+    liveUnstableTranscript,
     recordingElapsedSeconds,
     lastWasModified,
     canRetry,

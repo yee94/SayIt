@@ -384,7 +384,8 @@ const FFT_SIZE: usize = 64;
 const FREQUENCY_BIN_PICK_INDEX_LIST: [usize; 6] = [9, 4, 1, 2, 6, 12];
 const DB_FLOOR: f32 = -100.0;
 const DB_CEILING: f32 = -20.0;
-const WAVEFORM_EMIT_INTERVAL_MS: u128 = 16;
+/// HUD 波形跨进程事件上限约 20fps，降低 IPC 压力；FFT 与六频段计算路径不变。
+const WAVEFORM_EMIT_INTERVAL_MS: u128 = 50;
 
 fn normalize_db(db: f32) -> f32 {
     ((db - DB_FLOOR) / (DB_CEILING - DB_FLOOR)).clamp(0.0, 1.0)

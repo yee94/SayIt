@@ -651,6 +651,7 @@ export const useHistoryStore = defineStore("history", () => {
               enhancementTermList.length > 0 ? enhancementTermList : undefined,
             modelId: settingsStore.selectedLlmModelId,
             baseUrl: settingsStore.getLlmBaseUrl(),
+            headers: settingsStore.getLlmCustomHeaders(),
           });
 
           const anomaly = detectEnhancementAnomaly({

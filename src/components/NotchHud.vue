@@ -34,6 +34,10 @@ const props = withDefaults(
     message: string;
     /** ASR 串流中间文本（留海下方即时字幕） */
     liveTranscript?: string;
+    /** ASR 已确认的稳定字幕前缀 */
+    liveStableTranscript?: string;
+    /** ASR 仍可能修正的待定字幕尾段 */
+    liveUnstableTranscript?: string;
     canRetry: boolean;
     promptModeLabel: string;
     modeSwitchLabel: string;
@@ -41,6 +45,8 @@ const props = withDefaults(
   }>(),
   {
     liveTranscript: "",
+    liveStableTranscript: "",
+    liveUnstableTranscript: "",
   },
 );
 
@@ -49,6 +55,9 @@ defineEmits<{
 }>();
 
 const visualMode = ref<VisualMode>("hidden");
+const collapsingFromMode = ref<VisualMode | null>(null);
+const collapsingMessage = ref("");
+const collapsingCanRetry = ref(false);
 let morphingTimer: ReturnType<typeof setTimeout> | null = null;
 let collapsingTimer: ReturnType<typeof setTimeout> | null = null;
 let learnedTimer: ReturnType<typeof setTimeout> | null = null;
@@ -78,6 +87,7 @@ const MAX_BAR_HEIGHT = 28;
 const ERROR_WITH_MESSAGE_HEIGHT = 72;
 /** 含即时字幕时的留海高度（上排 42 + 字幕列） */
 const LIVE_TRANSCRIPT_HEIGHT = 72;
+const HUD_COLLAPSE_COMPLETE_EVENT = "sayit:hud-collapse-complete";
 
 interface NotchShapeParams {
   width: number;
@@ -103,8 +113,22 @@ function buildNotchPath(p: NotchShapeParams): string {
   return `path('M 0,0 Q ${tr},0 ${tr},${tr} L ${tr},${h - br} Q ${tr},${h} ${tr + br},${h} L ${w - tr - br},${h} Q ${w - tr},${h} ${w - tr},${h - br} L ${w - tr},${tr} Q ${w - tr},0 ${w},0 Z')`;
 }
 
+const contentMode = computed(() =>
+  visualMode.value === "collapsing"
+    ? (collapsingFromMode.value ?? "hidden")
+    : visualMode.value,
+);
+
+const displayedMessage = computed(() =>
+  visualMode.value === "collapsing" ? collapsingMessage.value : props.message,
+);
+
+const displayedCanRetry = computed(() =>
+  visualMode.value === "collapsing" ? collapsingCanRetry.value : props.canRetry,
+);
+
 const hasErrorMessage = computed(
-  () => visualMode.value === "error" && props.message !== "",
+  () => contentMode.value === "error" && displayedMessage.value !== "",
 );
 
 /**
@@ -112,14 +136,32 @@ const hasErrorMessage = computed(
  * - enhancing / editing：固定状态文案（替换掉之前的即时 ASR 文本）
  * - recording / 转写：显示 liveTranscript
  */
-const liveTranscriptDisplayText = computed(() => {
+const liveTranscriptStatusText = computed(() => {
   if (props.status === "enhancing") {
     return t("voiceFlow.enhancing");
   }
   if (props.status === "editing") {
     return t("voiceFlow.editing");
   }
+  return "";
+});
+
+const liveStableText = computed(
+  () => props.liveStableTranscript?.trim() ?? "",
+);
+
+const liveUnstableText = computed(() => {
+  const unstableText = props.liveUnstableTranscript?.trim() ?? "";
+  if (liveStableText.value || unstableText) return unstableText;
   return props.liveTranscript?.trim() ?? "";
+});
+
+const liveTranscriptSeparator = computed(() => {
+  if (!liveStableText.value || !liveUnstableText.value) return "";
+  return /[A-Za-z0-9]$/.test(liveStableText.value) &&
+    /^[A-Za-z0-9]/.test(liveUnstableText.value)
+    ? " "
+    : "";
 });
 
 /**
@@ -131,8 +173,7 @@ const showLiveTranscript = computed(() => {
   if (props.status === "enhancing" || props.status === "editing") {
     return true;
   }
-  const text = props.liveTranscript?.trim() ?? "";
-  if (!text) return false;
+  if (!liveStableText.value && !liveUnstableText.value) return false;
   const mode = visualMode.value;
   return (
     mode === "recording" ||
@@ -154,6 +195,13 @@ const isExpandedMode = computed(
 const notchStyle = computed(() => {
   let params = NOTCH_SHAPE_OVERRIDES[visualMode.value] ?? DEFAULT_NOTCH_SHAPE;
   // 预设 42px；只有真的有字幕 / 错误讯息 / learned 才撑高
+  if (visualMode.value === "collapsing") {
+    return {
+      width: `${params.width}px`,
+      height: `${params.height}px`,
+      clipPath: buildNotchPath(params),
+    };
+  }
   if (showLiveTranscript.value) {
     params = { ...params, height: LIVE_TRANSCRIPT_HEIGHT };
   } else if (hasErrorMessage.value || visualMode.value === "learned") {
@@ -193,7 +241,7 @@ const barStyleList = computed(() => {
 });
 
 const waveformElementClass = computed(() => {
-  switch (visualMode.value) {
+  switch (contentMode.value) {
     case "recording":
       return "waveform-bar";
     case "morphing":
@@ -264,6 +312,30 @@ function clearLearnedTimer() {
   }
 }
 
+function completeCollapse() {
+  visualMode.value = "hidden";
+  collapsingFromMode.value = null;
+  collapsingMessage.value = "";
+  collapsingCanRetry.value = false;
+  window.dispatchEvent(new CustomEvent(HUD_COLLAPSE_COMPLETE_EVENT));
+  processNextLearnedNotification();
+}
+
+function startCollapse() {
+  clearCollapsingTimer();
+  if (visualMode.value !== "collapsing") {
+    collapsingFromMode.value = visualMode.value;
+    if (visualMode.value !== "error") {
+      collapsingMessage.value = props.message;
+      collapsingCanRetry.value = props.canRetry;
+    }
+  }
+  visualMode.value = "collapsing";
+  collapsingTimer = setTimeout(() => {
+    completeCollapse();
+  }, COLLAPSE_ANIMATION_DURATION_MS);
+}
+
 function formatLearnedText(termList: string[]): string {
   if (termList.length <= MAX_DISPLAY_TERM_COUNT) {
     return t("voiceFlow.vocabularyLearned", {
@@ -300,11 +372,7 @@ function showLearnedNotification(termList: string[]) {
       return;
     }
     activeLearnedTermList.value = [];
-    visualMode.value = "collapsing";
-    collapsingTimer = setTimeout(() => {
-      visualMode.value = "hidden";
-      processNextLearnedNotification();
-    }, COLLAPSE_ANIMATION_DURATION_MS);
+    startCollapse();
   }, LEARNED_DISPLAY_DURATION_MS);
 }
 
@@ -350,11 +418,7 @@ watch(
     if (!label) {
       // Label cleared → trigger collapsing animation
       if (visualMode.value === "mode-switch") {
-        visualMode.value = "collapsing";
-        collapsingTimer = setTimeout(() => {
-          visualMode.value = "hidden";
-          processNextLearnedNotification();
-        }, COLLAPSE_ANIMATION_DURATION_MS);
+        startCollapse();
       }
       return;
     }
@@ -380,11 +444,7 @@ watch(
         processNextLearnedNotification();
         return;
       }
-      visualMode.value = "collapsing";
-      collapsingTimer = setTimeout(() => {
-        visualMode.value = "hidden";
-        processNextLearnedNotification();
-      }, COLLAPSE_ANIMATION_DURATION_MS);
+      startCollapse();
       return;
     }
 
@@ -432,18 +492,24 @@ watch(
 
     if (nextStatus === "success") {
       stopWaveformAnimation();
+      collapsingMessage.value = props.message;
+      collapsingCanRetry.value = false;
       visualMode.value = "success";
       return;
     }
 
     if (nextStatus === "error") {
       stopWaveformAnimation();
+      collapsingMessage.value = props.message;
+      collapsingCanRetry.value = props.canRetry;
       visualMode.value = "error";
       return;
     }
 
     if (nextStatus === "cancelled") {
       stopWaveformAnimation();
+      collapsingMessage.value = props.message;
+      collapsingCanRetry.value = false;
       visualMode.value = "cancelled";
       return;
     }
@@ -477,6 +543,7 @@ onUnmounted(() => {
     :class="{
       'notch-wrapper-success': visualMode === 'success',
       'notch-wrapper-learned': visualMode === 'learned',
+      'notch-wrapper-collapsing': visualMode === 'collapsing',
     }"
   >
     <div
@@ -488,7 +555,7 @@ onUnmounted(() => {
         <div class="notch-left">
           <!-- Cancelled: X icon -->
           <svg
-            v-if="visualMode === 'cancelled'"
+            v-if="contentMode === 'cancelled'"
             class="cancelled-icon-svg"
             width="18"
             height="18"
@@ -503,9 +570,9 @@ onUnmounted(() => {
             <line x1="6" y1="6" x2="18" y2="18" />
           </svg>
           <!-- Learned: 上排留空，内容在下方扩展行 -->
-          <template v-else-if="visualMode === 'learned'" />
+          <template v-else-if="contentMode === 'learned'" />
           <!-- Connecting: low-intensity device connection indicator -->
-          <template v-else-if="visualMode === 'connecting'">
+          <template v-else-if="contentMode === 'connecting'">
             <div class="connection-container" aria-hidden="true">
               <span
                 v-for="index in 3"
@@ -526,7 +593,7 @@ onUnmounted(() => {
               />
             </div>
             <svg
-              v-if="visualMode === 'success'"
+              v-if="contentMode === 'success'"
               class="checkmark-svg"
               width="18"
               height="18"
@@ -547,14 +614,14 @@ onUnmounted(() => {
         <div class="notch-camera-gap" />
 
         <div class="notch-right">
-          <span v-if="visualMode === 'cancelled'" class="cancelled-label">
+          <span v-if="contentMode === 'cancelled'" class="cancelled-label">
             {{ $t('voiceFlow.cancelled') }}
           </span>
-          <span v-else-if="visualMode === 'mode-switch'" class="mode-switch-label">
+          <span v-else-if="contentMode === 'mode-switch'" class="mode-switch-label">
             {{ props.modeSwitchLabel }}
           </span>
           <span
-            v-else-if="visualMode === 'connecting'"
+            v-else-if="contentMode === 'connecting'"
             class="connecting-label"
             role="status"
             aria-live="polite"
@@ -562,7 +629,7 @@ onUnmounted(() => {
           >
             {{ props.message || t('voiceFlow.connecting') }}
           </span>
-          <template v-else-if="visualMode === 'recording'">
+          <template v-else-if="contentMode === 'recording'">
             <span v-if="props.isEditMode" class="hud-badge edit-mode-badge">{{ t('voiceFlow.editMode') }}</span>
             <span v-else-if="props.promptModeLabel" class="hud-badge prompt-mode-badge">{{ props.promptModeLabel }}</span>
             <span class="elapsed-timer">
@@ -570,7 +637,7 @@ onUnmounted(() => {
             </span>
           </template>
           <span
-            v-else-if="visualMode === 'error' && canRetry"
+            v-else-if="contentMode === 'error' && displayedCanRetry"
             class="retry-icon"
             @click.stop="$emit('retry')"
           >&#x21BB;</span>
@@ -579,7 +646,7 @@ onUnmounted(() => {
 
       <!-- Learned：仅在非语音字幕时显示，禁止与 live transcript 叠层 -->
       <div
-        v-if="visualMode === 'learned' && !showLiveTranscript"
+        v-if="contentMode === 'learned' && !showLiveTranscript"
         class="learned-terms-row"
       >
         <div class="learned-terms-inner">
@@ -589,7 +656,7 @@ onUnmounted(() => {
       </div>
 
       <div v-if="hasErrorMessage" class="error-message-row">
-        <span class="error-message">{{ props.message }}</span>
+        <span class="error-message">{{ displayedMessage }}</span>
       </div>
 
       <!-- 即时转写字幕优先：与 learned 互斥 -->
@@ -601,7 +668,14 @@ onUnmounted(() => {
               props.status === 'enhancing' || props.status === 'editing',
           }"
         >
-          <bdi class="live-transcript-bdi">{{ liveTranscriptDisplayText }}</bdi>
+          <bdi class="live-transcript-bdi">
+            <template v-if="props.status === 'enhancing' || props.status === 'editing'">
+              {{ liveTranscriptStatusText }}
+            </template>
+            <template v-else>
+              <span v-if="liveStableText" class="live-transcript-stable">{{ liveStableText }}</span><span v-if="liveTranscriptSeparator">{{ liveTranscriptSeparator }}</span><span v-if="liveUnstableText" class="live-transcript-unstable">{{ liveUnstableText }}</span>
+            </template>
+          </bdi>
         </span>
       </div>
     </div>
@@ -616,8 +690,13 @@ onUnmounted(() => {
   width: 100%;
   display: flex;
   justify-content: center;
+  transform-origin: center top;
   filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
   animation: notchEnter 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.notch-wrapper-collapsing {
+  animation: notchExit 0.4s cubic-bezier(0.36, 0, 0.66, -0.56) forwards;
 }
 
 .notch-hud {
@@ -641,6 +720,17 @@ onUnmounted(() => {
   to {
     opacity: 1;
     transform: scaleX(1) scaleY(1);
+  }
+}
+
+@keyframes notchExit {
+  from {
+    opacity: 1;
+    transform: scaleX(1) scaleY(1);
+  }
+  to {
+    opacity: 0;
+    transform: scaleX(0.6) scaleY(0.3);
   }
 }
 
@@ -916,7 +1006,7 @@ onUnmounted(() => {
 
 .connecting-label {
   color: rgba(255, 255, 255, 0.62);
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 500;
   white-space: nowrap;
   animation: cancelledTextFadeIn 0.3s ease-out;
@@ -995,7 +1085,7 @@ onUnmounted(() => {
 .elapsed-timer {
   font-family: 'JetBrains Mono', monospace;
   color: rgba(255, 255, 255, 0.6);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
@@ -1050,6 +1140,10 @@ onUnmounted(() => {
   transition: opacity 0.15s ease;
 }
 
+.notch-collapsing {
+  pointer-events: none;
+}
+
 /* ---- Live transcript：黑底内第二行；等高度撑开后再淡入 ---- */
 .live-transcript-row {
   display: flex;
@@ -1073,7 +1167,7 @@ onUnmounted(() => {
   /* 左侧省略：overflow 时保留尾部（最新）文字 */
   direction: rtl;
   text-align: center;
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.02em;
   line-height: 1.35;
@@ -1108,6 +1202,18 @@ onUnmounted(() => {
   animation: liveTranscriptShine 2.4s linear infinite;
 }
 
+.live-transcript-stable {
+  color: inherit;
+}
+
+.live-transcript-unstable {
+  color: inherit;
+  text-decoration-line: underline;
+  text-decoration-color: rgba(125, 211, 252, 0.72);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
 @keyframes liveTranscriptShine {
   0% {
     background-position: 140% 0;
@@ -1127,4 +1233,5 @@ onUnmounted(() => {
     transform: translateY(0);
   }
 }
+
 </style>

@@ -18,7 +18,7 @@ const MAX_VOCABULARY_TERMS = 50;
 export class EnhancerApiError extends Error {
   constructor(
     public statusCode: number,
-    statusText: string,
+    public statusText: string,
     public body: string,
   ) {
     super(`Enhancement API error: ${statusCode} ${statusText}`);
@@ -42,6 +42,8 @@ export interface EnhanceOptions {
   vocabularyTermList?: string[];
   modelId?: string;
   baseUrl?: string;
+  /** 自定义 HTTP Header（Authorization / Content-Type 由应用后合并覆盖） */
+  headers?: Record<string, string>;
   signal?: AbortSignal;
   maxTokens?: number;
   /** 屏幕上下文（可选）：附带应用名 + 截图给 vision 模型 */
@@ -125,7 +127,12 @@ export async function enhanceText(
     maxTokens: options?.maxTokens ?? DEFAULT_LLM_MAX_TOKENS,
   };
 
-  const { url, init } = buildFetchParams(request, apiKey, baseUrl);
+  const { url, init } = buildFetchParams(
+    request,
+    apiKey,
+    baseUrl,
+    options?.headers,
+  );
 
   // 超时必须 abort 请求：仅 Promise.race 会留下挂起的 fetch，UI 可能一直停在「整理中」
   const timeoutController = new AbortController();

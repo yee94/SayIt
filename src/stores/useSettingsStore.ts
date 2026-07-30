@@ -107,6 +107,7 @@ export const useSettingsStore = defineStore("settings", () => {
   // Custom OpenAI-compatible LLM
   const llmBaseUrl = ref<string>(DEFAULT_LLM_BASE_URL);
   const llmApiKey = ref<string>("");
+  const llmCustomHeaders = ref<Record<string, string>>({});
   const selectedLlmModelId = ref<LlmModelId>(DEFAULT_LLM_MODEL_ID);
   const selectedLlmProviderId = ref<LlmProviderId>("custom");
   const selectedWhisperModelId = ref<WhisperModelId>(DEFAULT_WHISPER_MODEL_ID);
@@ -172,6 +173,71 @@ export const useSettingsStore = defineStore("settings", () => {
     return llmBaseUrl.value || DEFAULT_LLM_BASE_URL;
   }
 
+  function getLlmCustomHeaders(): Record<string, string> {
+    return { ...llmCustomHeaders.value };
+  }
+
+  /**
+   * Parse & validate custom header JSON object.
+   * Keys and values must be non-empty strings. Arrays / non-objects rejected.
+   * Does not log or return header values in error messages.
+   */
+  function parseLlmCustomHeadersJson(
+    raw: string,
+  ): { ok: true; headers: Record<string, string> } | { ok: false; errorKey: string } {
+    const trimmed = raw.trim();
+    if (trimmed === "") {
+      return { ok: true, headers: {} };
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch {
+      return { ok: false, errorKey: "settings.customHeaders.invalidJson" };
+    }
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return { ok: false, errorKey: "settings.customHeaders.mustBeObject" };
+    }
+    const headers: Record<string, string> = {};
+    for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+      if (key.trim() === "") {
+        return { ok: false, errorKey: "settings.customHeaders.emptyKey" };
+      }
+      if (typeof value !== "string") {
+        return { ok: false, errorKey: "settings.customHeaders.valueMustBeString" };
+      }
+      if (value.trim() === "") {
+        return { ok: false, errorKey: "settings.customHeaders.emptyValue" };
+      }
+      headers[key] = value;
+    }
+    return { ok: true, headers };
+  }
+
+  function normalizeStoredLlmCustomHeaders(
+    raw: unknown,
+  ): Record<string, string> {
+    if (raw === null || raw === undefined) return {};
+    if (typeof raw === "string") {
+      const result = parseLlmCustomHeadersJson(raw);
+      return result.ok ? result.headers : {};
+    }
+    if (typeof raw === "object" && !Array.isArray(raw)) {
+      const headers: Record<string, string> = {};
+      for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+        if (
+          key.trim() !== "" &&
+          typeof value === "string" &&
+          value.trim() !== ""
+        ) {
+          headers[key] = value;
+        }
+      }
+      return headers;
+    }
+    return {};
+  }
+
   async function syncHotkeyConfigToRust(key: TriggerKey, mode: TriggerMode) {
     try {
       await invoke("update_hotkey_config", {
@@ -211,6 +277,9 @@ export const useSettingsStore = defineStore("settings", () => {
       doubaoAccessKey.value = savedDoubaoAccessKey?.trim() ?? "";
       llmBaseUrl.value = savedLlmBaseUrl?.trim() || DEFAULT_LLM_BASE_URL;
       llmApiKey.value = savedLlmApiKey?.trim() ?? "";
+      llmCustomHeaders.value = normalizeStoredLlmCustomHeaders(
+        await store.get("llmCustomHeaders"),
+      );
 
       // Load independently persisted custom/combo key
       const savedCustomKey =
@@ -832,6 +901,43 @@ export const useSettingsStore = defineStore("settings", () => {
     }
   }
 
+  async function saveLlmCustomHeaders(headers: Record<string, string>) {
+    try {
+      const store = await load(STORE_NAME);
+      await store.set("llmCustomHeaders", headers);
+      await store.save();
+      llmCustomHeaders.value = { ...headers };
+      const payload: SettingsUpdatedPayload = {
+        key: "llmCustomHeaders",
+        // 仅同步键名数量，不广播 header 值
+        value: Object.keys(headers).length,
+      };
+      await emitEvent(SETTINGS_UPDATED, payload);
+      console.log(
+        `[useSettingsStore] LLM custom headers saved (count=${Object.keys(headers).length})`,
+      );
+    } catch (err) {
+      console.error(
+        "[useSettingsStore] saveLlmCustomHeaders failed:",
+        extractErrorMessage(err),
+      );
+      captureError(err, { source: "settings", step: "save-llm-custom-headers" });
+      throw err;
+    }
+  }
+
+  /**
+   * Validate JSON text and persist headers. On invalid input, keep previous
+   * headers and throw a localized Error (message never includes header values).
+   */
+  async function saveLlmCustomHeadersFromJson(raw: string) {
+    const result = parseLlmCustomHeadersJson(raw);
+    if (!result.ok) {
+      throw new Error(i18n.global.t(result.errorKey));
+    }
+    await saveLlmCustomHeaders(result.headers);
+  }
+
   // Back-compat stubs (settings UI may still call these names)
   async function saveOpenaiApiKey(key: string) {
     await saveLlmApiKeyValue(key);
@@ -865,6 +971,9 @@ export const useSettingsStore = defineStore("settings", () => {
         (await store.get<string>("llmBaseUrl"))?.trim() || DEFAULT_LLM_BASE_URL;
       selectedLlmModelId.value = getEffectiveLlmModelId(
         (await store.get<string>("llmModelId")) ?? null,
+      );
+      llmCustomHeaders.value = normalizeStoredLlmCustomHeaders(
+        await store.get("llmCustomHeaders"),
       );
     } catch (err) {
       console.error(
@@ -1184,6 +1293,7 @@ export const useSettingsStore = defineStore("settings", () => {
         (await store.get<string>("llmApiKey")) ??
         (await store.get<string>("openaiApiKey")) ??
         (await store.get<string>("groqApiKey"));
+      const savedLlmCustomHeaders = await store.get("llmCustomHeaders");
       const savedPrompt = await store.get<string>("aiPrompt");
       const savedThresholdEnabled = await store.get<boolean>(
         "enhancementThresholdEnabled",
@@ -1255,6 +1365,9 @@ export const useSettingsStore = defineStore("settings", () => {
       doubaoAccessKey.value = savedDoubaoAccessKey?.trim() ?? "";
       llmBaseUrl.value = savedLlmBaseUrl?.trim() || DEFAULT_LLM_BASE_URL;
       llmApiKey.value = savedLlmApiKey?.trim() ?? "";
+      llmCustomHeaders.value = normalizeStoredLlmCustomHeaders(
+        savedLlmCustomHeaders,
+      );
       aiPrompt.value =
         savedPrompt?.trim() ||
         getMinimalPromptForLocale(getEffectivePromptLocale());
@@ -1350,6 +1463,7 @@ export const useSettingsStore = defineStore("settings", () => {
     hasLlmApiKey,
     llmBaseUrl: computed(() => llmBaseUrl.value),
     llmApiKey: computed(() => llmApiKey.value),
+    llmCustomHeaders: computed(() => llmCustomHeaders.value),
     // legacy aliases
     openaiApiKey: computed(() => llmApiKey.value),
     anthropicApiKey: computed(() => llmApiKey.value),
@@ -1359,6 +1473,8 @@ export const useSettingsStore = defineStore("settings", () => {
     getDoubaoAccessKey,
     getLlmApiKey,
     getLlmBaseUrl,
+    getLlmCustomHeaders,
+    parseLlmCustomHeadersJson,
     getAiPrompt,
     savePromptMode,
     consumeUpgradeNotice,
@@ -1392,6 +1508,8 @@ export const useSettingsStore = defineStore("settings", () => {
     saveLlmBaseUrl,
     saveLlmApiKeyValue,
     deleteLlmApiKeyValue,
+    saveLlmCustomHeaders,
+    saveLlmCustomHeadersFromJson,
     saveOpenaiApiKey,
     deleteOpenaiApiKey,
     saveAnthropicApiKey,

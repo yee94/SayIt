@@ -42,18 +42,55 @@ export interface LlmChatResult {
 
 // ── OpenAI-compatible fetch ───────────────────────────────
 
-function normalizeChatCompletionsUrl(baseUrl: string): string {
-  const trimmed = baseUrl.trim().replace(/\/+$/, "");
+/**
+ * 归一化为 chat/completions 端点。
+ * - 已是完整 endpoint → 原样
+ * - 以 /v1 结尾 → 拼 /chat/completions
+ * - 误带 /chat/...（含拼写错误、重复拼接）→ 剥掉后重拼正确路径
+ *
+ * 例：
+ *   .../v1 → .../v1/chat/completions
+ *   .../v1/chat/completions → 不变
+ *   .../v1/chat/complgetions → .../v1/chat/completions
+ *   .../v1/chat/completions/chat/completions → .../v1/chat/completions
+ */
+export function normalizeChatCompletionsUrl(baseUrl: string): string {
+  let trimmed = baseUrl.trim().replace(/\/+$/, "");
   if (!trimmed) return DEFAULT_LLM_BASE_URL;
-  if (trimmed.endsWith("/chat/completions")) return trimmed;
-  if (trimmed.endsWith("/v1")) return `${trimmed}/chat/completions`;
+
+  // 剥掉末尾一层或多层 /chat/...，避免 typo / 重复拼接
+  // 例如 /chat/complgetions、/chat/completions、/chat/completions/chat/completions
+  trimmed = trimmed.replace(/(?:\/chat(?:\/[^/]*)?)+$/i, "");
+
+  if (/\/chat\/completions$/i.test(trimmed)) {
+    return trimmed;
+  }
   return `${trimmed}/chat/completions`;
+}
+
+/**
+ * Merge custom headers then apply app-owned auth/content-type (app wins).
+ * Never log header values.
+ */
+export function mergeLlmHeaders(
+  customHeaders?: Record<string, string> | null,
+  apiKey?: string,
+): Record<string, string> {
+  const headers: Record<string, string> = {
+    ...(customHeaders ?? {}),
+  };
+  headers["Content-Type"] = "application/json";
+  if (apiKey !== undefined) {
+    headers.Authorization = `Bearer ${apiKey}`;
+  }
+  return headers;
 }
 
 export function buildFetchParams(
   request: LlmChatRequest,
   apiKey: string,
   baseUrl: string,
+  customHeaders?: Record<string, string> | null,
 ): { url: string; init: RequestInit } {
   const url = normalizeChatCompletionsUrl(baseUrl);
   const body: Record<string, unknown> = {
@@ -71,10 +108,7 @@ export function buildFetchParams(
     url,
     init: {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
+      headers: mergeLlmHeaders(customHeaders, apiKey),
       body: JSON.stringify(body),
     },
   };

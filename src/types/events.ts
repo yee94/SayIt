@@ -25,6 +25,7 @@ export type SettingsKey =
   | "enhancementThreshold"
   | "llmModel"
   | "llmProvider"
+  | "llmCustomHeaders"
   | "whisperModel"
   | "muteOnRecording"
   | "smartDictionaryEnabled"
@@ -81,6 +82,10 @@ export interface VocabularyLearnedPayload {
 /** ASR 串流中间结果（HUD 即时字幕） */
 export interface TranscriptionPartialPayload {
   text: string;
+  /** 句级已确定前缀（可选；缺省时前端把 text 当待定） */
+  stableText?: string;
+  /** 仍在修正的尾段（可选） */
+  unstableText?: string;
 }
 
 export interface RecordingCapturedPayload {

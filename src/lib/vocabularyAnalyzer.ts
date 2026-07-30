@@ -105,7 +105,11 @@ export async function analyzeCorrections(
   pastedText: string,
   fieldText: string,
   apiKey: string,
-  options?: { modelId?: string; baseUrl?: string },
+  options?: {
+    modelId?: string;
+    baseUrl?: string;
+    headers?: Record<string, string>;
+  },
 ): Promise<VocabularyAnalysisResult> {
   const modelId = options?.modelId ?? DEFAULT_LLM_MODEL_ID;
   const baseUrl = options?.baseUrl ?? DEFAULT_LLM_BASE_URL;
@@ -123,7 +127,12 @@ export async function analyzeCorrections(
     maxTokens: 256,
   };
 
-  const { url, init } = buildFetchParams(request, apiKey, baseUrl);
+  const { url, init } = buildFetchParams(
+    request,
+    apiKey,
+    baseUrl,
+    options?.headers,
+  );
 
   const timeoutMs = DEFAULT_LLM_TIMEOUT_MS;
   const controller = new AbortController();

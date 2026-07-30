@@ -127,6 +127,20 @@ pub struct TranscriptionResult {
 #[serde(rename_all = "camelCase")]
 pub struct TranscriptionPartialPayload {
     pub text: String,
+    /// 句级已确定前缀（来自 utterances[].definite=true）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stable_text: Option<String>,
+    /// 仍在修正的尾段（definite=false，或无 utterances 时整段 text）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unstable_text: Option<String>,
+}
+
+/// 单次 partial 更新（累计全文 + 稳定/待定分段）
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct PartialTranscriptUpdate {
+    text: String,
+    stable_text: String,
+    unstable_text: String,
 }
 
 const TRANSCRIPTION_PARTIAL_EVENT: &str = "transcription:partial";
@@ -304,15 +318,20 @@ fn find_json_object(bytes: &[u8]) -> Option<serde_json::Value> {
     serde_json::from_str(text).ok()
 }
 
+/// 解析 utterances 列表（result.utterances 或顶层 utterances）。
+fn utterances_array(parsed: &serde_json::Value) -> Option<&Vec<serde_json::Value>> {
+    parsed
+        .pointer("/result/utterances")
+        .and_then(|v| v.as_array())
+        .or_else(|| parsed.get("utterances").and_then(|v| v.as_array()))
+}
+
 /// 从服务端 JSON 提取当前累计文本 + 是否「会话级」结束。
 ///
 /// 重要：单条 utterance 的 `definite=true` 只表示该句落定，**不是整段录音结束**。
 /// 过早把 utterance-definite 当 session final，会只拿到开头一小段文字。
 fn extract_text_and_final(parsed: &serde_json::Value) -> (String, bool) {
-    let utterances = parsed
-        .pointer("/result/utterances")
-        .and_then(|v| v.as_array())
-        .or_else(|| parsed.get("utterances").and_then(|v| v.as_array()));
+    let utterances = utterances_array(parsed);
 
     let mut text = String::new();
     if let Some(t) = parsed.pointer("/result/text").and_then(|v| v.as_str()) {
@@ -346,6 +365,57 @@ fn extract_text_and_final(parsed: &serde_json::Value) -> (String, bool) {
     (text, session_final)
 }
 
+/// 从 utterances[].definite 派生稳定前缀与待定尾段；无 utterances 时全文作待定。
+///
+/// 规则：仅连续 `definite=true` 前缀归入 stable；自第一个 non-definite 起，
+/// 之后所有文本（含后续 definite）按原始顺序归入 unstable。避免交错 definite 重排。
+///
+/// 返回 `(text, stable_text, unstable_text, session_final)`。
+/// `session_final` 仍只看会话级字段，与 utterance definite 无关。
+fn extract_text_segments_and_final(
+    parsed: &serde_json::Value,
+) -> (String, String, String, bool) {
+    let (text, session_final) = extract_text_and_final(parsed);
+
+    if let Some(list) = utterances_array(parsed) {
+        let mut stable_text = String::new();
+        let mut unstable_text = String::new();
+        let mut in_stable_prefix = true;
+        let mut saw_any = false;
+        for utterance in list {
+            let Some(piece) = utterance.get("text").and_then(|t| t.as_str()) else {
+                continue;
+            };
+            if piece.is_empty() {
+                continue;
+            }
+            saw_any = true;
+            let definite = utterance
+                .get("definite")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            if in_stable_prefix && definite {
+                stable_text.push_str(piece);
+            } else {
+                // 第一个 non-definite 之后全部进 unstable（含后续 definite）
+                in_stable_prefix = false;
+                unstable_text.push_str(piece);
+            }
+        }
+        if saw_any {
+            let full = if text.trim().is_empty() {
+                format!("{stable_text}{unstable_text}")
+            } else {
+                text
+            };
+            return (full, stable_text, unstable_text, session_final);
+        }
+    }
+
+    // 缺少 utterances：保守把完整 partial 当作待定字幕
+    (text.clone(), String::new(), text, session_final)
+}
+
 /// 用最新服务端文本更新累计结果：优先更长（避免 partial 回退覆盖完整句）
 fn merge_transcript(current: &mut String, incoming: &str) {
     let next = incoming.trim();
@@ -360,6 +430,25 @@ fn merge_transcript(current: &mut String, incoming: &str) {
         // 非前缀关系时仍取最新（服务端可能重整标点/分句）
         *current = next.to_string();
     }
+}
+
+/// 保证 `stable + unstable` 精确重构 `full`；不匹配时退化为全文待定。
+///
+/// merge 后 `accumulated_text` 可能比当前 frame 分段更长，直接 emit 会导致
+/// HUD 只显示短分段。此时 stable 清空、unstable=全文。
+fn reconcile_segments_with_full(
+    full: &str,
+    stable_text: &str,
+    unstable_text: &str,
+) -> (String, String) {
+    let full = full.trim();
+    let stable = stable_text.trim();
+    let unstable = unstable_text.trim();
+    if format!("{stable}{unstable}") == full {
+        return (stable.to_string(), unstable.to_string());
+    }
+    // 分段无法重构全文（含 partial 回退保留更长累计）：全文作待定
+    (String::new(), full.to_string())
 }
 
 // ========== Audio helpers ==========
@@ -521,12 +610,13 @@ fn build_hotwords_context_string(vocabulary_term_list: Option<&[String]>) -> Opt
 /// - `Ok((None, true))` 会话 last packet / final（可结束读循环）
 /// - `Ok((Some(err), _))` 服务端业务错误（已 close）
 ///
-/// `on_partial` 在累计文本有更新时回调（供 HUD 实时字幕）。
+/// `on_partial` 在累计文本或稳定/待定分段变更时回调（供 HUD 实时字幕）。
 async fn handle_binary_frame(
     data: &[u8],
     accumulated_text: &mut String,
+    last_partial: &mut Option<PartialTranscriptUpdate>,
     write: &mut (impl SinkExt<Message> + Unpin),
-    mut on_partial: impl FnMut(&str),
+    mut on_partial: impl FnMut(&PartialTranscriptUpdate),
 ) -> Result<(Option<TranscriptionError>, bool), TranscriptionError> {
     if data.len() < 2 {
         return Ok((None, false));
@@ -543,12 +633,30 @@ async fn handle_binary_frame(
     let is_last_packet = (flags & SERVER_FLAG_LAST_PACKET) != 0;
 
     if let Some((parsed, flag_last)) = parse_server_message_with_meta(data) {
-        let (text, session_final) = extract_text_and_final(&parsed);
+        let (text, frame_stable, frame_unstable, session_final) =
+            extract_text_segments_and_final(&parsed);
         if !text.trim().is_empty() {
-            let previous = accumulated_text.clone();
             merge_transcript(accumulated_text, &text);
-            if !accumulated_text.is_empty() && *accumulated_text != previous {
-                on_partial(accumulated_text);
+            if !accumulated_text.is_empty() {
+                let (stable_text, unstable_text) = reconcile_segments_with_full(
+                    accumulated_text,
+                    &frame_stable,
+                    &frame_unstable,
+                );
+                let update = PartialTranscriptUpdate {
+                    text: accumulated_text.clone(),
+                    stable_text,
+                    unstable_text,
+                };
+                // 全文或稳定性分段任一变化都要推送（definite 翻转时全文可能不变）
+                let should_emit = match last_partial.as_ref() {
+                    Some(prev) => prev != &update,
+                    None => true,
+                };
+                if should_emit {
+                    *last_partial = Some(update.clone());
+                    on_partial(&update);
+                }
             }
         }
         let done = is_last_packet || flag_last || session_final;
@@ -558,18 +666,33 @@ async fn handle_binary_frame(
     Ok((None, is_last_packet))
 }
 
-fn emit_transcription_partial<R: Runtime>(app: Option<&AppHandle<R>>, text: &str) {
+fn emit_transcription_partial<R: Runtime>(
+    app: Option<&AppHandle<R>>,
+    update: &PartialTranscriptUpdate,
+) {
     let Some(app) = app else {
         return;
     };
-    let trimmed = text.trim();
+    let trimmed = update.text.trim();
     if trimmed.is_empty() {
         return;
     }
+    let stable = update.stable_text.trim();
+    let unstable = update.unstable_text.trim();
     let _ = app.emit(
         TRANSCRIPTION_PARTIAL_EVENT,
         TranscriptionPartialPayload {
             text: trimmed.to_string(),
+            stable_text: if stable.is_empty() {
+                None
+            } else {
+                Some(stable.to_string())
+            },
+            unstable_text: if unstable.is_empty() {
+                None
+            } else {
+                Some(unstable.to_string())
+            },
         },
     );
 }
@@ -660,6 +783,7 @@ async fn send_doubao_transcription_request<R: Runtime>(
         .map_err(|e| TranscriptionError::RequestFailed(format!("Failed to send init: {e}")))?;
 
     let mut accumulated_text = String::new();
+    let mut last_partial: Option<PartialTranscriptUpdate> = None;
     let mut last_packet_sent = false;
     let mut offset = 0usize;
 
@@ -680,11 +804,14 @@ async fn send_doubao_transcription_request<R: Runtime>(
         loop {
             match tokio::time::timeout(std::time::Duration::from_millis(1), read.next()).await {
                 Ok(Some(Ok(Message::Binary(data)))) => {
-                    let (err, _done) =
-                        handle_binary_frame(&data, &mut accumulated_text, &mut write, |text| {
-                            emit_transcription_partial(app, text)
-                        })
-                        .await?;
+                    let (err, _done) = handle_binary_frame(
+                        &data,
+                        &mut accumulated_text,
+                        &mut last_partial,
+                        &mut write,
+                        |update| emit_transcription_partial(app, update),
+                    )
+                    .await?;
                     if let Some(err) = err {
                         return Err(err);
                     }
@@ -754,11 +881,14 @@ async fn send_doubao_transcription_request<R: Runtime>(
         let next = tokio::time::timeout(remaining, read.next()).await;
         match next {
             Ok(Some(Ok(Message::Binary(data)))) => {
-                let (err, done) =
-                    handle_binary_frame(&data, &mut accumulated_text, &mut write, |text| {
-                        emit_transcription_partial(app, text)
-                    })
-                    .await?;
+                let (err, done) = handle_binary_frame(
+                    &data,
+                    &mut accumulated_text,
+                    &mut last_partial,
+                    &mut write,
+                    |update| emit_transcription_partial(app, update),
+                )
+                .await?;
                 if let Some(err) = err {
                     return Err(err);
                 }
@@ -1128,6 +1258,7 @@ async fn run_live_asr_session(
         .map_err(|e| TranscriptionError::RequestFailed(format!("Failed to send init: {e}")))?;
 
     let mut accumulated_text = String::new();
+    let mut last_partial: Option<PartialTranscriptUpdate> = None;
     let mut pcm_byte_buf: Vec<u8> = Vec::with_capacity(PCM_CHUNK_BYTES * 4);
     // 目标：每 200ms 发送一包 16k mono
     let target_chunk_samples = (TARGET_SAMPLE_RATE as usize * PCM_CHUNK_MS as usize) / 1000;
@@ -1154,11 +1285,14 @@ async fn run_live_asr_session(
         loop {
             match tokio::time::timeout(std::time::Duration::from_millis(1), read.next()).await {
                 Ok(Some(Ok(Message::Binary(data)))) => {
-                    let (err, _done) =
-                        handle_binary_frame(&data, &mut accumulated_text, &mut write, |text| {
-                            emit_transcription_partial(Some(&app), text)
-                        })
-                        .await?;
+                    let (err, _done) = handle_binary_frame(
+                        &data,
+                        &mut accumulated_text,
+                        &mut last_partial,
+                        &mut write,
+                        |update| emit_transcription_partial(Some(&app), update),
+                    )
+                    .await?;
                     if let Some(err) = err {
                         return Err(err);
                     }
@@ -1296,11 +1430,14 @@ async fn run_live_asr_session(
         }
         match tokio::time::timeout(remaining, read.next()).await {
             Ok(Some(Ok(Message::Binary(data)))) => {
-                let (err, done) =
-                    handle_binary_frame(&data, &mut accumulated_text, &mut write, |text| {
-                        emit_transcription_partial(Some(&app), text)
-                    })
-                    .await?;
+                let (err, done) = handle_binary_frame(
+                    &data,
+                    &mut accumulated_text,
+                    &mut last_partial,
+                    &mut write,
+                    |update| emit_transcription_partial(Some(&app), update),
+                )
+                .await?;
                 if let Some(err) = err {
                     return Err(err);
                 }
@@ -1413,6 +1550,151 @@ mod tests {
         let (text, is_final) = extract_text_and_final(&parsed);
         assert_eq!(text, "完整句子");
         assert!(is_final);
+    }
+
+    #[test]
+    fn test_extract_segments_definite_and_pending() {
+        let parsed = serde_json::json!({
+            "result": {
+                "text": "你好世界",
+                "utterances": [
+                    { "text": "你好", "definite": true },
+                    { "text": "世界", "definite": false }
+                ]
+            }
+        });
+        let (text, stable, unstable, is_final) = extract_text_segments_and_final(&parsed);
+        assert_eq!(text, "你好世界");
+        assert_eq!(stable, "你好");
+        assert_eq!(unstable, "世界");
+        assert!(!is_final);
+    }
+
+    #[test]
+    fn test_extract_segments_stability_change_same_text() {
+        // 同一累计文字，definite 从 false → true：分段应变，session final 仍为 false
+        let pending = serde_json::json!({
+            "result": {
+                "text": "你好",
+                "utterances": [{ "text": "你好", "definite": false }]
+            }
+        });
+        let confirmed = serde_json::json!({
+            "result": {
+                "text": "你好",
+                "utterances": [{ "text": "你好", "definite": true }]
+            }
+        });
+        let (t1, s1, u1, f1) = extract_text_segments_and_final(&pending);
+        let (t2, s2, u2, f2) = extract_text_segments_and_final(&confirmed);
+        assert_eq!(t1, t2);
+        assert_eq!(s1, "");
+        assert_eq!(u1, "你好");
+        assert_eq!(s2, "你好");
+        assert_eq!(u2, "");
+        assert!(!f1);
+        assert!(!f2);
+        // 稳定性变更应产生不同的 PartialTranscriptUpdate，触发 emit
+        let prev = PartialTranscriptUpdate {
+            text: t1,
+            stable_text: s1,
+            unstable_text: u1,
+        };
+        let next = PartialTranscriptUpdate {
+            text: t2,
+            stable_text: s2,
+            unstable_text: u2,
+        };
+        assert_ne!(prev, next);
+    }
+
+    #[test]
+    fn test_extract_segments_fallback_without_utterances() {
+        let parsed = serde_json::json!({
+            "result": { "text": "仅有全文 partial" }
+        });
+        let (text, stable, unstable, is_final) = extract_text_segments_and_final(&parsed);
+        assert_eq!(text, "仅有全文 partial");
+        assert_eq!(stable, "");
+        assert_eq!(unstable, "仅有全文 partial");
+        assert!(!is_final);
+    }
+
+    #[test]
+    fn test_extract_segments_session_final_still_from_session_fields() {
+        let parsed = serde_json::json!({
+            "result": {
+                "text": "完整句子",
+                "is_final": true,
+                "utterances": [
+                    { "text": "完整", "definite": true },
+                    { "text": "句子", "definite": true }
+                ]
+            }
+        });
+        let (text, stable, unstable, is_final) = extract_text_segments_and_final(&parsed);
+        assert_eq!(text, "完整句子");
+        assert_eq!(stable, "完整句子");
+        assert_eq!(unstable, "");
+        assert!(is_final);
+    }
+
+    #[test]
+    fn test_extract_segments_interleaved_definite_stays_in_order() {
+        // definite 交错：仅连续 definite 前缀进 stable，其后（含 definite）全进 unstable
+        let parsed = serde_json::json!({
+            "result": {
+                "text": "甲乙丙丁",
+                "utterances": [
+                    { "text": "甲", "definite": true },
+                    { "text": "乙", "definite": false },
+                    { "text": "丙", "definite": true },
+                    { "text": "丁", "definite": false }
+                ]
+            }
+        });
+        let (text, stable, unstable, is_final) = extract_text_segments_and_final(&parsed);
+        assert_eq!(text, "甲乙丙丁");
+        assert_eq!(stable, "甲");
+        assert_eq!(unstable, "乙丙丁");
+        assert!(!is_final);
+        // 不得把所有 definite 拼到前面（会变成 甲丙 / 乙丁）
+        assert_ne!(stable, "甲丙");
+        assert_ne!(unstable, "乙丁");
+    }
+
+    #[test]
+    fn test_reconcile_segments_when_merge_keeps_longer() {
+        // partial 回退：merge 保留更长全文，frame 分段无法重构 → 全文待定
+        let mut accumulated = "你好世界完整句".to_string();
+        merge_transcript(&mut accumulated, "你好");
+        assert_eq!(accumulated, "你好世界完整句");
+        let (stable, unstable) =
+            reconcile_segments_with_full(&accumulated, "你", "好");
+        assert_eq!(stable, "");
+        assert_eq!(unstable, "你好世界完整句");
+    }
+
+    #[test]
+    fn test_reconcile_segments_when_exact_match() {
+        let (stable, unstable) = reconcile_segments_with_full("你好世界", "你好", "世界");
+        assert_eq!(stable, "你好");
+        assert_eq!(unstable, "世界");
+    }
+
+    #[test]
+    fn test_partial_payload_serde_camel_case() {
+        let payload = TranscriptionPartialPayload {
+            text: "你好世界".to_string(),
+            stable_text: Some("你好".to_string()),
+            unstable_text: Some("世界".to_string()),
+        };
+        let json = serde_json::to_string(&payload).unwrap();
+        assert!(json.contains("\"text\""));
+        assert!(json.contains("\"stableText\""));
+        assert!(json.contains("\"unstableText\""));
+        assert!(!json.contains("\"stable_text\""));
+        assert!(!json.contains("\"unstable_text\""));
     }
 
     #[test]

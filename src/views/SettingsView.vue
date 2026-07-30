@@ -72,6 +72,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
+  ChevronDown,
   Mic,
   RefreshCw,
   Trash2,
@@ -509,6 +510,48 @@ const llmBaseUrlInput = ref("");
 const llmApiKeyInput = ref("");
 const llmModelInput = ref("");
 const isLlmApiKeyVisible = ref(false);
+const llmCustomHeadersOpen = ref(false);
+const llmCustomHeadersInput = ref("");
+/**
+ * Textarea placeholder：勿放进 vue-i18n（`{...}` 会被当成插值编译失败）。
+ * 形态对齐 OpenAI SDK `extra_headers`（如 Adams 网关）。
+ */
+const LLM_CUSTOM_HEADERS_PLACEHOLDER = `{
+  "Adams-Platform-User": "your-user",
+  "Adams-User-Token": "your-token",
+  "Adams-Business": "1954"
+}`;
+
+function formatLlmCustomHeadersInput(headers: Record<string, string>): string {
+  if (Object.keys(headers).length === 0) return "";
+  return JSON.stringify(headers, null, 2);
+}
+
+/**
+ * 连接测试 / 保存共用：消费输入框草稿（与 Base URL / Model / API Key 一致）。
+ * 非法 JSON 直接抛本地化错误，不静默回落，避免误以为 Header 已生效。
+ * 对应 OpenAI Python SDK 的 extra_headers。
+ */
+function resolveLlmCustomHeadersForRequest(): Record<string, string> {
+  const result = settingsStore.parseLlmCustomHeadersJson(
+    llmCustomHeadersInput.value,
+  );
+  if (!result.ok) {
+    throw new Error(t(result.errorKey));
+  }
+  return result.headers;
+}
+
+/** 测试连接：Base URL + Model + API Key + 自定义 Header 均取当前表单草稿 */
+async function handleTestLlmConnection() {
+  const apiKey =
+    llmApiKeyInput.value.trim() || settingsStore.getLlmApiKey();
+  return testLlmConnection(apiKey, {
+    modelId: llmModelInput.value.trim() || settingsStore.selectedLlmModelId,
+    baseUrl: llmBaseUrlInput.value.trim() || settingsStore.getLlmBaseUrl(),
+    headers: resolveLlmCustomHeadersForRequest(),
+  });
+}
 
 async function handleSaveLlmConfig() {
   try {
@@ -518,12 +561,23 @@ async function handleSaveLlmConfig() {
     if (llmModelInput.value.trim()) {
       await settingsStore.saveLlmModel(llmModelInput.value.trim());
     }
+    // API Key 始终可编辑：有内容则覆盖保存；空字串不覆盖已有 Key
     if (llmApiKeyInput.value.trim()) {
-      await settingsStore.saveLlmApiKeyValue(llmApiKeyInput.value);
-      llmApiKeyInput.value = "";
+      await settingsStore.saveLlmApiKeyValue(llmApiKeyInput.value.trim());
     }
+    // 自定义 Header：校验失败时保留旧设置并显示错误（不覆盖已保存值）
+    await settingsStore.saveLlmCustomHeadersFromJson(llmCustomHeadersInput.value);
+    llmCustomHeadersInput.value = formatLlmCustomHeadersInput(
+      settingsStore.getLlmCustomHeaders(),
+    );
+    // 保存后回填当前 Key（保持可继续编辑），不再清空成只读遮罩
+    llmApiKeyInput.value = settingsStore.getLlmApiKey();
     providerFeedback.show("success", t("settings.apiKey.saved"));
   } catch (err) {
+    // 无效 Header 时回填已保存的有效值，避免 UI 继续展示非法内容
+    llmCustomHeadersInput.value = formatLlmCustomHeadersInput(
+      settingsStore.getLlmCustomHeaders(),
+    );
     providerFeedback.show("error", extractErrorMessage(err));
   }
 }
@@ -775,6 +829,15 @@ onMounted(async () => {
   }
   llmBaseUrlInput.value = settingsStore.getLlmBaseUrl() || DEFAULT_LLM_BASE_URL;
   llmModelInput.value = settingsStore.selectedLlmModelId;
+  // 与豆包凭据一致：已保存的 Key 载入可编辑输入框（不再 readonly）
+  llmApiKeyInput.value = settingsStore.getLlmApiKey();
+  llmCustomHeadersInput.value = formatLlmCustomHeadersInput(
+    settingsStore.getLlmCustomHeaders(),
+  );
+  // 已有自定义 Header 时默认展开，方便确认测试连接会带上
+  if (Object.keys(settingsStore.getLlmCustomHeaders()).length > 0) {
+    llmCustomHeadersOpen.value = true;
+  }
   thresholdEnabled.value = settingsStore.isEnhancementThresholdEnabled;
   thresholdCharCount.value = settingsStore.enhancementThresholdCharCount;
   recordingAutoCleanupEnabled.value =
@@ -1100,30 +1163,13 @@ onBeforeUnmount(() => {
 
         <div class="space-y-2">
           <Label for="llm-api-key">{{ $t("settings.provider.apiKey") }}</Label>
-          <div v-if="settingsStore.hasLlmApiKey" class="flex gap-2">
-            <Input
-              id="llm-api-key"
-              :model-value="isLlmApiKeyVisible ? settingsStore.llmApiKey : '••••••••••'"
-              readonly
-              class="flex-1 font-mono text-xs"
-            />
-            <Button
-              variant="outline"
-              class="w-[80px] shrink-0"
-              @click="isLlmApiKeyVisible = !isLlmApiKeyVisible"
-            >
-              {{ isLlmApiKeyVisible ? $t('settings.apiKey.hide') : $t('settings.apiKey.show') }}
-            </Button>
-            <Button class="w-[80px] shrink-0" @click="handleSaveLlmConfig">
-              {{ $t('common.save') }}
-            </Button>
-          </div>
-          <div v-else class="flex gap-2">
+          <div class="flex gap-2">
             <Input
               id="llm-api-key"
               v-model="llmApiKeyInput"
               :type="isLlmApiKeyVisible ? 'text' : 'password'"
-              placeholder="sk-..."
+              placeholder="sk-... / test"
+              autocomplete="off"
               class="flex-1 font-mono text-xs"
             />
             <Button
@@ -1139,6 +1185,46 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
+        <!-- 简单折叠：避免 reka-ui Collapsible Presence 高度测量导致展开后内容不可见 -->
+        <div class="space-y-2">
+          <button
+            type="button"
+            class="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 text-left text-sm font-medium transition-colors hover:bg-accent/40"
+            :aria-expanded="llmCustomHeadersOpen"
+            aria-controls="llm-custom-headers-panel"
+            @click="llmCustomHeadersOpen = !llmCustomHeadersOpen"
+          >
+            <span>{{ $t("settings.customHeaders.title") }}</span>
+            <ChevronDown
+              class="size-4 shrink-0 text-muted-foreground transition-transform"
+              :class="llmCustomHeadersOpen ? 'rotate-180' : ''"
+            />
+          </button>
+          <div
+            v-show="llmCustomHeadersOpen"
+            id="llm-custom-headers-panel"
+            class="space-y-2"
+          >
+            <p class="text-xs text-muted-foreground leading-relaxed">
+              {{ $t("settings.customHeaders.description") }}
+            </p>
+            <Label for="llm-custom-headers" class="sr-only">
+              {{ $t("settings.customHeaders.title") }}
+            </Label>
+            <Textarea
+              id="llm-custom-headers"
+              v-model="llmCustomHeadersInput"
+              :placeholder="LLM_CUSTOM_HEADERS_PLACEHOLDER"
+              autocomplete="off"
+              class="min-h-24 font-mono text-xs"
+              spellcheck="false"
+            />
+            <p class="text-xs text-muted-foreground">
+              {{ $t("settings.customHeaders.hint") }}
+            </p>
+          </div>
+        </div>
+
         <div class="flex flex-wrap items-start gap-2">
           <Button
             v-if="settingsStore.hasLlmApiKey"
@@ -1149,8 +1235,8 @@ onBeforeUnmount(() => {
             {{ $t('settings.apiKey.delete') }}
           </Button>
           <ConnectionTestButton
-            :on-test="() => testLlmConnection(settingsStore.getLlmApiKey() || llmApiKeyInput, { modelId: llmModelInput || settingsStore.selectedLlmModelId, baseUrl: llmBaseUrlInput || settingsStore.getLlmBaseUrl() })"
-            :disabled="!(settingsStore.hasLlmApiKey || llmApiKeyInput.trim())"
+            :on-test="handleTestLlmConnection"
+            :disabled="!(llmApiKeyInput.trim() || settingsStore.hasLlmApiKey)"
           />
         </div>
 

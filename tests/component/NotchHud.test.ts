@@ -19,6 +19,8 @@ const i18n = createI18n({
     "zh-CN": {
       voiceFlow: {
         connecting: "连接麦克风...",
+        enhancing: "整理中...",
+        editing: "编辑中...",
         vocabularyLearned: "已学习：{terms}",
         vocabularyLearnedTruncated: "已学习：{terms} 等{count}个",
       },
@@ -235,7 +237,7 @@ describe("NotchHud", () => {
     const wrapper = mountNotchHud({
       status: "error",
       recordingElapsedSeconds: 0,
-      message: "",
+      message: "API Key 未设置",
     });
 
     expect(wrapper.find(".notch-wrapper").exists()).toBe(true);
@@ -246,6 +248,8 @@ describe("NotchHud", () => {
     // collapsing 状态中仍可见
     expect(wrapper.find(".notch-wrapper").exists()).toBe(true);
     expect(wrapper.find(".notch-hud").classes()).toContain("notch-collapsing");
+    expect(wrapper.findAll(".waveform-scatter")).toHaveLength(6);
+    expect(wrapper.find(".error-message").text()).toBe("API Key 未设置");
 
     // 动画结束后隐藏
     vi.advanceTimersByTime(400);
@@ -372,7 +376,7 @@ describe("NotchHud", () => {
     );
   });
 
-  it("[P0] 有 liveTranscript 后才从 42 撑到 72", async () => {
+  it("[P0] 有 liveTranscript 后才从 42 撑到紧凑字幕高度", async () => {
     const wrapper = mountNotchHud({
       status: "transcribing",
       recordingElapsedSeconds: 0,
@@ -394,5 +398,109 @@ describe("NotchHud", () => {
     expect(wrapper.find(".notch-hud").attributes("style") ?? "").toMatch(
       /height:\s*72px/,
     );
+  });
+
+  it("[P0] 实时字幕显示期间应持续保留文字高光节点", () => {
+    const wrapper = mountNotchHud({
+      status: "transcribing",
+      recordingElapsedSeconds: 0,
+      message: "",
+      liveTranscript: "第一句字幕",
+    });
+
+    expect(wrapper.find(".live-transcript-bdi").exists()).toBe(true);
+  });
+
+  it("[P0] 实时字幕内容变化时应保持同一个文字高光动画节点", async () => {
+    const wrapper = mountNotchHud({
+      status: "transcribing",
+      recordingElapsedSeconds: 0,
+      message: "",
+      liveTranscript: "第一句字幕",
+    });
+
+    const initialHighlightElement = wrapper.find(
+      ".live-transcript-bdi",
+    ).element;
+
+    await wrapper.setProps({ liveTranscript: "第一句字幕继续" });
+
+    const updatedHighlight = wrapper.find(".live-transcript-bdi");
+    expect(updatedHighlight.exists()).toBe(true);
+    expect(updatedHighlight.element).toBe(initialHighlightElement);
+  });
+
+  it("[P0] 应分别呈现稳定字幕与带下划线的待定字幕", () => {
+    const wrapper = mountNotchHud({
+      status: "transcribing",
+      recordingElapsedSeconds: 0,
+      message: "",
+      liveTranscript: "你好世界",
+      liveStableTranscript: "你好",
+      liveUnstableTranscript: "世界",
+    });
+
+    expect(wrapper.find(".live-transcript-stable").text()).toBe("你好");
+    expect(wrapper.find(".live-transcript-unstable").text()).toBe("世界");
+  });
+
+  it("[P0] 缺少稳定分段时应将旧 liveTranscript 作为待定字幕", () => {
+    const wrapper = mountNotchHud({
+      status: "recording",
+      recordingElapsedSeconds: 1,
+      message: "",
+      liveTranscript: "旧版即时字幕",
+    });
+
+    expect(wrapper.find(".live-transcript-stable").exists()).toBe(false);
+    expect(wrapper.find(".live-transcript-unstable").text()).toBe(
+      "旧版即时字幕",
+    );
+  });
+
+  it.each([
+    ["enhancing", "整理中..."],
+    ["editing", "编辑中..."],
+  ])("[P0] %s 状态应显示固定状态文案", (status, expectedText) => {
+    const wrapper = mountNotchHud({
+      status,
+      recordingElapsedSeconds: 0,
+      message: "",
+      liveTranscript: "实时字幕",
+      liveStableTranscript: "稳定字幕",
+      liveUnstableTranscript: "待定字幕",
+    });
+
+    expect(wrapper.find(".live-transcript-bdi").text()).toBe(expectedText);
+    expect(wrapper.find(".live-transcript-stable").exists()).toBe(false);
+    expect(wrapper.find(".live-transcript-unstable").exists()).toBe(false);
+    expect(wrapper.find(".live-transcript-bdi").exists()).toBe(true);
+  });
+
+  it("[P0] cancelled → idle 应播放反向收缩并发送完成信号", async () => {
+    vi.useFakeTimers();
+    const dispatchEventSpy = vi.spyOn(window, "dispatchEvent");
+    const wrapper = mountNotchHud({
+      status: "cancelled",
+      recordingElapsedSeconds: 0,
+      message: "",
+    });
+
+    await wrapper.setProps({ status: "idle" });
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find(".notch-wrapper").classes()).toContain(
+      "notch-wrapper-collapsing",
+    );
+    expect(wrapper.find(".notch-hud").classes()).toContain("notch-collapsing");
+    expect(wrapper.find(".cancelled-label").exists()).toBe(true);
+
+    vi.advanceTimersByTime(400);
+    await wrapper.vm.$nextTick();
+
+    expect(dispatchEventSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "sayit:hud-collapse-complete" }),
+    );
+    expect(wrapper.find(".notch-wrapper").exists()).toBe(false);
   });
 });
