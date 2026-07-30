@@ -6,6 +6,7 @@ import {
   DEFAULT_LLM_TIMEOUT_MS,
   DEFAULT_LLM_BASE_URL,
   type LlmChatRequest,
+  type LlmExtraBody,
   type LlmUsageData,
 } from "./llmProvider";
 
@@ -109,6 +110,7 @@ export async function analyzeCorrections(
     modelId?: string;
     baseUrl?: string;
     headers?: Record<string, string>;
+    extraBody?: LlmExtraBody;
   },
 ): Promise<VocabularyAnalysisResult> {
   const modelId = options?.modelId ?? DEFAULT_LLM_MODEL_ID;
@@ -132,6 +134,7 @@ export async function analyzeCorrections(
     apiKey,
     baseUrl,
     options?.headers,
+    options?.extraBody,
   );
 
   const timeoutMs = DEFAULT_LLM_TIMEOUT_MS;

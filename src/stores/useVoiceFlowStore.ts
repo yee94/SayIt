@@ -910,6 +910,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
           modelId: settingsStore.selectedLlmModelId,
           baseUrl: settingsStore.getLlmBaseUrl(),
           headers: settingsStore.getLlmCustomHeaders(),
+          extraBody: settingsStore.getLlmExtraBody?.(),
         },
       );
       await yieldToMain();
@@ -1939,6 +1940,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
             modelId: settingsStore.selectedLlmModelId,
             baseUrl: settingsStore.getLlmBaseUrl(),
             headers: settingsStore.getLlmCustomHeaders(),
+            extraBody: settingsStore.getLlmExtraBody?.(),
             signal: abortController?.signal,
             screenContext: screenCtx
               ? {
@@ -2158,6 +2160,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         modelId: settingsStore.selectedLlmModelId,
         baseUrl: settingsStore.getLlmBaseUrl(),
         headers: settingsStore.getLlmCustomHeaders(),
+        extraBody: settingsStore.getLlmExtraBody?.(),
         signal: abortController?.signal,
         maxTokens: EDIT_MODE_MAX_TOKENS,
         screenContext: editScreenCtx
@@ -2323,6 +2326,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
             modelId: settingsStore.selectedLlmModelId,
             baseUrl: settingsStore.getLlmBaseUrl(),
             headers: settingsStore.getLlmCustomHeaders(),
+            extraBody: settingsStore.getLlmExtraBody?.(),
             signal: abortController?.signal,
             screenContext: resendScreenCtx
               ? {

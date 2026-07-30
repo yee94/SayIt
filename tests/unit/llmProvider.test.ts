@@ -77,6 +77,23 @@ describe("llmProvider.ts (OpenAI-compatible)", () => {
       expect(headers["Content-Type"]).toBe("application/json");
     });
 
+    it("[P0] 应合并额外请求体字段，并保持应用管理字段", () => {
+      const { init } = buildFetchParams(
+        BASE_REQUEST,
+        TEST_API_KEY,
+        DEFAULT_LLM_BASE_URL,
+        undefined,
+        {
+          model: "override-attempt",
+          chat_template_kwargs: { enable_thinking: false },
+        },
+      );
+      const body = JSON.parse(init.body as string);
+      expect(body.model).toBe("test-model");
+      expect(body.messages).toEqual(BASE_REQUEST.messages);
+      expect(body.chat_template_kwargs).toEqual({ enable_thinking: false });
+    });
+
     it("[P0] 应用 Authorization / Content-Type 应覆盖同名自定义 Header", () => {
       const { init } = buildFetchParams(
         BASE_REQUEST,
@@ -107,36 +124,34 @@ describe("llmProvider.ts (OpenAI-compatible)", () => {
       });
     });
 
-    it("[P0] Adams extra_headers + /v1 base 应等价 OpenAI SDK", () => {
+    it("[P0] extra_headers + /v1 base 应等价 OpenAI SDK", () => {
       // 对齐 OpenAI(base_url=.../v1).chat.completions.create(..., extra_headers=...)
       const { url, init } = buildFetchParams(
         { ...BASE_REQUEST, model: "qwen3d6_27b" },
         "test",
-        "http://mmdcadamsminiserverproxy.polaris:25340/service/26222/v1",
+        "https://proxy.example.com/v1",
         {
-          "Adams-Platform-User": "yyeewang",
-          "Adams-User-Token": "token-example",
-          "Adams-Business": "1954",
+          "X-Client-Id": "client-example",
+          "X-Request-Source": "desktop-app",
         },
       );
       expect(url).toBe(
-        "http://mmdcadamsminiserverproxy.polaris:25340/service/26222/v1/chat/completions",
+        "https://proxy.example.com/v1/chat/completions",
       );
       const headers = init.headers as Record<string, string>;
       expect(headers.Authorization).toBe("Bearer test");
       expect(headers["Content-Type"]).toBe("application/json");
-      expect(headers["Adams-Platform-User"]).toBe("yyeewang");
-      expect(headers["Adams-User-Token"]).toBe("token-example");
-      expect(headers["Adams-Business"]).toBe("1954");
+      expect(headers["X-Client-Id"]).toBe("client-example");
+      expect(headers["X-Request-Source"]).toBe("desktop-app");
     });
 
     it("[P0] 误拼 /chat/complgetions 或重复拼接应纠正", () => {
       expect(
         normalizeChatCompletionsUrl(
-          "https://mmdcadamsminiserverproxy.polaris:25340/service/26222/v1/chat/complgetions",
+          "https://proxy.example.com/v1/chat/complgetions",
         ),
       ).toBe(
-        "https://mmdcadamsminiserverproxy.polaris:25340/service/26222/v1/chat/completions",
+        "https://proxy.example.com/v1/chat/completions",
       );
       expect(
         normalizeChatCompletionsUrl(

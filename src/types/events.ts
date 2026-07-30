@@ -26,6 +26,7 @@ export type SettingsKey =
   | "llmModel"
   | "llmProvider"
   | "llmCustomHeaders"
+  | "llmExtraBody"
   | "whisperModel"
   | "muteOnRecording"
   | "smartDictionaryEnabled"

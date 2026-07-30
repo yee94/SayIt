@@ -76,6 +76,13 @@
       "emptyValue": "自定义 Header 的值不能为空",
       "valueMustBeString": "自定义 Header 的值必须是字符串"
     },
+    "extraBody": {
+      "title": "额外请求体参数",
+      "description": "以 JSON 对象填写 OpenAI 兼容接口的扩展字段。模型、消息、temperature 与 max_tokens 由应用生成并优先。",
+      "hint": "Qwen3.6 关闭思考：chat_template_kwargs.enable_thinking 设为 false。保存时校验；非法 JSON 保留已保存配置。",
+      "invalidJson": "额外请求体参数必须是合法 JSON 对象",
+      "mustBeObject": "额外请求体参数必须是 JSON 对象，不能是数组"
+    },
     "providerApiKey": {
       "openaiTitle": "OpenAI API Key",
       "anthropicTitle": "Anthropic API Key",
@@ -420,7 +427,7 @@
     },
     "upgradeNotice": {
       "title": "SayIt 更新摘要",
-      "item1": "HUD 收起更利落：文字贴上完成或取消操作后，刘海会立即从顶部缩回，不再显示成功对勾或「已取消」文字。",
+      "item1": "LLM 额外请求体参数：可在设置中填写 JSON 对象，向 OpenAI 兼容接口传递模型或网关专属字段，例如关闭 Qwen3.6 的思考模式。",
       "item2": "",
       "dismiss": "了解"
     }

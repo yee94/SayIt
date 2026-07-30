@@ -6,6 +6,7 @@ import {
   getTranscriptionErrorMessage,
 } from "./errorUtils";
 import { normalizeChatCompletionsUrl } from "./llmProvider";
+import type { LlmExtraBody } from "./llmProvider";
 
 export interface TestSuccess {
   ok: true;
@@ -66,6 +67,7 @@ export async function testLlmConnection(
     modelId: string;
     baseUrl: string;
     headers?: Record<string, string>;
+    extraBody?: LlmExtraBody;
   },
 ): Promise<TestResult> {
   const start = performance.now();
@@ -75,6 +77,7 @@ export async function testLlmConnection(
       modelId: options.modelId,
       baseUrl: options.baseUrl,
       headers: options.headers,
+      extraBody: options.extraBody,
       systemPrompt: "Reply with the word OK only.",
       maxTokens: 8,
     });

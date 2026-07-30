@@ -76,6 +76,13 @@
       "emptyValue": "Custom header values cannot be empty",
       "valueMustBeString": "Custom header values must be strings"
     },
+    "extraBody": {
+      "title": "Extra Request Body",
+      "description": "Additional OpenAI-compatible request fields as a JSON object. The app owns model, messages, temperature, and max_tokens.",
+      "hint": "Disable Qwen3.6 thinking by setting chat_template_kwargs.enable_thinking to false. Validated on save; invalid JSON preserves the saved configuration.",
+      "invalidJson": "Extra request body must be a valid JSON object",
+      "mustBeObject": "Extra request body must be a JSON object, not an array"
+    },
     "providerApiKey": {
       "openaiTitle": "OpenAI API Key",
       "anthropicTitle": "Anthropic API Key",
@@ -420,7 +427,7 @@
     },
     "upgradeNotice": {
       "title": "What's New in SayIt",
-      "item1": "A crisper HUD exit: after text is pasted or an action is cancelled, the notch retracts upward immediately without a success checkmark or cancelled label.",
+      "item1": "Extra LLM request-body fields: add a JSON object in Settings to send model- or gateway-specific options to OpenAI-compatible APIs, such as disabling Qwen3.6 thinking.",
       "item2": "",
       "dismiss": "Got it"
     }

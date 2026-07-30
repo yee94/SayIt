@@ -8,6 +8,7 @@ import {
   buildFetchParams,
   parseProviderResponse,
   type LlmChatRequest,
+  type LlmExtraBody,
 } from "./llmProvider";
 import { getMinimalPromptForLocale } from "../i18n/prompts";
 import type { SupportedLocale } from "../i18n/languageConfig";
@@ -44,6 +45,8 @@ export interface EnhanceOptions {
   baseUrl?: string;
   /** 自定义 HTTP Header（Authorization / Content-Type 由应用后合并覆盖） */
   headers?: Record<string, string>;
+  /** OpenAI 兼容接口的额外请求体字段 */
+  extraBody?: LlmExtraBody;
   signal?: AbortSignal;
   maxTokens?: number;
   /** 屏幕上下文（可选）：附带应用名 + 截图给 vision 模型 */
@@ -132,6 +135,7 @@ export async function enhanceText(
     apiKey,
     baseUrl,
     options?.headers,
+    options?.extraBody,
   );
 
   // 超时必须 abort 请求：仅 Promise.race 会留下挂起的 fetch，UI 可能一直停在「整理中」

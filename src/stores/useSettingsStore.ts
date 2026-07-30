@@ -58,7 +58,10 @@ import {
   type WhisperModelId,
   DOUBAO_ASR_MODEL_ID,
 } from "../lib/modelRegistry";
-import { DEFAULT_LLM_BASE_URL } from "../lib/llmProvider";
+import {
+  DEFAULT_LLM_BASE_URL,
+  type LlmExtraBody,
+} from "../lib/llmProvider";
 
 declare const __APP_VERSION__: string;
 
@@ -108,6 +111,7 @@ export const useSettingsStore = defineStore("settings", () => {
   const llmBaseUrl = ref<string>(DEFAULT_LLM_BASE_URL);
   const llmApiKey = ref<string>("");
   const llmCustomHeaders = ref<Record<string, string>>({});
+  const llmExtraBody = ref<LlmExtraBody>({});
   const selectedLlmModelId = ref<LlmModelId>(DEFAULT_LLM_MODEL_ID);
   const selectedLlmProviderId = ref<LlmProviderId>("custom");
   const selectedWhisperModelId = ref<WhisperModelId>(DEFAULT_WHISPER_MODEL_ID);
@@ -177,6 +181,10 @@ export const useSettingsStore = defineStore("settings", () => {
     return { ...llmCustomHeaders.value };
   }
 
+  function getLlmExtraBody(): LlmExtraBody {
+    return { ...llmExtraBody.value };
+  }
+
   /**
    * Parse & validate custom header JSON object.
    * Keys and values must be non-empty strings. Arrays / non-objects rejected.
@@ -238,6 +246,34 @@ export const useSettingsStore = defineStore("settings", () => {
     return {};
   }
 
+  /** Parse an OpenAI-compatible request body extension as a JSON object. */
+  function parseLlmExtraBodyJson(
+    raw: string,
+  ): { ok: true; body: LlmExtraBody } | { ok: false; errorKey: string } {
+    const trimmed = raw.trim();
+    if (trimmed === "") return { ok: true, body: {} };
+    try {
+      const parsed: unknown = JSON.parse(trimmed);
+      if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return { ok: false, errorKey: "settings.extraBody.mustBeObject" };
+      }
+      return { ok: true, body: parsed as LlmExtraBody };
+    } catch {
+      return { ok: false, errorKey: "settings.extraBody.invalidJson" };
+    }
+  }
+
+  function normalizeStoredLlmExtraBody(raw: unknown): LlmExtraBody {
+    if (raw !== null && typeof raw === "object" && !Array.isArray(raw)) {
+      return { ...(raw as LlmExtraBody) };
+    }
+    if (typeof raw === "string") {
+      const result = parseLlmExtraBodyJson(raw);
+      return result.ok ? result.body : {};
+    }
+    return {};
+  }
+
   async function syncHotkeyConfigToRust(key: TriggerKey, mode: TriggerMode) {
     try {
       await invoke("update_hotkey_config", {
@@ -279,6 +315,9 @@ export const useSettingsStore = defineStore("settings", () => {
       llmApiKey.value = savedLlmApiKey?.trim() ?? "";
       llmCustomHeaders.value = normalizeStoredLlmCustomHeaders(
         await store.get("llmCustomHeaders"),
+      );
+      llmExtraBody.value = normalizeStoredLlmExtraBody(
+        await store.get("llmExtraBody"),
       );
 
       // Load independently persisted custom/combo key
@@ -938,6 +977,37 @@ export const useSettingsStore = defineStore("settings", () => {
     await saveLlmCustomHeaders(result.headers);
   }
 
+  async function saveLlmExtraBody(body: LlmExtraBody) {
+    try {
+      const store = await load(STORE_NAME);
+      await store.set("llmExtraBody", body);
+      await store.save();
+      llmExtraBody.value = { ...body };
+      await emitEvent(SETTINGS_UPDATED, {
+        key: "llmExtraBody",
+        value: Object.keys(body).length,
+      });
+      console.log(
+        `[useSettingsStore] LLM extra body saved (count=${Object.keys(body).length})`,
+      );
+    } catch (err) {
+      console.error(
+        "[useSettingsStore] saveLlmExtraBody failed:",
+        extractErrorMessage(err),
+      );
+      captureError(err, { source: "settings", step: "save-llm-extra-body" });
+      throw err;
+    }
+  }
+
+  async function saveLlmExtraBodyFromJson(raw: string) {
+    const result = parseLlmExtraBodyJson(raw);
+    if (!result.ok) {
+      throw new Error(i18n.global.t(result.errorKey));
+    }
+    await saveLlmExtraBody(result.body);
+  }
+
   // Back-compat stubs (settings UI may still call these names)
   async function saveOpenaiApiKey(key: string) {
     await saveLlmApiKeyValue(key);
@@ -974,6 +1044,9 @@ export const useSettingsStore = defineStore("settings", () => {
       );
       llmCustomHeaders.value = normalizeStoredLlmCustomHeaders(
         await store.get("llmCustomHeaders"),
+      );
+      llmExtraBody.value = normalizeStoredLlmExtraBody(
+        await store.get("llmExtraBody"),
       );
     } catch (err) {
       console.error(
@@ -1294,6 +1367,7 @@ export const useSettingsStore = defineStore("settings", () => {
         (await store.get<string>("openaiApiKey")) ??
         (await store.get<string>("groqApiKey"));
       const savedLlmCustomHeaders = await store.get("llmCustomHeaders");
+      const savedLlmExtraBody = await store.get("llmExtraBody");
       const savedPrompt = await store.get<string>("aiPrompt");
       const savedThresholdEnabled = await store.get<boolean>(
         "enhancementThresholdEnabled",
@@ -1368,6 +1442,7 @@ export const useSettingsStore = defineStore("settings", () => {
       llmCustomHeaders.value = normalizeStoredLlmCustomHeaders(
         savedLlmCustomHeaders,
       );
+      llmExtraBody.value = normalizeStoredLlmExtraBody(savedLlmExtraBody);
       aiPrompt.value =
         savedPrompt?.trim() ||
         getMinimalPromptForLocale(getEffectivePromptLocale());
@@ -1464,6 +1539,7 @@ export const useSettingsStore = defineStore("settings", () => {
     llmBaseUrl: computed(() => llmBaseUrl.value),
     llmApiKey: computed(() => llmApiKey.value),
     llmCustomHeaders: computed(() => llmCustomHeaders.value),
+    llmExtraBody: computed(() => llmExtraBody.value),
     // legacy aliases
     openaiApiKey: computed(() => llmApiKey.value),
     anthropicApiKey: computed(() => llmApiKey.value),
@@ -1474,7 +1550,9 @@ export const useSettingsStore = defineStore("settings", () => {
     getLlmApiKey,
     getLlmBaseUrl,
     getLlmCustomHeaders,
+    getLlmExtraBody,
     parseLlmCustomHeadersJson,
+    parseLlmExtraBodyJson,
     getAiPrompt,
     savePromptMode,
     consumeUpgradeNotice,
@@ -1510,6 +1588,8 @@ export const useSettingsStore = defineStore("settings", () => {
     deleteLlmApiKeyValue,
     saveLlmCustomHeaders,
     saveLlmCustomHeadersFromJson,
+    saveLlmExtraBody,
+    saveLlmExtraBodyFromJson,
     saveOpenaiApiKey,
     deleteOpenaiApiKey,
     saveAnthropicApiKey,

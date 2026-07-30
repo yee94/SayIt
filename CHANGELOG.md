@@ -2,6 +2,12 @@
 
 SayIt 版本更新纪录。
 
+## [0.12.12] - 2026-07-30
+
+### Added
+
+- LLM 额外请求体参数：设置中可填写 JSON 对象并透传至 OpenAI 兼容接口，支持 `chat_template_kwargs.enable_thinking` 等网关或模型专属字段；模型、消息与生成参数继续由 SayIt 统一管理。
+
 ## [0.12.11] - 2026-07-30
 
 ### Improved

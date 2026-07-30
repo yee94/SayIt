@@ -26,6 +26,9 @@ export interface LlmChatRequest {
   maxTokens?: number;
 }
 
+/** OpenAI 兼容接口的额外请求体字段，例如 chat_template_kwargs。 */
+export type LlmExtraBody = Record<string, unknown>;
+
 export interface LlmUsageData {
   promptTokens: number;
   completionTokens: number;
@@ -91,9 +94,11 @@ export function buildFetchParams(
   apiKey: string,
   baseUrl: string,
   customHeaders?: Record<string, string> | null,
+  extraBody?: LlmExtraBody | null,
 ): { url: string; init: RequestInit } {
   const url = normalizeChatCompletionsUrl(baseUrl);
   const body: Record<string, unknown> = {
+    ...(extraBody ?? {}),
     model: request.model,
     messages: request.messages,
   };

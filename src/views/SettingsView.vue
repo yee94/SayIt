@@ -512,19 +512,30 @@ const llmModelInput = ref("");
 const isLlmApiKeyVisible = ref(false);
 const llmCustomHeadersOpen = ref(false);
 const llmCustomHeadersInput = ref("");
+const llmExtraBodyOpen = ref(false);
+const llmExtraBodyInput = ref("");
 /**
  * Textarea placeholder：勿放进 vue-i18n（`{...}` 会被当成插值编译失败）。
- * 形态对齐 OpenAI SDK `extra_headers`（如 Adams 网关）。
+ * 形态对齐 OpenAI SDK `extra_headers`。
  */
 const LLM_CUSTOM_HEADERS_PLACEHOLDER = `{
-  "Adams-Platform-User": "your-user",
-  "Adams-User-Token": "your-token",
-  "Adams-Business": "1954"
+  "X-Client-Id": "your-client-id",
+  "X-Request-Source": "desktop-app"
+}`;
+const LLM_EXTRA_BODY_PLACEHOLDER = `{
+  "chat_template_kwargs": {
+    "enable_thinking": false
+  }
 }`;
 
 function formatLlmCustomHeadersInput(headers: Record<string, string>): string {
   if (Object.keys(headers).length === 0) return "";
   return JSON.stringify(headers, null, 2);
+}
+
+function formatLlmExtraBodyInput(body: Record<string, unknown>): string {
+  if (Object.keys(body).length === 0) return "";
+  return JSON.stringify(body, null, 2);
 }
 
 /**
@@ -542,6 +553,14 @@ function resolveLlmCustomHeadersForRequest(): Record<string, string> {
   return result.headers;
 }
 
+function resolveLlmExtraBodyForRequest(): Record<string, unknown> {
+  const result = settingsStore.parseLlmExtraBodyJson(llmExtraBodyInput.value);
+  if (!result.ok) {
+    throw new Error(t(result.errorKey));
+  }
+  return result.body;
+}
+
 /** 测试连接：Base URL + Model + API Key + 自定义 Header 均取当前表单草稿 */
 async function handleTestLlmConnection() {
   const apiKey =
@@ -550,6 +569,7 @@ async function handleTestLlmConnection() {
     modelId: llmModelInput.value.trim() || settingsStore.selectedLlmModelId,
     baseUrl: llmBaseUrlInput.value.trim() || settingsStore.getLlmBaseUrl(),
     headers: resolveLlmCustomHeadersForRequest(),
+    extraBody: resolveLlmExtraBodyForRequest(),
   });
 }
 
@@ -570,6 +590,10 @@ async function handleSaveLlmConfig() {
     llmCustomHeadersInput.value = formatLlmCustomHeadersInput(
       settingsStore.getLlmCustomHeaders(),
     );
+    await settingsStore.saveLlmExtraBodyFromJson(llmExtraBodyInput.value);
+    llmExtraBodyInput.value = formatLlmExtraBodyInput(
+      settingsStore.getLlmExtraBody(),
+    );
     // 保存后回填当前 Key（保持可继续编辑），不再清空成只读遮罩
     llmApiKeyInput.value = settingsStore.getLlmApiKey();
     providerFeedback.show("success", t("settings.apiKey.saved"));
@@ -577,6 +601,9 @@ async function handleSaveLlmConfig() {
     // 无效 Header 时回填已保存的有效值，避免 UI 继续展示非法内容
     llmCustomHeadersInput.value = formatLlmCustomHeadersInput(
       settingsStore.getLlmCustomHeaders(),
+    );
+    llmExtraBodyInput.value = formatLlmExtraBodyInput(
+      settingsStore.getLlmExtraBody(),
     );
     providerFeedback.show("error", extractErrorMessage(err));
   }
@@ -834,9 +861,15 @@ onMounted(async () => {
   llmCustomHeadersInput.value = formatLlmCustomHeadersInput(
     settingsStore.getLlmCustomHeaders(),
   );
+  llmExtraBodyInput.value = formatLlmExtraBodyInput(
+    settingsStore.getLlmExtraBody(),
+  );
   // 已有自定义 Header 时默认展开，方便确认测试连接会带上
   if (Object.keys(settingsStore.getLlmCustomHeaders()).length > 0) {
     llmCustomHeadersOpen.value = true;
+  }
+  if (Object.keys(settingsStore.getLlmExtraBody()).length > 0) {
+    llmExtraBodyOpen.value = true;
   }
   thresholdEnabled.value = settingsStore.isEnhancementThresholdEnabled;
   thresholdCharCount.value = settingsStore.enhancementThresholdCharCount;
@@ -1182,6 +1215,45 @@ onBeforeUnmount(() => {
             <Button class="w-[80px] shrink-0" @click="handleSaveLlmConfig">
               {{ $t('common.save') }}
             </Button>
+          </div>
+        </div>
+
+        <div class="space-y-2">
+          <button
+            type="button"
+            class="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 text-left text-sm font-medium transition-colors hover:bg-accent/40"
+            :aria-expanded="llmExtraBodyOpen"
+            aria-controls="llm-extra-body-panel"
+            @click="llmExtraBodyOpen = !llmExtraBodyOpen"
+          >
+            <span>{{ $t("settings.extraBody.title") }}</span>
+            <ChevronDown
+              class="size-4 shrink-0 text-muted-foreground transition-transform"
+              :class="llmExtraBodyOpen ? 'rotate-180' : ''"
+            />
+          </button>
+          <div
+            v-show="llmExtraBodyOpen"
+            id="llm-extra-body-panel"
+            class="space-y-2"
+          >
+            <p class="text-xs text-muted-foreground leading-relaxed">
+              {{ $t("settings.extraBody.description") }}
+            </p>
+            <Label for="llm-extra-body" class="sr-only">
+              {{ $t("settings.extraBody.title") }}
+            </Label>
+            <Textarea
+              id="llm-extra-body"
+              v-model="llmExtraBodyInput"
+              :placeholder="LLM_EXTRA_BODY_PLACEHOLDER"
+              autocomplete="off"
+              class="min-h-24 font-mono text-xs"
+              spellcheck="false"
+            />
+            <p class="text-xs text-muted-foreground">
+              {{ $t("settings.extraBody.hint") }}
+            </p>
           </div>
         </div>
 

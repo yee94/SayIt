@@ -76,6 +76,13 @@
       "emptyValue": "カスタム Header の値は空にできません",
       "valueMustBeString": "カスタム Header の値は文字列である必要があります"
     },
+    "extraBody": {
+      "title": "追加リクエスト本文",
+      "description": "OpenAI 互換 API の拡張フィールドを JSON オブジェクトで指定します。model、messages、temperature、max_tokens はアプリが管理します。",
+      "hint": "Qwen3.6 の思考を無効化: chat_template_kwargs.enable_thinking を false に設定します。保存時に検証します。",
+      "invalidJson": "追加リクエスト本文は有効な JSON オブジェクトである必要があります",
+      "mustBeObject": "追加リクエスト本文は JSON オブジェクトである必要があり、配列は不可です"
+    },
     "providerApiKey": {
       "openaiTitle": "OpenAI API Key",
       "anthropicTitle": "Anthropic API Key",
@@ -420,7 +427,7 @@
     },
     "upgradeNotice": {
       "title": "SayIt 更新情報",
-      "item1": "HUD の終了動作を高速化：テキストの貼り付け完了や操作のキャンセル後、ノッチはすぐに上方向へ縮み、成功チェックやキャンセル表示は出ません。",
+      "item1": "LLM 追加リクエスト本文：設定で JSON オブジェクトを指定し、OpenAI 互換 API にモデルやゲートウェイ固有の項目を渡せます。Qwen3.6 の思考無効化などに対応します。",
       "item2": "",
       "dismiss": "OK"
     }

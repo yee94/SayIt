@@ -76,6 +76,13 @@
       "emptyValue": "사용자 지정 Header 값은 비울 수 없습니다",
       "valueMustBeString": "사용자 지정 Header 값은 문자열이어야 합니다"
     },
+    "extraBody": {
+      "title": "추가 요청 본문",
+      "description": "OpenAI 호환 API의 확장 필드를 JSON 객체로 입력하세요. model, messages, temperature, max_tokens는 앱에서 관리합니다.",
+      "hint": "Qwen3.6 사고 비활성화: chat_template_kwargs.enable_thinking을 false로 설정하세요. 저장 시 검증됩니다.",
+      "invalidJson": "추가 요청 본문은 유효한 JSON 객체여야 합니다",
+      "mustBeObject": "추가 요청 본문은 JSON 객체여야 하며 배열은 허용되지 않습니다"
+    },
     "providerApiKey": {
       "openaiTitle": "OpenAI API Key",
       "anthropicTitle": "Anthropic API Key",
@@ -420,7 +427,7 @@
     },
     "upgradeNotice": {
       "title": "SayIt 업데이트 안내",
-      "item1": "더 깔끔해진 HUD 종료: 텍스트를 붙여넣거나 작업을 취소하면 노치가 즉시 위로 접히며 성공 체크 표시나 취소 문구가 나타나지 않습니다.",
+      "item1": "LLM 추가 요청 본문: 설정에서 JSON 객체를 입력해 OpenAI 호환 API에 모델 또는 게이트웨이 전용 옵션을 전달할 수 있습니다. Qwen3.6 사고 비활성화 같은 설정을 지원합니다.",
       "item2": "",
       "dismiss": "확인"
     }
