@@ -20,7 +20,10 @@ function readSource(relativePath: string): string {
 }
 
 describe("DB 连线池安全：禁止跨呼叫交易语句", () => {
-  const files = ["src/lib/database.ts", "src/stores/useVocabularyStore.ts"];
+  const files = [
+    "src/lib/database.ts",
+    "src/stores/useVocabularyStore.ts",
+  ];
 
   for (const file of files) {
     it(`[P1] ${file} 不得有独立的 execute("BEGIN/COMMIT/ROLLBACK") 呼叫`, () => {

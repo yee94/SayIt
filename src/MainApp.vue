@@ -30,6 +30,7 @@ import { useFeedbackMessage } from "./composables/useFeedbackMessage";
 import { listenToEvent, VOCABULARY_CHANGED } from "./composables/useTauriEvents";
 import { useSettingsStore } from "./stores/useSettingsStore";
 import { useVocabularyStore } from "./stores/useVocabularyStore";
+import { runVocabularySyncIfEnabled } from "./lib/runVocabularySync";
 import { captureError } from "./lib/sentry";
 import { getDatabaseInitError } from "./lib/database";
 import type { UnlistenFn } from "@tauri-apps/api/event";
@@ -88,6 +89,15 @@ const showAutoInstallDialog = ref(false);
 const settingsStore = useSettingsStore();
 const showUpgradeNoticeDialog = ref(false);
 const upgradeNoticeItemCount = 1;
+watch(
+  () => settingsStore.vocabularySyncDirectoryPath,
+  (path, prev) => {
+    if (path.trim() && path.trim() !== (prev ?? "").trim()) {
+      scheduleVocabularySync("path-changed");
+    }
+  },
+);
+
 watch(() => settingsStore.showPromptUpgradeNotice, (shouldShow) => {
   if (shouldShow) {
     showUpgradeNoticeDialog.value = true;
@@ -222,13 +232,39 @@ const isUpdateBusy = computed(() =>
 
 const vocabularyStore = useVocabularyStore();
 let unlistenVocabularyChanged: UnlistenFn | null = null;
+const VOCAB_SYNC_DEBOUNCE_MS = 30_000;
+const VOCAB_SYNC_INTERVAL_MS = 5 * 60_000;
+let vocabularySyncDebounceId: ReturnType<typeof setTimeout> | null = null;
+let vocabularySyncIntervalId: ReturnType<typeof setInterval> | null = null;
+
+function scheduleVocabularySync(reason: string) {
+  if (!settingsStore.isVocabularySyncEnabled) return;
+  console.log(`[main-window] schedule vocabulary sync (${reason})`);
+  if (vocabularySyncDebounceId) clearTimeout(vocabularySyncDebounceId);
+  const delay = reason === "change" ? VOCAB_SYNC_DEBOUNCE_MS : 0;
+  vocabularySyncDebounceId = setTimeout(() => {
+    vocabularySyncDebounceId = null;
+    void runVocabularySyncIfEnabled().catch((err) => {
+      console.error("[main-window] vocabulary sync failed:", err);
+    });
+  }, delay);
+}
 
 onMounted(async () => {
   // 监听词汇变更（HUD 视窗 AI 新增词汇时同步 Dashboard）
   unlistenVocabularyChanged = await listenToEvent(VOCABULARY_CHANGED, () => {
     console.log("[main-window] VOCABULARY_CHANGED received, refreshing termList");
     void vocabularyStore.fetchTermList();
+    scheduleVocabularySync("change");
   });
+
+  // iCloud 词典同步：启动立即同步，之后每 5 分钟
+  void vocabularyStore.fetchTermList().finally(() => {
+    scheduleVocabularySync("startup");
+  });
+  vocabularySyncIntervalId = setInterval(() => {
+    scheduleVocabularySync("interval");
+  }, VOCAB_SYNC_INTERVAL_MS);
 
   // macOS 无障碍权限检查
   const isMacOS = navigator.userAgent.includes("Macintosh");
@@ -256,6 +292,8 @@ onMounted(async () => {
 
 onUnmounted(() => {
   unlistenVocabularyChanged?.();
+  if (vocabularySyncDebounceId) clearTimeout(vocabularySyncDebounceId);
+  if (vocabularySyncIntervalId) clearInterval(vocabularySyncIntervalId);
   if (autoCheckTimeoutId) clearTimeout(autoCheckTimeoutId);
   if (autoCheckIntervalId) clearInterval(autoCheckIntervalId);
 });

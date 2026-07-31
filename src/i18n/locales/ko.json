@@ -207,6 +207,23 @@
       "llmRequirement": "필수 조건: 위에서 설정한 LLM이 멀티모달 Vision(이미지 입력)을 지원해야 합니다(예: GPT-4o, GPT-4o mini, Gemini). 텍스트 전용 모델은 스크린샷을 처리할 수 없으며, 비지원 모델에서 켜면 정리 요청이 실패할 수 있습니다. 앱 이름만 보내는 것은 텍스트 모델도 가능하지만 효과는 제한적입니다.",
       "privacyNote": "스크린샷은 해당 AI 정리 요청에만 사용되며 ASR로 보내지 않고 장기 저장하지 않습니다. 기본값은 꺼짐입니다. macOS에서는 화면 기록 권한이 필요합니다",
       "permissionHint": "캡처에 실패하면 시스템 설정에서 SayIt에 화면 기록을 허용해 주세요"
+    },
+    "vocabularySync": {
+      "title": "iCloud 사전 동기화",
+      "description": "iCloud Drive(또는 공유) 폴더를 선택하면 동기화가 자동으로 켜집니다. 각 기기가 스냅샷을 쓰고 다른 기기의 단어를 병합합니다.",
+      "chooseDirectory": "동기화 폴더 선택",
+      "changeDirectory": "폴더 변경",
+      "clearDirectory": "경로 지우기",
+      "directoryLabel": "동기화 경로",
+      "notConfigured": "경로 없음(설정 후 자동 동기화)",
+      "lastSynced": "마지막 동기화: {time}",
+      "neverSynced": "아직 동기화 없음",
+      "syncNow": "지금 동기화",
+      "syncSuccess": "동기화 완료",
+      "syncFailed": "동기화 실패",
+      "pathSaved": "동기화 경로 저장됨(동기화 켜짐)",
+      "pathCleared": "동기화 경로 제거됨",
+      "hint": "iCloud Drive 아래 전용 폴더(예: SayIt Dictionary)를 권장합니다."
     }
   },
   "dashboard": {

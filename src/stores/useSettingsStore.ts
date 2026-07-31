@@ -132,6 +132,15 @@ export const useSettingsStore = defineStore("settings", () => {
   const isSmartDictionaryEnabled = ref<boolean>(
     DEFAULT_SMART_DICTIONARY_ENABLED,
   );
+
+  /** iCloud/共享目录词典同步：有路径即自动开启 */
+  const vocabularySyncDirectoryPath = ref<string>("");
+  const vocabularySyncDeviceId = ref<string>("");
+  const vocabularySyncLastSyncedAt = ref<string | null>(null);
+  const isVocabularySyncEnabled = computed(
+    () => vocabularySyncDirectoryPath.value.trim().length > 0,
+  );
+
   const isScreenContextEnabled = ref<boolean>(DEFAULT_SCREEN_CONTEXT_ENABLED);
   const customTriggerKeyDomCode = ref<string>("");
   const selectedLocale = ref<SupportedLocale>(FALLBACK_LOCALE);
@@ -437,6 +446,28 @@ export const useSettingsStore = defineStore("settings", () => {
       );
       isSmartDictionaryEnabled.value =
         savedSmartDictionary ?? DEFAULT_SMART_DICTIONARY_ENABLED;
+
+      const savedVocabularySyncDirectoryPath = await store.get<string>(
+        "vocabularySyncDirectoryPath",
+      );
+      vocabularySyncDirectoryPath.value =
+        savedVocabularySyncDirectoryPath?.trim() ?? "";
+
+      let savedVocabularySyncDeviceId = await store.get<string>(
+        "vocabularySyncDeviceId",
+      );
+      if (!savedVocabularySyncDeviceId?.trim()) {
+        savedVocabularySyncDeviceId = crypto.randomUUID();
+        await store.set("vocabularySyncDeviceId", savedVocabularySyncDeviceId);
+        await store.save();
+      }
+      vocabularySyncDeviceId.value = savedVocabularySyncDeviceId.trim();
+
+      const savedVocabularySyncLastSyncedAt = await store.get<string>(
+        "vocabularySyncLastSyncedAt",
+      );
+      vocabularySyncLastSyncedAt.value =
+        savedVocabularySyncLastSyncedAt?.trim() || null;
 
       const savedScreenContext = await store.get<boolean>(
         "screenContextEnabled",
@@ -1349,6 +1380,89 @@ export const useSettingsStore = defineStore("settings", () => {
     }
   }
 
+
+  async function ensureVocabularySyncDeviceId(): Promise<string> {
+    if (vocabularySyncDeviceId.value.trim()) {
+      return vocabularySyncDeviceId.value.trim();
+    }
+    const store = await load(STORE_NAME);
+    const id = crypto.randomUUID();
+    await store.set("vocabularySyncDeviceId", id);
+    await store.save();
+    vocabularySyncDeviceId.value = id;
+    return id;
+  }
+
+  /** 设置同步目录；传入空字串/null 表示关闭同步 */
+  async function saveVocabularySyncDirectory(directoryPath: string | null) {
+    const trimmed = directoryPath?.trim() ?? "";
+    try {
+      const store = await load(STORE_NAME);
+      const deviceId = await ensureVocabularySyncDeviceId();
+      await store.set("vocabularySyncDirectoryPath", trimmed);
+      await store.set("vocabularySyncDeviceId", deviceId);
+      if (!trimmed) {
+        await store.set("vocabularySyncLastSyncedAt", "");
+        vocabularySyncLastSyncedAt.value = null;
+      }
+      await store.save();
+      vocabularySyncDirectoryPath.value = trimmed;
+
+      const payload: SettingsUpdatedPayload = {
+        key: "vocabularySync",
+        value: {
+          directoryPath: trimmed,
+          deviceId,
+          lastSyncedAt: vocabularySyncLastSyncedAt.value,
+        },
+      };
+      await emitEvent(SETTINGS_UPDATED, payload);
+      console.log(
+        `[useSettingsStore] vocabularySyncDirectoryPath saved: ${trimmed || "(cleared)"}`,
+      );
+    } catch (err) {
+      console.error(
+        "[useSettingsStore] saveVocabularySyncDirectory failed:",
+        extractErrorMessage(err),
+      );
+      captureError(err, {
+        source: "settings",
+        step: "save-vocabulary-sync-directory",
+      });
+      throw err;
+    }
+  }
+
+  async function saveVocabularySyncLastSyncedAt(isoTimestamp: string) {
+    const trimmed = isoTimestamp.trim();
+    try {
+      const store = await load(STORE_NAME);
+      await store.set("vocabularySyncLastSyncedAt", trimmed);
+      await store.save();
+      vocabularySyncLastSyncedAt.value = trimmed || null;
+
+      const payload: SettingsUpdatedPayload = {
+        key: "vocabularySync",
+        value: {
+          directoryPath: vocabularySyncDirectoryPath.value,
+          deviceId: vocabularySyncDeviceId.value,
+          lastSyncedAt: vocabularySyncLastSyncedAt.value,
+        },
+      };
+      await emitEvent(SETTINGS_UPDATED, payload);
+    } catch (err) {
+      console.error(
+        "[useSettingsStore] saveVocabularySyncLastSyncedAt failed:",
+        extractErrorMessage(err),
+      );
+      captureError(err, {
+        source: "settings",
+        step: "save-vocabulary-sync-last-synced-at",
+      });
+      throw err;
+    }
+  }
+
   async function refreshCrossWindowSettings() {
     try {
       const store = await load(STORE_NAME);
@@ -1488,6 +1602,21 @@ export const useSettingsStore = defineStore("settings", () => {
       isCopyTranscriptionToClipboardEnabled.value =
         savedCopyTranscriptionToClipboard ??
         DEFAULT_COPY_TRANSCRIPTION_TO_CLIPBOARD;
+
+      const savedVocabularySyncDirectoryPath = await store.get<string>(
+        "vocabularySyncDirectoryPath",
+      );
+      vocabularySyncDirectoryPath.value =
+        savedVocabularySyncDirectoryPath?.trim() ?? "";
+      const savedVocabularySyncDeviceId = await store.get<string>(
+        "vocabularySyncDeviceId",
+      );
+      vocabularySyncDeviceId.value = savedVocabularySyncDeviceId?.trim() ?? "";
+      const savedVocabularySyncLastSyncedAt = await store.get<string>(
+        "vocabularySyncLastSyncedAt",
+      );
+      vocabularySyncLastSyncedAt.value =
+        savedVocabularySyncLastSyncedAt?.trim() || null;
     } catch (err) {
       console.error(
         "[useSettingsStore] refreshCrossWindowSettings failed:",
@@ -1613,6 +1742,13 @@ export const useSettingsStore = defineStore("settings", () => {
     saveAudioInputDevice,
     isCopyTranscriptionToClipboardEnabled,
     saveCopyTranscriptionToClipboard,
+    vocabularySyncDirectoryPath,
+    vocabularySyncDeviceId,
+    vocabularySyncLastSyncedAt,
+    isVocabularySyncEnabled,
+    saveVocabularySyncDirectory,
+    saveVocabularySyncLastSyncedAt,
+    ensureVocabularySyncDeviceId,
     selectedLocale,
     saveLocale,
     selectedTranscriptionLocale,

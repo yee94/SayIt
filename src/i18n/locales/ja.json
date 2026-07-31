@@ -207,6 +207,23 @@
       "llmRequirement": "必要条件：上記の LLM はマルチモーダル（Vision / 画像入力）に対応している必要があります（例：GPT-4o、GPT-4o mini、Gemini）。テキスト専用モデルはスクリーンショットを扱えません。非対応モデルで有効にすると整理リクエストが失敗する可能性があります。アプリ名のみならテキストモデルでも送れますが、効果は限定的です。",
       "privacyNote": "スクリーンショットは当回の AI 整理リクエストのみに使い、ASR には送らず長期保存もしません。既定はオフです。macOS では画面収録の許可が必要です",
       "permissionHint": "取得に失敗した場合は、システム設定で SayIt に画面収録を許可してください"
+    },
+    "vocabularySync": {
+      "title": "iCloud 辞書同期",
+      "description": "iCloud Drive（または共有）フォルダを選ぶと自動で同期が有効になります。各デバイスがスナップショットを書き込み、他デバイスの語句をマージします。",
+      "chooseDirectory": "同期フォルダを選択",
+      "changeDirectory": "フォルダを変更",
+      "clearDirectory": "パスをクリア",
+      "directoryLabel": "同期パス",
+      "notConfigured": "未設定（パス設定後に自動同期）",
+      "lastSynced": "前回同期：{time}",
+      "neverSynced": "未同期",
+      "syncNow": "今すぐ同期",
+      "syncSuccess": "同期完了",
+      "syncFailed": "同期失敗",
+      "pathSaved": "同期パスを保存しました（同期オン）",
+      "pathCleared": "同期パスをクリアしました",
+      "hint": "iCloud Drive 内の専用フォルダ（例：SayIt Dictionary）を推奨します。"
     }
   },
   "dashboard": {

@@ -43,3 +43,10 @@ export interface HotkeyConfig {
 export const PROMPT_MODE_VALUES = ["minimal", "active", "custom"] as const;
 export type PromptMode = (typeof PROMPT_MODE_VALUES)[number];
 export type PresetPromptMode = Exclude<PromptMode, "custom">;
+
+/** iCloud/共享文件夹词典同步：有 directoryPath 即视为开启 */
+export interface VocabularySyncConfig {
+  directoryPath: string;
+  deviceId: string;
+  lastSyncedAt: string | null;
+}

@@ -207,6 +207,23 @@
       "llmRequirement": "Requirement: your LLM above must support multimodal vision (image input), e.g. GPT-4o, GPT-4o mini, or Gemini. Text-only models cannot use screenshots; enabling this with a non-vision model may cause cleanup requests to fail. App name alone works with text models, but with limited benefit.",
       "privacyNote": "Screenshots are used only for the current AI cleanup request—never sent to ASR and not stored long-term. Off by default. macOS needs Screen Recording permission",
       "permissionHint": "If capture fails, allow Screen Recording for SayIt in System Settings"
+    },
+    "vocabularySync": {
+      "title": "iCloud Dictionary Sync",
+      "description": "Pick an iCloud Drive (or other shared) folder to enable sync automatically. Each device writes its own snapshot and merges terms from others.",
+      "chooseDirectory": "Choose Sync Folder",
+      "changeDirectory": "Change Folder",
+      "clearDirectory": "Clear Path",
+      "directoryLabel": "Sync path",
+      "notConfigured": "No folder set (sync starts once a path is chosen)",
+      "lastSynced": "Last synced: {time}",
+      "neverSynced": "Not synced yet",
+      "syncNow": "Sync Now",
+      "syncSuccess": "Sync complete",
+      "syncFailed": "Sync failed",
+      "pathSaved": "Sync folder saved; sync is on",
+      "pathCleared": "Sync path cleared",
+      "hint": "Prefer a dedicated folder under iCloud Drive, e.g. SayIt Dictionary."
     }
   },
   "dashboard": {

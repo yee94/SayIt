@@ -43,3 +43,6 @@ playwright/.auth/
 
 # Auto-generated documentation scanner output
 docs/project-scan-report.json
+
+# Deepwork local progress
+.slim/deepwork/

@@ -606,6 +606,12 @@ pub fn run() {
             plugins::transcription::finish_live_asr,
             plugins::transcription::cancel_live_asr,
             plugins::typeless_import::fetch_typeless_dictionary_terms,
+            plugins::vocabulary_csv::load_vocabulary_csv,
+            plugins::vocabulary_csv::save_vocabulary_csv,
+            plugins::vocabulary_csv::get_vocabulary_csv_path,
+            plugins::vocabulary_sync::pick_vocabulary_sync_directory,
+            plugins::vocabulary_sync::list_vocabulary_sync_snapshots,
+            plugins::vocabulary_sync::write_vocabulary_sync_snapshot,
             plugins::sound_feedback::play_start_sound,
             plugins::sound_feedback::play_stop_sound,
             plugins::sound_feedback::play_error_sound,
@@ -624,6 +630,8 @@ pub fn run() {
             app.manage(plugins::audio_recorder::AudioPreviewState::new());
             // 初始化 transcription 状态（共用 HTTP client）
             app.manage(plugins::transcription::TranscriptionState::new());
+            // 初始化 vocabulary CSV 互斥锁（HUD / Dashboard 共用）
+            app.manage(plugins::vocabulary_csv::VocabularyCsvState::new());
 
             let open_dashboard_item =
                 MenuItem::with_id(app, "open-dashboard", "打开 Dashboard", true, None::<&str>)?;

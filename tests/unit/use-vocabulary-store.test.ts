@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 
-const mockDbExecute = vi.fn().mockResolvedValue(undefined);
 const mockDbSelect = vi.fn().mockResolvedValue([]);
 const mockEmit = vi.fn().mockResolvedValue(undefined);
 const mockInvoke = vi.fn();
@@ -12,7 +11,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 vi.mock("../../src/lib/database", () => ({
   getDatabase: () => ({
-    execute: mockDbExecute,
+    execute: vi.fn(),
     select: mockDbSelect,
   }),
 }));
@@ -34,32 +33,102 @@ vi.mock("../../src/lib/sentry", () => ({
   captureError: vi.fn(),
 }));
 
-function createRawVocabularyRow(overrides: Record<string, unknown> = {}) {
+function createCsvRow(overrides: Record<string, unknown> = {}) {
   return {
     id: "vocab-1",
     term: "Vue.js",
     weight: 1,
     source: "manual",
-    created_at: "2026-03-09 00:00:00",
+    createdAt: "2026-03-09 00:00:00",
     ...overrides,
   };
 }
 
-describe("useVocabularyStore", () => {
+function mockLoadCsv(
+  entries: ReturnType<typeof createCsvRow>[] = [],
+  fileExists = true,
+) {
+  mockInvoke.mockResolvedValueOnce({ entries, fileExists });
+}
+
+function mockSaveCsv() {
+  mockInvoke.mockResolvedValueOnce(undefined);
+}
+
+describe("useVocabularyStore (CSV)", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
-    mockDbExecute.mockClear().mockResolvedValue(undefined);
     mockDbSelect.mockClear().mockResolvedValue([]);
     mockEmit.mockClear().mockResolvedValue(undefined);
     mockInvoke.mockClear();
   });
 
-  // ==========================================================================
-  // addAiSuggestedTerm
-  // ==========================================================================
+  describe("fetchTermList", () => {
+    it("应从 load_vocabulary_csv 载入并排序", async () => {
+      mockLoadCsv([
+        createCsvRow({
+          id: "1",
+          term: "Low",
+          weight: 1,
+          createdAt: "2026-03-01 00:00:00",
+        }),
+        createCsvRow({
+          id: "2",
+          term: "High",
+          weight: 10,
+          createdAt: "2026-03-01 00:00:00",
+        }),
+      ]);
+
+      const { useVocabularyStore } = await import(
+        "../../src/stores/useVocabularyStore"
+      );
+      const store = useVocabularyStore();
+      await store.fetchTermList();
+
+      expect(mockInvoke).toHaveBeenCalledWith("load_vocabulary_csv");
+      expect(store.termList.map((e) => e.term)).toEqual(["High", "Low"]);
+    });
+
+    it("CSV 不存在时应从 SQLite 迁移并写出 CSV", async () => {
+      mockLoadCsv([], false);
+      mockDbSelect.mockResolvedValueOnce([
+        {
+          id: "sql-1",
+          term: "FromSqlite",
+          weight: 2,
+          source: "manual",
+          created_at: "2026-01-01 00:00:00",
+        },
+      ]);
+      mockSaveCsv();
+
+      const { useVocabularyStore } = await import(
+        "../../src/stores/useVocabularyStore"
+      );
+      const store = useVocabularyStore();
+      await store.fetchTermList();
+
+      expect(mockInvoke).toHaveBeenCalledWith("save_vocabulary_csv", {
+        entries: [
+          expect.objectContaining({
+            id: "sql-1",
+            term: "FromSqlite",
+            weight: 2,
+            source: "manual",
+            createdAt: "2026-01-01 00:00:00",
+          }),
+        ],
+      });
+      expect(store.termList).toHaveLength(1);
+      expect(store.termList[0]?.term).toBe("FromSqlite");
+    });
+  });
 
   describe("addAiSuggestedTerm", () => {
-    it("应以 source='ai' 插入词汇", async () => {
+    it("应以 source='ai' 写入 CSV", async () => {
+      mockSaveCsv();
+
       const { useVocabularyStore } = await import(
         "../../src/stores/useVocabularyStore"
       );
@@ -67,14 +136,20 @@ describe("useVocabularyStore", () => {
 
       await store.addAiSuggestedTerm("Tauri");
 
-      expect(mockDbExecute).toHaveBeenCalledTimes(1);
-      const [sql, params] = mockDbExecute.mock.calls[0];
-      expect(sql).toContain("INSERT INTO vocabulary");
-      expect(sql).toContain("'ai'");
-      expect(params[1]).toBe("Tauri");
+      expect(mockInvoke).toHaveBeenCalledWith("save_vocabulary_csv", {
+        entries: [
+          expect.objectContaining({
+            term: "Tauri",
+            source: "ai",
+            weight: 1,
+          }),
+        ],
+      });
+      expect(store.termList).toHaveLength(1);
+      expect(store.termList[0]?.source).toBe("ai");
     });
 
-    it("空字串不触发 INSERT", async () => {
+    it("空字串不触发保存", async () => {
       const { useVocabularyStore } = await import(
         "../../src/stores/useVocabularyStore"
       );
@@ -82,35 +157,69 @@ describe("useVocabularyStore", () => {
 
       await store.addAiSuggestedTerm("  ");
 
-      expect(mockDbExecute).not.toHaveBeenCalled();
+      expect(mockInvoke).not.toHaveBeenCalled();
     });
 
-    it("UNIQUE 冲突时静默处理不抛错", async () => {
-      mockDbExecute.mockRejectedValueOnce(
-        new Error("UNIQUE constraint failed"),
+    it("已存在时静默处理不抛错", async () => {
+      mockLoadCsv([createCsvRow({ term: "Vue.js" })]);
+
+      const { useVocabularyStore } = await import(
+        "../../src/stores/useVocabularyStore"
       );
+      const store = useVocabularyStore();
+      await store.fetchTermList();
+      mockInvoke.mockClear();
+
+      await expect(store.addAiSuggestedTerm("Vue.js")).resolves.toBeUndefined();
+      expect(mockInvoke).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("addTerm", () => {
+    it("应以 source='manual' 写入 CSV", async () => {
+      mockSaveCsv();
 
       const { useVocabularyStore } = await import(
         "../../src/stores/useVocabularyStore"
       );
       const store = useVocabularyStore();
 
-      await expect(store.addAiSuggestedTerm("Vue.js")).resolves.toBeUndefined();
+      await store.addTerm("React");
+
+      expect(mockInvoke).toHaveBeenCalledWith("save_vocabulary_csv", {
+        entries: [
+          expect.objectContaining({
+            term: "React",
+            source: "manual",
+            weight: 1,
+          }),
+        ],
+      });
+      expect(mockEmit).toHaveBeenCalledWith(
+        "vocabulary:changed",
+        expect.objectContaining({ action: "added", term: "React" }),
+      );
+    });
+
+    it("重复词应抛 duplicateEntry", async () => {
+      mockLoadCsv([createCsvRow({ term: "React" })]);
+
+      const { useVocabularyStore } = await import(
+        "../../src/stores/useVocabularyStore"
+      );
+      const store = useVocabularyStore();
+      await store.fetchTermList();
+
+      await expect(store.addTerm("react")).rejects.toThrow(
+        "dictionary.duplicateEntry",
+      );
     });
   });
 
-  // ==========================================================================
-  // updateTerm
-  // ==========================================================================
-
   describe("updateTerm", () => {
-    it("应更新指定 id 的词汇文案", async () => {
-      mockDbSelect.mockResolvedValueOnce([
-        createRawVocabularyRow({ id: "vocab-1", term: "Vue.js" }),
-      ]);
-      mockDbSelect.mockResolvedValueOnce([
-        createRawVocabularyRow({ id: "vocab-1", term: "Vue 3" }),
-      ]);
+    it("应就地改 term 并写回 CSV", async () => {
+      mockLoadCsv([createCsvRow({ id: "vocab-1", term: "Vue.js" })]);
+      mockSaveCsv();
 
       const { useVocabularyStore } = await import(
         "../../src/stores/useVocabularyStore"
@@ -120,40 +229,34 @@ describe("useVocabularyStore", () => {
 
       await store.updateTerm("vocab-1", "Vue 3");
 
-      const updateCall = mockDbExecute.mock.calls.find(
-        (call) =>
-          typeof call[0] === "string" &&
-          call[0].includes("UPDATE vocabulary SET term"),
-      );
-      expect(updateCall).toBeDefined();
-      expect(updateCall?.[1]).toEqual(["Vue 3", "vocab-1"]);
+      expect(mockInvoke).toHaveBeenLastCalledWith("save_vocabulary_csv", {
+        entries: [expect.objectContaining({ id: "vocab-1", term: "Vue 3" })],
+      });
       expect(mockEmit).toHaveBeenCalledWith(
         "vocabulary:changed",
         expect.objectContaining({ action: "updated", term: "Vue 3" }),
       );
     });
 
-    it("与自身相同文案时不执行 UPDATE", async () => {
-      mockDbSelect.mockResolvedValueOnce([
-        createRawVocabularyRow({ id: "vocab-1", term: "Vue.js" }),
-      ]);
+    it("与自身相同文案时不执行保存", async () => {
+      mockLoadCsv([createCsvRow({ id: "vocab-1", term: "Vue.js" })]);
 
       const { useVocabularyStore } = await import(
         "../../src/stores/useVocabularyStore"
       );
       const store = useVocabularyStore();
       await store.fetchTermList();
-      mockDbExecute.mockClear();
+      mockInvoke.mockClear();
 
       await store.updateTerm("vocab-1", "Vue.js");
 
-      expect(mockDbExecute).not.toHaveBeenCalled();
+      expect(mockInvoke).not.toHaveBeenCalled();
     });
 
     it("与其他词重复时应抛 duplicateEntry", async () => {
-      mockDbSelect.mockResolvedValueOnce([
-        createRawVocabularyRow({ id: "vocab-1", term: "Vue.js" }),
-        createRawVocabularyRow({ id: "vocab-2", term: "Tauri" }),
+      mockLoadCsv([
+        createCsvRow({ id: "vocab-1", term: "Vue.js" }),
+        createCsvRow({ id: "vocab-2", term: "Tauri" }),
       ]);
 
       const { useVocabularyStore } = await import(
@@ -168,9 +271,7 @@ describe("useVocabularyStore", () => {
     });
 
     it("空字串应抛 emptyTerm", async () => {
-      mockDbSelect.mockResolvedValueOnce([
-        createRawVocabularyRow({ id: "vocab-1", term: "Vue.js" }),
-      ]);
+      mockLoadCsv([createCsvRow({ id: "vocab-1", term: "Vue.js" })]);
 
       const { useVocabularyStore } = await import(
         "../../src/stores/useVocabularyStore"
@@ -184,27 +285,60 @@ describe("useVocabularyStore", () => {
     });
   });
 
-  // ==========================================================================
-  // batchIncrementWeights
-  // ==========================================================================
+  describe("removeTerm", () => {
+    it("应从列表移除并写回 CSV", async () => {
+      mockLoadCsv([createCsvRow({ id: "vocab-1", term: "Vue.js" })]);
+      mockSaveCsv();
 
-  describe("batchIncrementWeights", () => {
-    it("应对每个 ID 执行 UPDATE weight + 1", async () => {
       const { useVocabularyStore } = await import(
         "../../src/stores/useVocabularyStore"
       );
       const store = useVocabularyStore();
+      await store.fetchTermList();
 
-      await store.batchIncrementWeights(["id-1", "id-2", "id-3"]);
+      await store.removeTerm("vocab-1");
 
-      // 3 updates + 1 fetchTermList SELECT
-      const updateCalls = mockDbExecute.mock.calls.filter(
-        (call) => typeof call[0] === "string" && call[0].includes("UPDATE"),
+      expect(mockInvoke).toHaveBeenLastCalledWith("save_vocabulary_csv", {
+        entries: [],
+      });
+      expect(store.termList).toHaveLength(0);
+      expect(mockEmit).toHaveBeenCalledWith(
+        "vocabulary:changed",
+        expect.objectContaining({ action: "removed", term: "Vue.js" }),
       );
-      expect(updateCalls).toHaveLength(3);
-      expect(updateCalls[0][1]).toEqual(["id-1"]);
-      expect(updateCalls[1][1]).toEqual(["id-2"]);
-      expect(updateCalls[2][1]).toEqual(["id-3"]);
+    });
+  });
+
+  describe("batchIncrementWeights", () => {
+    it("应对匹配 ID 做 weight + 1 并写回", async () => {
+      mockLoadCsv([
+        createCsvRow({ id: "id-1", term: "A", weight: 1 }),
+        createCsvRow({ id: "id-2", term: "B", weight: 2 }),
+        createCsvRow({ id: "id-3", term: "C", weight: 3 }),
+      ]);
+      mockSaveCsv();
+
+      const { useVocabularyStore } = await import(
+        "../../src/stores/useVocabularyStore"
+      );
+      const store = useVocabularyStore();
+      await store.fetchTermList();
+
+      await store.batchIncrementWeights(["id-1", "id-3"]);
+
+      expect(mockInvoke).toHaveBeenLastCalledWith(
+        "save_vocabulary_csv",
+        expect.objectContaining({
+          entries: expect.arrayContaining([
+            expect.objectContaining({ id: "id-3", weight: 4 }),
+            expect.objectContaining({ id: "id-1", weight: 2 }),
+            expect.objectContaining({ id: "id-2", weight: 2 }),
+          ]),
+        }),
+      );
+      expect(store.termList[0]).toMatchObject({ id: "id-3", weight: 4 });
+      expect(store.termList.find((e) => e.id === "id-1")?.weight).toBe(2);
+      expect(store.termList.find((e) => e.id === "id-2")?.weight).toBe(2);
     });
 
     it("空阵列不执行任何操作", async () => {
@@ -215,39 +349,70 @@ describe("useVocabularyStore", () => {
 
       await store.batchIncrementWeights([]);
 
-      expect(mockDbExecute).not.toHaveBeenCalled();
-      expect(mockDbSelect).not.toHaveBeenCalled();
+      expect(mockInvoke).not.toHaveBeenCalled();
     });
   });
 
-  // ==========================================================================
-  // getTopTermListByWeight
-  // ==========================================================================
-
   describe("getTopTermListByWeight", () => {
-    it("应回传按 weight DESC 排序的前 N 个词", async () => {
-      mockDbSelect.mockResolvedValueOnce([
-        { term: "Tauri" },
-        { term: "Vue.js" },
-        { term: "Groq" },
+    it("应从 termList 按 weight DESC, createdAt DESC 回传前 N 个词", async () => {
+      mockLoadCsv([
+        createCsvRow({
+          id: "1",
+          term: "Low",
+          weight: 1,
+          createdAt: "2026-03-01 00:00:00",
+        }),
+        createCsvRow({
+          id: "2",
+          term: "High",
+          weight: 10,
+          createdAt: "2026-03-01 00:00:00",
+        }),
+        createCsvRow({
+          id: "3",
+          term: "MidNewer",
+          weight: 5,
+          createdAt: "2026-03-09 00:00:00",
+        }),
+        createCsvRow({
+          id: "4",
+          term: "MidOlder",
+          weight: 5,
+          createdAt: "2026-03-02 00:00:00",
+        }),
       ]);
 
       const { useVocabularyStore } = await import(
         "../../src/stores/useVocabularyStore"
       );
       const store = useVocabularyStore();
+      await store.fetchTermList();
+      mockInvoke.mockClear();
 
       const result = await store.getTopTermListByWeight(3);
 
-      expect(result).toEqual(["Tauri", "Vue.js", "Groq"]);
-      const [sql, params] = mockDbSelect.mock.calls[0];
-      expect(sql).toContain("ORDER BY weight DESC");
-      expect(sql).toContain("LIMIT $1");
-      expect(params).toEqual([3]);
+      expect(result).toEqual(["High", "MidNewer", "MidOlder"]);
+      expect(mockInvoke).not.toHaveBeenCalled();
     });
 
-    it("DB 失败时回传空阵列", async () => {
-      mockDbSelect.mockRejectedValueOnce(new Error("DB error"));
+    it("limit 超过列表长度时回传全部", async () => {
+      mockLoadCsv([
+        createCsvRow({ id: "1", term: "A", weight: 2 }),
+        createCsvRow({ id: "2", term: "B", weight: 1 }),
+      ]);
+
+      const { useVocabularyStore } = await import(
+        "../../src/stores/useVocabularyStore"
+      );
+      const store = useVocabularyStore();
+      await store.fetchTermList();
+
+      const result = await store.getTopTermListByWeight(10);
+      expect(result).toEqual(["A", "B"]);
+    });
+
+    it("尚未载入时会先 load，空表回传空阵列", async () => {
+      mockLoadCsv([]);
 
       const { useVocabularyStore } = await import(
         "../../src/stores/useVocabularyStore"
@@ -256,19 +421,16 @@ describe("useVocabularyStore", () => {
 
       const result = await store.getTopTermListByWeight(10);
       expect(result).toEqual([]);
+      expect(mockInvoke).toHaveBeenCalledWith("load_vocabulary_csv");
     });
   });
 
-  // ==========================================================================
-  // manualTermList / aiSuggestedTermList computed
-  // ==========================================================================
-
   describe("computed 过滤", () => {
     it("manualTermList 只包含 source=manual 的项目", async () => {
-      mockDbSelect.mockResolvedValueOnce([
-        createRawVocabularyRow({ id: "1", term: "Vue.js", source: "manual" }),
-        createRawVocabularyRow({ id: "2", term: "Tauri", source: "ai" }),
-        createRawVocabularyRow({ id: "3", term: "Groq", source: "manual" }),
+      mockLoadCsv([
+        createCsvRow({ id: "1", term: "Vue.js", source: "manual" }),
+        createCsvRow({ id: "2", term: "Tauri", source: "ai" }),
+        createCsvRow({ id: "3", term: "Groq", source: "manual" }),
       ]);
 
       const { useVocabularyStore } = await import(
@@ -277,7 +439,6 @@ describe("useVocabularyStore", () => {
       const store = useVocabularyStore();
       await store.fetchTermList();
 
-      expect(store.manualTermList).toHaveLength(2);
       expect(store.manualTermList.map((e) => e.term)).toEqual([
         "Vue.js",
         "Groq",
@@ -285,10 +446,10 @@ describe("useVocabularyStore", () => {
     });
 
     it("aiSuggestedTermList 只包含 source=ai 的项目", async () => {
-      mockDbSelect.mockResolvedValueOnce([
-        createRawVocabularyRow({ id: "1", term: "Vue.js", source: "manual" }),
-        createRawVocabularyRow({ id: "2", term: "Tauri", source: "ai" }),
-        createRawVocabularyRow({ id: "3", term: "泰呈", source: "ai" }),
+      mockLoadCsv([
+        createCsvRow({ id: "1", term: "Vue.js", source: "manual" }),
+        createCsvRow({ id: "2", term: "Tauri", source: "ai" }),
+        createCsvRow({ id: "3", term: "泰呈", source: "ai" }),
       ]);
 
       const { useVocabularyStore } = await import(
@@ -297,7 +458,6 @@ describe("useVocabularyStore", () => {
       const store = useVocabularyStore();
       await store.fetchTermList();
 
-      expect(store.aiSuggestedTermList).toHaveLength(2);
       expect(store.aiSuggestedTermList.map((e) => e.term)).toEqual([
         "Tauri",
         "泰呈",
@@ -305,40 +465,12 @@ describe("useVocabularyStore", () => {
     });
   });
 
-  // ==========================================================================
-  // addTerm (manual) — 验证 source='manual'
-  // ==========================================================================
-
-  describe("addTerm", () => {
-    it("应以 source='manual' 插入", async () => {
-      const { useVocabularyStore } = await import(
-        "../../src/stores/useVocabularyStore"
-      );
-      const store = useVocabularyStore();
-
-      await store.addTerm("React");
-
-      expect(mockDbExecute).toHaveBeenCalledTimes(1);
-      const [sql] = mockDbExecute.mock.calls[0];
-      expect(sql).toContain("'manual'");
-    });
-  });
-
-  // ==========================================================================
-  // importTerms
-  // ==========================================================================
-
   describe("importTerms", () => {
     it("批量插入新词并跳过已存在（大小写不敏感）", async () => {
-      mockDbSelect
-        .mockResolvedValueOnce([
-          createRawVocabularyRow({ id: "1", term: "Vue.js", source: "manual" }),
-        ])
-        .mockResolvedValueOnce([
-          createRawVocabularyRow({ id: "1", term: "Vue.js", source: "manual" }),
-          createRawVocabularyRow({ id: "2", term: "Tauri", source: "manual" }),
-          createRawVocabularyRow({ id: "3", term: "Pinia", source: "manual" }),
-        ]);
+      mockLoadCsv([
+        createCsvRow({ id: "1", term: "Vue.js", source: "manual" }),
+      ]);
+      mockSaveCsv();
 
       const { useVocabularyStore } = await import(
         "../../src/stores/useVocabularyStore"
@@ -349,19 +481,19 @@ describe("useVocabularyStore", () => {
       const result = await store.importTerms(["vue.js", "Tauri", "Pinia", "  "]);
 
       expect(result).toEqual({ added: 2, skipped: 2 });
-      // 两次 INSERT（Tauri、Pinia）
-      const insertCalls = mockDbExecute.mock.calls.filter(([sql]) =>
-        String(sql).includes("INSERT INTO vocabulary"),
-      );
-      expect(insertCalls).toHaveLength(2);
-      expect(insertCalls.every(([sql]) => String(sql).includes("'manual'"))).toBe(
-        true,
-      );
+      expect(mockInvoke).toHaveBeenLastCalledWith("save_vocabulary_csv", {
+        entries: expect.arrayContaining([
+          expect.objectContaining({ term: "Vue.js" }),
+          expect.objectContaining({ term: "Tauri", source: "manual" }),
+          expect.objectContaining({ term: "Pinia", source: "manual" }),
+        ]),
+      });
+      expect(store.termList).toHaveLength(3);
     });
 
-    it("全部已存在时不写入 DB", async () => {
-      mockDbSelect.mockResolvedValueOnce([
-        createRawVocabularyRow({ id: "1", term: "Vue.js", source: "manual" }),
+    it("全部已存在时不写入", async () => {
+      mockLoadCsv([
+        createCsvRow({ id: "1", term: "Vue.js", source: "manual" }),
       ]);
 
       const { useVocabularyStore } = await import(
@@ -369,21 +501,18 @@ describe("useVocabularyStore", () => {
       );
       const store = useVocabularyStore();
       await store.fetchTermList();
-      mockDbExecute.mockClear();
+      mockInvoke.mockClear();
 
       const result = await store.importTerms(["Vue.js", "vue.js"]);
       expect(result).toEqual({ added: 0, skipped: 2 });
-      expect(mockDbExecute).not.toHaveBeenCalled();
+      expect(mockInvoke).not.toHaveBeenCalled();
     });
   });
 
   describe("importFromTypeless", () => {
     it("拉取 Typeless 词典并汇入新词", async () => {
       mockInvoke.mockResolvedValueOnce(["Tauri", "Pinia"]);
-      mockDbSelect.mockResolvedValueOnce([
-        createRawVocabularyRow({ id: "1", term: "Tauri", source: "manual" }),
-        createRawVocabularyRow({ id: "2", term: "Pinia", source: "manual" }),
-      ]);
+      mockSaveCsv();
 
       const { useVocabularyStore } = await import(
         "../../src/stores/useVocabularyStore"
@@ -394,6 +523,12 @@ describe("useVocabularyStore", () => {
       expect(mockInvoke).toHaveBeenCalledWith(
         "fetch_typeless_dictionary_terms",
       );
+      expect(mockInvoke).toHaveBeenCalledWith("save_vocabulary_csv", {
+        entries: expect.arrayContaining([
+          expect.objectContaining({ term: "Tauri", source: "manual" }),
+          expect.objectContaining({ term: "Pinia", source: "manual" }),
+        ]),
+      });
       expect(result).toEqual({ fetched: 2, added: 2, skipped: 0 });
     });
   });

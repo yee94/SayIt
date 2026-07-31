@@ -1163,13 +1163,16 @@ onUnmounted(() => {
 
 .live-transcript-text {
   display: block;
+  width: fit-content;
+  min-width: 0;
   max-width: 100%;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
   /* 左侧省略：overflow 时保留尾部（最新）文字 */
   direction: rtl;
-  text-align: center;
+  /* 超出时从逻辑起点（右侧）排版，省略号紧贴可见文字 */
+  text-align: right;
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.02em;

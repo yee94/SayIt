@@ -392,6 +392,39 @@ async function doInitializeDatabase(): Promise<Database> {
     );
   }
 
+  // --- Migration v8 → v9: vocabulary soft-delete + updated_at ---
+  const v9VersionRows = await connection.select<{ version: number }[]>(
+    "SELECT version FROM schema_version ORDER BY version DESC LIMIT 1",
+  );
+  const v9CurrentVersion = v9VersionRows[0]?.version ?? 1;
+
+  if (v9CurrentVersion < 9) {
+    await addColumnIfNotExists(
+      connection,
+      "vocabulary",
+      "updated_at TEXT",
+    );
+    await addColumnIfNotExists(
+      connection,
+      "vocabulary",
+      "deleted_at TEXT",
+    );
+
+    // 存量行用 created_at 回填 updated_at，供后续多设备同步元数据
+    await connection.execute(`
+      UPDATE vocabulary
+      SET updated_at = created_at
+      WHERE updated_at IS NULL;
+    `);
+
+    await connection.execute(
+      "INSERT OR REPLACE INTO schema_version (version) VALUES (9);",
+    );
+    console.log(
+      "[database] Migration v8 → v9: vocabulary soft-delete + updated_at",
+    );
+  }
+
   // --- 关键表验证与恢复 ---
   // 先前版本的 migration 可能因连线池覆盖导致 DROP TABLE 后未 RENAME，
   // 若 api_usage 不存在则以最新 schema 重建（资料已遗失，但 app 可正常运作）
@@ -412,6 +445,22 @@ async function doInitializeDatabase(): Promise<Database> {
       "vocabulary",
       "source TEXT NOT NULL DEFAULT 'manual'",
     );
+    await addColumnIfNotExists(
+      connection,
+      "vocabulary",
+      "updated_at TEXT",
+    );
+    await addColumnIfNotExists(
+      connection,
+      "vocabulary",
+      "deleted_at TEXT",
+    );
+    // 崩溃恢复后可能补上 updated_at 但未回填
+    await connection.execute(`
+      UPDATE vocabulary
+      SET updated_at = COALESCE(updated_at, created_at, datetime('now'))
+      WHERE updated_at IS NULL;
+    `);
   }
 
   if (!(await tableExists(connection, "api_usage"))) {

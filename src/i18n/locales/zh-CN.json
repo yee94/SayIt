@@ -207,6 +207,23 @@
       "llmRequirement": "依赖要求：上方配置的 LLM 接口必须支持多模态（Vision / 看图），例如 GPT-4o、GPT-4o mini、Gemini 等。纯文本模型无法处理截图；开启后若模型不支持，整理请求可能失败。仅传前台应用名不需要多模态，但收益有限。",
       "privacyNote": "截图仅用于当次 AI 整理请求，不会发给 ASR，也不长期保存；默认关闭。macOS 需授予「屏幕录制」权限",
       "permissionHint": "若截图失败，请在系统设置中允许 SayIt 屏幕录制"
+    },
+    "vocabularySync": {
+      "title": "iCloud 词典同步",
+      "description": "选择一个 iCloud Drive（或其它共享）文件夹后自动开启同步。每台设备会写入自己的快照文件，并合并其他设备的词条。",
+      "chooseDirectory": "选择同步文件夹",
+      "changeDirectory": "更改文件夹",
+      "clearDirectory": "清除路径",
+      "directoryLabel": "同步路径",
+      "notConfigured": "尚未设置路径（设置后自动同步）",
+      "lastSynced": "上次同步：{time}",
+      "neverSynced": "尚未同步",
+      "syncNow": "立即同步",
+      "syncSuccess": "同步完成",
+      "syncFailed": "同步失败",
+      "pathSaved": "已设置同步路径，同步已开启",
+      "pathCleared": "已清除同步路径",
+      "hint": "建议选择「iCloud Drive」下的专用文件夹，例如 SayIt Dictionary。"
     }
   },
   "dashboard": {

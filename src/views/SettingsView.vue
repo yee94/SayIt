@@ -9,6 +9,8 @@ import {
   DEFAULT_ENHANCEMENT_THRESHOLD_CHAR_COUNT,
 } from "../stores/useSettingsStore";
 import { extractErrorMessage } from "../lib/errorUtils";
+import { pickVocabularySyncDirectory } from "../lib/vocabularySync";
+import { runVocabularySyncIfEnabled } from "../lib/runVocabularySync";
 import { useFeedbackMessage } from "../composables/useFeedbackMessage";
 import { useHistoryStore } from "../stores/useHistoryStore";
 import {
@@ -73,6 +75,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   ChevronDown,
+  FolderOpen,
   Mic,
   RefreshCw,
   Trash2,
@@ -706,6 +709,84 @@ async function handleToggleSmartDictionary(newValue: boolean) {
   }
 }
 
+// ── iCloud 词典同步（有路径即自动开启）────────────────────────
+const vocabularySyncFeedback = useFeedbackMessage();
+const isVocabularySyncBusy = ref(false);
+
+const vocabularySyncPathDisplay = computed(() =>
+  settingsStore.vocabularySyncDirectoryPath.trim(),
+);
+
+const vocabularySyncLastSyncedDisplay = computed(() => {
+  const raw = settingsStore.vocabularySyncLastSyncedAt;
+  if (!raw) return "";
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return raw;
+  return date.toLocaleString();
+});
+
+async function handlePickVocabularySyncDirectory() {
+  try {
+    isVocabularySyncBusy.value = true;
+    const selected = await pickVocabularySyncDirectory();
+    if (!selected) return;
+    await settingsStore.saveVocabularySyncDirectory(selected);
+    vocabularySyncFeedback.show(
+      "success",
+      t("settings.vocabularySync.pathSaved"),
+    );
+    try {
+      await runVocabularySyncIfEnabled();
+      vocabularySyncFeedback.show(
+        "success",
+        t("settings.vocabularySync.syncSuccess"),
+      );
+    } catch (err) {
+      vocabularySyncFeedback.show(
+        "error",
+        extractErrorMessage(err) || t("settings.vocabularySync.syncFailed"),
+      );
+    }
+  } catch (err) {
+    vocabularySyncFeedback.show("error", extractErrorMessage(err));
+  } finally {
+    isVocabularySyncBusy.value = false;
+  }
+}
+
+async function handleClearVocabularySyncDirectory() {
+  try {
+    isVocabularySyncBusy.value = true;
+    await settingsStore.saveVocabularySyncDirectory(null);
+    vocabularySyncFeedback.show(
+      "success",
+      t("settings.vocabularySync.pathCleared"),
+    );
+  } catch (err) {
+    vocabularySyncFeedback.show("error", extractErrorMessage(err));
+  } finally {
+    isVocabularySyncBusy.value = false;
+  }
+}
+
+async function handleVocabularySyncNow() {
+  try {
+    isVocabularySyncBusy.value = true;
+    await runVocabularySyncIfEnabled();
+    vocabularySyncFeedback.show(
+      "success",
+      t("settings.vocabularySync.syncSuccess"),
+    );
+  } catch (err) {
+    vocabularySyncFeedback.show(
+      "error",
+      extractErrorMessage(err) || t("settings.vocabularySync.syncFailed"),
+    );
+  } finally {
+    isVocabularySyncBusy.value = false;
+  }
+}
+
 // ── 屏幕上下文感知 ──────────────────────────────────────────
 const screenContextFeedback = useFeedbackMessage();
 
@@ -900,6 +981,7 @@ onBeforeUnmount(() => {
   transcriptionLocaleFeedback.clearTimer();
   autoStartFeedback.clearTimer();
   smartDictionaryFeedback.clearTimer();
+  vocabularySyncFeedback.clearTimer();
   screenContextFeedback.clearTimer();
   recordingCleanupFeedback.clearTimer();
   providerFeedback.clearTimer();
@@ -1456,6 +1538,89 @@ onBeforeUnmount(() => {
             "
           >
             {{ smartDictionaryFeedback.message.value }}
+          </p>
+        </transition>
+      </CardContent>
+    </Card>
+
+    <!-- iCloud 词典同步：设置路径后自动开启 -->
+    <Card>
+      <CardHeader class="border-b border-border">
+        <CardTitle class="text-base">{{ $t("settings.vocabularySync.title") }}</CardTitle>
+      </CardHeader>
+      <CardContent class="space-y-4">
+        <p class="text-sm text-muted-foreground leading-relaxed">
+          {{ $t("settings.vocabularySync.description") }}
+        </p>
+
+        <div class="space-y-1">
+          <Label>{{ $t("settings.vocabularySync.directoryLabel") }}</Label>
+          <p class="break-all rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">
+            {{
+              vocabularySyncPathDisplay ||
+              $t("settings.vocabularySync.notConfigured")
+            }}
+          </p>
+          <p class="text-xs text-muted-foreground">
+            {{ $t("settings.vocabularySync.hint") }}
+          </p>
+        </div>
+
+        <div class="flex flex-wrap gap-2">
+          <Button
+            variant="secondary"
+            class="gap-2"
+            :disabled="isVocabularySyncBusy"
+            @click="handlePickVocabularySyncDirectory"
+          >
+            <FolderOpen class="h-4 w-4" />
+            {{
+              vocabularySyncPathDisplay
+                ? $t("settings.vocabularySync.changeDirectory")
+                : $t("settings.vocabularySync.chooseDirectory")
+            }}
+          </Button>
+          <Button
+            v-if="vocabularySyncPathDisplay"
+            variant="outline"
+            class="gap-2"
+            :disabled="isVocabularySyncBusy"
+            @click="handleVocabularySyncNow"
+          >
+            <RefreshCw class="h-4 w-4" />
+            {{ $t("settings.vocabularySync.syncNow") }}
+          </Button>
+          <Button
+            v-if="vocabularySyncPathDisplay"
+            variant="ghost"
+            :disabled="isVocabularySyncBusy"
+            @click="handleClearVocabularySyncDirectory"
+          >
+            {{ $t("settings.vocabularySync.clearDirectory") }}
+          </Button>
+        </div>
+
+        <p v-if="vocabularySyncPathDisplay" class="text-xs text-muted-foreground">
+          {{
+            vocabularySyncLastSyncedDisplay
+              ? $t("settings.vocabularySync.lastSynced", {
+                  time: vocabularySyncLastSyncedDisplay,
+                })
+              : $t("settings.vocabularySync.neverSynced")
+          }}
+        </p>
+
+        <transition name="feedback-fade">
+          <p
+            v-if="vocabularySyncFeedback.message.value !== ''"
+            class="text-sm"
+            :class="
+              vocabularySyncFeedback.type.value === 'success'
+                ? 'text-green-400'
+                : 'text-red-400'
+            "
+          >
+            {{ vocabularySyncFeedback.message.value }}
           </p>
         </transition>
       </CardContent>

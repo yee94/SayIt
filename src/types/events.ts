@@ -36,7 +36,8 @@ export type SettingsKey =
   | "soundEffectsEnabled"
   | "promptMode"
   | "audioInputDevice"
-  | "copyTranscriptionToClipboard";
+  | "copyTranscriptionToClipboard"
+  | "vocabularySync";
 
 export interface SettingsUpdatedPayload {
   key: SettingsKey;
