@@ -173,14 +173,11 @@ class RecordingOverlayWindow: NSPanel {
     private func observe(state: OverlayState) {
         guard observedState !== state else { return }
         observedState = state
-        appearanceStateCancellable = Publishers.CombineLatest(
-            Publishers.CombineLatest4(
-                state.$displayMode,
-                state.$allowsSessionTranslationLanguageSwitching,
-                state.$isSessionTranslationTargetPickerPresented,
-                state.$answerInteractionMode
-            ),
-            state.$statusPresentation
+        appearanceStateCancellable = Publishers.CombineLatest4(
+            state.$displayMode,
+            state.$allowsSessionTranslationLanguageSwitching,
+            state.$isSessionTranslationTargetPickerPresented,
+            state.$answerInteractionMode
         )
         .receive(on: RunLoop.main)
         .sink { [weak self, weak state] _ in
@@ -212,25 +209,9 @@ class RecordingOverlayWindow: NSPanel {
             return CGSize(width: 472, height: 96)
         }
 
-        let allowsRealtimeText = UserDefaults.standard.object(forKey: AppPreferenceKey.realtimeTextDisplayEnabled) as? Bool ?? true
-        return Self.classicPanelSize(
-            displayMode: state.displayMode,
-            statusPresentation: state.statusPresentation,
-            allowsRealtimeText: allowsRealtimeText
-        )
-    }
-
-    static func classicPanelSize(
-        displayMode: OverlayDisplayMode,
-        statusPresentation: OverlayStatusPresentation,
-        allowsRealtimeText: Bool
-    ) -> CGSize {
-        if statusPresentation == .dictionaryLearning && displayMode != .answer {
-            return CGSize(width: 320, height: 84)
-        }
-
-        switch displayMode {
+        switch state.displayMode {
         case .recording, .processing:
+            let allowsRealtimeText = UserDefaults.standard.object(forKey: AppPreferenceKey.realtimeTextDisplayEnabled) as? Bool ?? true
             let width: CGFloat = allowsRealtimeText ? 360 : 220
             return CGSize(width: width, height: 140)
         case .answer:
@@ -242,33 +223,16 @@ class RecordingOverlayWindow: NSPanel {
     }
 
     private func notchFrame(for size: CGSize) -> CGRect {
-        guard let screen = NSScreen.main else {
-            return CGRect(origin: frame.origin, size: size)
-        }
-        let screenFrame = screen.frame
+        let screenFrame = NSScreen.main?.frame ?? .zero
         guard !screenFrame.isEmpty else {
             return CGRect(origin: frame.origin, size: size)
         }
 
-        return Self.notchPanelFrame(
-            screenFrame: screenFrame,
-            panelSize: size,
-            safeAreaTopInset: screen.safeAreaInsets.top
-        )
-    }
-
-    static func notchPanelFrame(
-        screenFrame: CGRect,
-        panelSize: CGSize,
-        safeAreaTopInset: CGFloat
-    ) -> CGRect {
-        let topInset = max(0, safeAreaTopInset)
-        let visualGap: CGFloat = topInset > 0 ? 5 : 0
         return CGRect(
-            x: screenFrame.midX - panelSize.width / 2,
-            y: screenFrame.maxY - topInset - visualGap - panelSize.height,
-            width: panelSize.width,
-            height: panelSize.height
+            x: screenFrame.midX - size.width / 2,
+            y: screenFrame.maxY - size.height,
+            width: size.width,
+            height: size.height
         )
     }
 

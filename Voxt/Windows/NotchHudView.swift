@@ -60,7 +60,6 @@ struct NotchHudView: View {
     var shouldAnimate: Bool
     var transcribedText: String
     var statusMessage: String = ""
-    var statusPresentation: OverlayStatusPresentation = .standard
     var isEnhancing: Bool = false
     var isRequesting: Bool = false
     var isFinalizingTranscription: Bool = false
@@ -87,7 +86,6 @@ struct NotchHudView: View {
 
     private let hudWidth: CGFloat = 420
     private let compactWidth: CGFloat = 200
-    private let learningFeedbackWidth: CGFloat = 300
     private let collapsedHeight: CGFloat = 42
     private let expandedHeight: CGFloat = 72
 
@@ -166,7 +164,6 @@ struct NotchHudView: View {
     }
 
     private var subtitleTextIsVisible: Bool {
-        if statusPresentation == .dictionaryLearning { return false }
         // Completing / success / exit must never re-surface the live transcript.
         // Otherwise "整理中..." flickers back into the previous underlined text
         // for one frame before the HUD collapses.
@@ -174,9 +171,7 @@ struct NotchHudView: View {
             return false
         }
         if isError { return !trimmedStatus.isEmpty }
-        // Keep connecting mic inside the collapsed top row so the notch HUD
-        // does not expand/contract for a temporary status line.
-        if visualMode == .connecting { return false }
+        if visualMode == .connecting { return true }
         if isOrganizing { return true }
         // After organizing ends, collapse subtitle immediately — do not revive
         // the previous streaming transcript with underlines.
@@ -191,8 +186,7 @@ struct NotchHudView: View {
     }
 
     private var targetWidth: CGFloat {
-        if statusPresentation == .dictionaryLearning { return learningFeedbackWidth }
-        return usesCompactWidth ? compactWidth : hudWidth
+        usesCompactWidth ? compactWidth : hudWidth
     }
 
     private var usesCompactWidth: Bool {
@@ -229,13 +223,7 @@ struct NotchHudView: View {
                         )
 
                     VStack(spacing: 0) {
-                        Group {
-                            if statusPresentation == .dictionaryLearning {
-                                learningFeedbackRow
-                            } else {
-                                topRow
-                            }
-                        }
+                        topRow
                             .frame(height: collapsedHeight)
 
                         if subtitleTextIsVisible && !usesCompactWidth {
@@ -324,27 +312,12 @@ struct NotchHudView: View {
         .padding(.horizontal, 40)
     }
 
-    private var learningFeedbackRow: some View {
-        Text(trimmedStatus)
-            .font(.system(size: 13, weight: .medium))
-            .foregroundStyle(.white.opacity(0.9))
-            .lineLimit(1)
-            .truncationMode(.tail)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-            .padding(.horizontal, 24)
-    }
-
     @ViewBuilder
     private var statusVisual: some View {
         switch visualMode {
         case .connecting:
-            Text(trimmedConnectingStatusText)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.white.opacity(0.9))
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                .transition(.opacity)
+            ProcessingDotsView(isAnimating: shouldAnimate)
+                .transition(.opacity.combined(with: .scale(scale: 0.72)))
         case .recording:
             recordingWaveform
                 .transition(.opacity.combined(with: .scale(scale: 0.72)))
@@ -392,6 +365,8 @@ struct NotchHudView: View {
                 if isError {
                     Text(trimmedStatus)
                         .foregroundStyle(Color.orange)
+                } else if visualMode == .connecting {
+                    ShimmeringTranscriptText(stableText: trimmedConnectingStatusText, unstableText: "", shouldAnimate: shouldAnimate)
                 } else if isOrganizing || didEnterOrganizing {
                     // Keep "整理中..." locked; never swap back to underlined transcript.
                     ShimmeringTranscriptText(stableText: "整理中...", unstableText: "", shouldAnimate: shouldAnimate && isOrganizing)
