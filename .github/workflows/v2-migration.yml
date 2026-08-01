@@ -153,8 +153,12 @@ jobs:
           BUNDLE_ID="com.sayit.app"
           test -d "$APP_PATH"
           test -f "$ENTITLEMENTS_PATH"
-          ln -sfn SayIt "$APP_PATH/Contents/MacOS/sayit"
-          test -L "$APP_PATH/Contents/MacOS/sayit"
+          # Product executable is already named SayIt. Do NOT create
+          # Contents/MacOS/sayit -> SayIt: on case-insensitive APFS that becomes
+          # a self-referential symlink and codesign fails with
+          # "Too many levels of symbolic links".
+          test -f "$APP_PATH/Contents/MacOS/SayIt"
+          ls -la "$APP_PATH/Contents/MacOS"
           # Fail only on real entitlement keys, not comments.
           if grep -E '<key>com\.apple\.security\.app-sandbox</key>|<key>com\.apple\.application-identifier</key>|<key>keychain-access-groups</key>|<key>com\.apple\.developer\.icloud' "$ENTITLEMENTS_PATH"; then
             echo "::error::Developer ID entitlements must stay unsandboxed and free of restricted identity keys"
