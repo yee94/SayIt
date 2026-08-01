@@ -149,19 +149,17 @@ jobs:
         run: |
           set -euo pipefail
           APP_PATH="build/DerivedData/Build/Products/Release/Voxt.app"
-          ENTITLEMENTS_PATH="build/SayItMigration.entitlements"
-          PROFILE_PREFIX="6W97S9B7CZ"
+          ENTITLEMENTS_PATH="Voxt/Voxt.DeveloperID.entitlements"
           BUNDLE_ID="com.sayit.app"
           test -d "$APP_PATH"
+          test -f "$ENTITLEMENTS_PATH"
           ln -sfn Voxt "$APP_PATH/Contents/MacOS/sayit"
           test -L "$APP_PATH/Contents/MacOS/sayit"
-          sed \
-            -e "s#\\\$(PRODUCT_BUNDLE_IDENTIFIER)#$BUNDLE_ID#g" \
-            -e "s#\\\$(AppIdentifierPrefix)#$PROFILE_PREFIX.#g" \
-            -e "s#\\\$(DEVELOPMENT_TEAM)#$PROFILE_PREFIX#g" \
-            Voxt/Voxt.entitlements > "$ENTITLEMENTS_PATH"
-          if grep -q '\$(' "$ENTITLEMENTS_PATH"; then
-            echo "::error::Failed to expand signing entitlements"
+          # Developer ID migration builds intentionally use the minimal SayIt-style
+          # entitlements (no App Sandbox / no restricted identity keys). The sandboxed
+          # Voxt.entitlements set currently fails launchd spawn on signed releases.
+          if grep -E 'app-sandbox|application-identifier|keychain-access-groups|icloud' "$ENTITLEMENTS_PATH"; then
+            echo "::error::Developer ID entitlements must stay unsandboxed and free of restricted identity keys"
             exit 1
           fi
           sign_target() {
@@ -189,6 +187,11 @@ jobs:
             "$APP_PATH"
           codesign --verify --strict --verbose=4 "$APP_PATH"
           codesign --display --verbose=4 "$APP_PATH" 2>&1 | tee build/codesign.txt
+          codesign -d --entitlements :- "$APP_PATH" 2>/dev/null | tee build/entitlements.xml
+          if grep -E 'app-sandbox|application-identifier|keychain-access-groups|icloud' build/entitlements.xml; then
+            echo "::error::Signed app still contains restricted/sandbox entitlements"
+            exit 1
+          fi
           grep -F "TeamIdentifier=6W97S9B7CZ" build/codesign.txt > /dev/null
           /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_PATH/Contents/Info.plist" | grep -Fx "$BUNDLE_ID"
 

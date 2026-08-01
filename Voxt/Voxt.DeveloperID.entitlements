@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Developer ID distribution entitlements for SayIt/Voxt migration builds.
+	  Keep this aligned with the working SayIt desktop app: no App Sandbox and no
+	  restricted identity entitlements (application-identifier / keychain-access-groups),
+	  which currently cause launchd spawn failure (POSIX 163) on signed releases.
+	-->
+	<key>com.apple.security.automation.apple-events</key>
+	<true/>
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
+</dict>
+</plist>
