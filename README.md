@@ -1,24 +1,19 @@
-<p align="center">
-  <img src="docs/Banner.png" alt="SayIt — 按住说话，松开粘贴" width="100%" />
-</p>
+<div align="center"><a name="readme-top"></a>
 
-<h1 align="center">SayIt</h1>
+# SayIt
 
-<p align="center">
-  <strong>按住说话，松开粘贴</strong> — 跨平台语音输入桌面工具<br/>
-  在任意应用中说话，经 ASR 转写 + LLM 整理后，自动粘贴到光标位置。
-</p>
+**按住说话，松开粘贴** — 跨平台语音输入桌面工具
 
-<p align="center">
-  <a href="https://github.com/yee94/SayIt/releases/latest"><img src="https://img.shields.io/github/v/release/yee94/SayIt?style=flat-square&label=release&color=f97316" alt="Latest Release" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT License" /></a>
-  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-111827?style=flat-square" alt="Platform" />
-  <a href="https://github.com/yee94/SayIt/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/yee94/SayIt/ci.yml?branch=main&style=flat-square&label=CI" alt="CI" /></a>
-  <img src="https://img.shields.io/badge/i18n-zh--CN%20%7C%20en%20%7C%20ja%20%7C%20ko-10b981?style=flat-square" alt="i18n" />
-  <img src="https://img.shields.io/badge/Tauri-v2-24C8DB?style=flat-square&logo=tauri&logoColor=white" alt="Tauri" />
-  <img src="https://img.shields.io/badge/Vue-3-42b883?style=flat-square&logo=vuedotjs&logoColor=white" alt="Vue 3" />
-  <img src="https://img.shields.io/badge/Rust-stable-dea584?style=flat-square&logo=rust&logoColor=white" alt="Rust" />
-</p>
+在任意应用中说话，经 ASR 转写 + LLM 整理后，自动粘贴到光标位置。
+
+[![][github-release-shield]][github-release-link]
+[![][macos-version-shield]][macos-version-link]
+[![][license-shield]][license-link]
+[![][release-date-shield]][release-date-link]
+
+<img width="2664" height="1752" alt="SayIt / Voxt overview" src="https://github.com/user-attachments/assets/67f6e1d7-0761-4685-992d-15cc89821475" />
+
+</div>
 
 <p align="center">
   <a href="#-和-typeless-的关系">与 Typeless</a> ·
@@ -193,3 +188,13 @@ pnpm tauri build    # 打包桌面应用
 
 [MIT](LICENSE) © 2026 Tai-Cheng Chen
 ```
+
+
+[github-release-link]: https://github.com/yee94/SayIt/releases/latest
+[macos-version-link]: https://github.com/yee94/SayIt/releases/latest
+[license-link]: ./LICENSE
+[release-date-link]: https://github.com/yee94/SayIt/releases/latest
+[github-release-shield]: https://img.shields.io/github/v/release/yee94/SayIt?label=release&labelColor=000000&color=3fb950&style=flat-square&logo=github&logoColor=white
+[macos-version-shield]: https://img.shields.io/badge/macOS-15.0%2B-58a6ff?style=flat-square&labelColor=000000&logo=apple&logoColor=white
+[license-shield]: https://img.shields.io/badge/License-Apache%202.0-58a6ff.svg?style=flat-square&labelColor=000000&logo=apache&logoColor=white
+[release-date-shield]: https://img.shields.io/github/release-date/yee94/SayIt?style=flat-square&labelColor=000000&color=58a6ff&logo=github&logoColor=white
