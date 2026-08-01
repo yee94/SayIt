@@ -178,14 +178,14 @@ final class RemoteASRSupportTests: XCTestCase {
             model: "stepaudio-2.5-asr",
             hintPayload: ResolvedASRHintPayload(
                 language: "zh",
-                contextualPhrases: ["Voxt", "FireRed"]
+                contextualPhrases: ["SayIt", "FireRed"]
             )
         )
 
         XCTAssertEqual(payload["model"] as? String, "stepaudio-2.5-asr")
         XCTAssertEqual(payload["language"] as? String, "zh")
         XCTAssertEqual(payload["enable_itn"] as? Bool, true)
-        XCTAssertEqual(payload["hotwords"] as? [String], ["Voxt", "FireRed"])
+        XCTAssertEqual(payload["hotwords"] as? [String], ["SayIt", "FireRed"])
         XCTAssertNil(payload["enable_timestamp"])
         XCTAssertNil(payload["prompt"])
         XCTAssertFalse(StepFunPayloadSupport.supportsSSEPrompt(model: "stepaudio-2.5-asr"))
@@ -195,14 +195,14 @@ final class RemoteASRSupportTests: XCTestCase {
         let parameters = AliyunFunRealtimePayloadSupport.parameters(
             hintPayload: ResolvedASRHintPayload(
                 languageHints: ["zh", "en"],
-                contextualPhrases: ["Voxt", "FireRed"]
+                contextualPhrases: ["SayIt", "FireRed"]
             )
         )
 
         XCTAssertEqual(parameters["sample_rate"] as? Int, 16000)
         XCTAssertEqual(parameters["format"] as? String, "pcm")
         XCTAssertEqual(parameters["language_hints"] as? [String], ["zh", "en"])
-        XCTAssertEqual(parameters["hotwords"] as? [String], ["Voxt", "FireRed"])
+        XCTAssertEqual(parameters["hotwords"] as? [String], ["SayIt", "FireRed"])
     }
 
     func testAliyunFunRealtimeParametersOmitEmptyHotwords() {
@@ -220,14 +220,14 @@ final class RemoteASRSupportTests: XCTestCase {
             hintPayload: ResolvedASRHintPayload(
                 language: "zh",
                 prompt: "Prefer these terms.\nVoxt",
-                contextualPhrases: ["Voxt"]
+                contextualPhrases: ["SayIt"]
             ),
             includePrompt: StepFunPayloadSupport.supportsSSEPrompt(model: "stepaudio-2-asr-pro")
         )
 
         XCTAssertEqual(payload["model"] as? String, "stepaudio-2-asr-pro")
         XCTAssertEqual(payload["prompt"] as? String, "Prefer these terms.\nVoxt")
-        XCTAssertEqual(payload["hotwords"] as? [String], ["Voxt"])
+        XCTAssertEqual(payload["hotwords"] as? [String], ["SayIt"])
         XCTAssertTrue(StepFunPayloadSupport.supportsSSEPrompt(model: "stepaudio-2-asr-pro"))
     }
 
@@ -249,7 +249,7 @@ final class RemoteASRSupportTests: XCTestCase {
             hintPayload: ResolvedASRHintPayload(
                 language: "zh",
                 prompt: "Prefer these terms.\nVoxt",
-                contextualPhrases: ["Voxt"]
+                contextualPhrases: ["SayIt"]
             ),
             useServerVAD: true
         )

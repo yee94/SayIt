@@ -1,6 +1,6 @@
 # English Prompts
 
-English prompt templates used as localized defaults for Voxt features.
+English prompt templates used as localized defaults for SayIt features.
 
 ## Responsibilities
 

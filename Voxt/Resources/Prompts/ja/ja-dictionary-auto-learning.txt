@@ -3,7 +3,7 @@
 ユーザーの主要な話し言葉：{{USER_MAIN_LANGUAGE}}
 ユーザーのその他の頻出言語：{{USER_OTHER_LANGUAGES}}
 
-Voxt が最初に挿入したテキスト：
+SayIt が最初に挿入したテキスト：
 <inserted_text>
 {{INSERTED}}
 </inserted_text>

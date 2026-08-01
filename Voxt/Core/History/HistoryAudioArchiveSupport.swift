@@ -30,7 +30,7 @@ enum HistoryAudioArchiveSupport {
         let appendedSamples = try readWAVSamples(from: appendedArchiveURL)
         guard !appendedSamples.isEmpty else {
             throw NSError(
-                domain: "Voxt.HistoryAudio",
+                domain: "SayIt.HistoryAudio",
                 code: 1,
                 userInfo: [NSLocalizedDescriptionKey: "The appended rewrite audio archive was empty."]
             )
@@ -56,7 +56,7 @@ enum HistoryAudioArchiveSupport {
         let data = try Data(contentsOf: fileURL)
         guard data.count >= 44 else {
             throw NSError(
-                domain: "Voxt.HistoryAudio",
+                domain: "SayIt.HistoryAudio",
                 code: 2,
                 userInfo: [NSLocalizedDescriptionKey: "The WAV file was too small to parse."]
             )
@@ -65,7 +65,7 @@ enum HistoryAudioArchiveSupport {
         guard String(data: data[0..<4], encoding: .ascii) == "RIFF",
               String(data: data[8..<12], encoding: .ascii) == "WAVE" else {
             throw NSError(
-                domain: "Voxt.HistoryAudio",
+                domain: "SayIt.HistoryAudio",
                 code: 3,
                 userInfo: [NSLocalizedDescriptionKey: "The audio archive was not a WAV file."]
             )
@@ -102,7 +102,7 @@ enum HistoryAudioArchiveSupport {
               let dataChunkRange
         else {
             throw NSError(
-                domain: "Voxt.HistoryAudio",
+                domain: "SayIt.HistoryAudio",
                 code: 4,
                 userInfo: [NSLocalizedDescriptionKey: "Only mono 16-bit WAV archives are supported."]
             )

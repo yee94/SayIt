@@ -778,7 +778,7 @@ enum StepFunSupport {
     static func extractPCMData(fromWAV wavData: Data) throws -> Data {
         guard wavData.count > 44 else {
             throw NSError(
-                domain: "Voxt.StepFun",
+                domain: "SayIt.StepFun",
                 code: -1,
                 userInfo: [NSLocalizedDescriptionKey: "WAV file too small for StepFun ASR."]
             )
@@ -796,7 +796,7 @@ enum StepFunSupport {
                 let dataEnd = min(dataStart + size, wavData.count)
                 guard dataEnd > dataStart else {
                     throw NSError(
-                        domain: "Voxt.StepFun",
+                        domain: "SayIt.StepFun",
                         code: -2,
                         userInfo: [NSLocalizedDescriptionKey: "WAV data chunk is empty."]
                     )
@@ -809,7 +809,7 @@ enum StepFunSupport {
 
         guard wavData.count > 44 else {
             throw NSError(
-                domain: "Voxt.StepFun",
+                domain: "SayIt.StepFun",
                 code: -3,
                 userInfo: [NSLocalizedDescriptionKey: "Cannot locate WAV data chunk."]
             )

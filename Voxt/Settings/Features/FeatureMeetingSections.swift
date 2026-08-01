@@ -108,7 +108,7 @@ extension FeatureSettingsView {
             guard let appDelegate = AppDelegate.shared else {
                 meetingFileUploadState = .failed(
                     fileName: fileName,
-                    message: featureSettingsLocalized("Voxt is not ready to analyze this file yet.")
+                    message: featureSettingsLocalized("SayIt is not ready to analyze this file yet.")
                 )
                 return
             }

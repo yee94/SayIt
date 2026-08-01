@@ -14,7 +14,7 @@ enum ModelStorageDirectoryManager {
             switch self {
             case .authorizationRequired(let path):
                 return AppLocalization.format(
-                    "Voxt needs permission to access the model storage folder at %@. Choose the folder again to reauthorize it.",
+                    "SayIt needs permission to access the model storage folder at %@. Choose the folder again to reauthorize it.",
                     path
                 )
             case .invalidBookmark(let path):

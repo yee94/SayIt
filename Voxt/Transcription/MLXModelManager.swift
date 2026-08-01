@@ -140,7 +140,7 @@ private nonisolated enum MLXSTTModelLoader {
             throw NSError(
                 domain: "MLXModelManager",
                 code: 1001,
-                userInfo: [NSLocalizedDescriptionKey: "Qwen3-ForcedAligner is alignment-only and not supported by Voxt transcription."]
+                userInfo: [NSLocalizedDescriptionKey: "Qwen3-ForcedAligner is alignment-only and not supported by SayIt transcription."]
             )
         } else if lower.contains("glmasr") || lower.contains("glm-asr") {
             model = try await GLMASRModel.fromModelDirectory(directory)
@@ -186,7 +186,7 @@ private nonisolated enum MLXSTTModelLoader {
 class MLXModelManager: ObservableObject {
     static let defaultHubBaseURL = URL(string: "https://huggingface.co")!
     static let mirrorHubBaseURL = URL(string: "https://hf-mirror.com")!
-    static let hubUserAgent = "Voxt/1.0 (MLXAudio)"
+    static let hubUserAgent = "SayIt/1.0 (MLXAudio)"
     enum ModelState: Equatable {
         case notDownloaded
         case downloading(
@@ -1017,7 +1017,7 @@ class MLXModelManager: ObservableObject {
     private func readyModel(for repo: String) throws -> any STTGenerationModel {
         guard let model = loadedModel, loadedRepo == repo else {
             throw NSError(
-                domain: "Voxt.MLXModelManager",
+                domain: "SayIt.MLXModelManager",
                 code: -1,
                 userInfo: [NSLocalizedDescriptionKey: "Model load finished without a ready model instance."]
             )

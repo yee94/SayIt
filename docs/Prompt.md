@@ -1,13 +1,13 @@
 # Prompt
 
-This document summarizes Voxt's current default prompts, template variables, runtime rules, and recommended writing patterns, so custom prompts remain stable and predictable in the main window.
+This document summarizes SayIt's current default prompts, template variables, runtime rules, and recommended writing patterns, so custom prompts remain stable and predictable in the main window.
 
 > [!IMPORTANT]
-> Most prompts in Voxt are not "chat-style conversational prompts". They are single-turn task prompts. The best results usually come from prompts that are explicit, constrained, and strict about output boundaries.
+> Most prompts in SayIt are not "chat-style conversational prompts". They are single-turn task prompts. The best results usually come from prompts that are explicit, constrained, and strict about output boundaries.
 
 ## Call Flow
 
-Prompt-related functionality in Voxt mainly falls into three core chains:
+Prompt-related functionality in SayIt mainly falls into three core chains:
 
 - Standard transcription: `ASR -> text enhancement -> output`
 - Translation: `ASR / selected text -> optional enhancement -> translation -> output`
@@ -102,7 +102,7 @@ flowchart LR
    - Uses local ASR, remote ASR, or system dictation based on current settings
    - Once recognition finishes, it enters `processTranscription(...)`
 2. Dispatch stage
-   - If `sessionOutputMode` is standard transcription, Voxt enters `processStandardTranscription(...)`
+   - If `sessionOutputMode` is standard transcription, SayIt enters `processStandardTranscription(...)`
 3. Enhancement stage
    - `enhancementMode = off`
      - output raw ASR text directly
@@ -167,7 +167,7 @@ flowchart LR
    - ASR returns raw text
 2. Enter translation branch
    - `sessionOutputMode == .translation`
-   - Voxt calls `processTranslatedTranscription(...)`
+   - SayIt calls `processTranslatedTranscription(...)`
 3. Run translation pipeline
    - `runTranslationPipeline(text, targetLanguage, includeEnhancement: true, allowStrictRetry: false)`
 4. EnhanceStage
@@ -185,7 +185,7 @@ flowchart LR
 
 1. Selection detection
    - if "translate selected text" is enabled and selection exists
-   - Voxt goes straight into `beginSelectedTextTranslationIfPossible()`
+   - SayIt goes straight into `beginSelectedTextTranslationIfPossible()`
 2. Skip recording and ASR
    - selected text becomes the input directly
 3. Run translation pipeline
@@ -195,7 +195,7 @@ flowchart LR
 5. Translate directly
    - uses `TranslateStage`
 6. Strict retry
-   - if the first result looks too close to the source text, Voxt triggers `StrictRetryTranslateStage`
+   - if the first result looks too close to the source text, SayIt triggers `StrictRetryTranslateStage`
    - it retries once using a stricter translation prompt
 7. Submit output
    - writes the translated text back into the selection / input target
@@ -236,7 +236,7 @@ flowchart LR
    - ASR turns the spoken instruction into text
 2. Enter rewrite branch
    - `sessionOutputMode == .rewrite`
-   - Voxt calls `processRewriteTranscription(...)`
+   - SayIt calls `processRewriteTranscription(...)`
 3. Read selected text
    - tries to read current selection through Accessibility or simulated copy
    - the selection may be empty
@@ -262,7 +262,7 @@ flowchart LR
 
 If the rewrite stage fails:
 
-- Voxt tries to fall back to the enhanced dictated instruction itself
+- SayIt tries to fall back to the enhanced dictated instruction itself
 - in other words, it tries to return something usable instead of dropping the result entirely
 
 ### Unified Submission and Finalization
@@ -364,18 +364,18 @@ flowchart TD
    - both eventually pass through `resolvedEnhancementPrompt(rawTranscription:)`
 2. Feature switch check
    - if `appEnhancementEnabled = false`
-   - Voxt falls back directly to the global enhancement prompt
+   - SayIt falls back directly to the global enhancement prompt
    - no App / URL matching is attempted
 3. Load group configuration
    - load App Branch groups
    - load URL rules
-   - if there are no groups at all, Voxt also falls back directly to the global prompt
+   - if there are no groups at all, SayIt also falls back directly to the global prompt
 4. Capture context snapshot
    - records current foreground app `bundleID`
    - records a timestamp
    - this is meant to keep enhancement aligned with the context around recording stop, instead of whatever the user switched to later
 5. Decide whether current context is browser-based
-   - if the foreground app is a browser, Voxt prioritizes URL-level matching
+   - if the foreground app is a browser, SayIt prioritizes URL-level matching
    - otherwise it only performs app-level matching
 
 #### Browser URL Match Path
@@ -459,7 +459,7 @@ In other words:
 
 ## Template Variables
 
-Voxt currently includes the following built-in template variables:
+SayIt currently includes the following built-in template variables:
 
 | Variable | Purpose | Typical Use |
 | --- | --- | --- |
@@ -487,7 +487,7 @@ Text enhancement is used for lightweight cleanup of speech recognition results, 
 ### Default Prompt
 
 ```text
-You are Voxt's transcription cleanup assistant, responsible for precise cleanup of raw text generated by speech recognition.
+You are SayIt's transcription cleanup assistant, responsible for precise cleanup of raw text generated by speech recognition.
 
 User main language:
 {{USER_MAIN_LANGUAGE}}
@@ -537,7 +537,7 @@ Return only the adjusted text, with no extra explanation.
 ### Runtime Notes
 
 - If an App Branch prompt matches the current App or URL, that prompt may replace the global enhancement prompt for the enhancement stage.
-- If dictionary recognition finds relevant terms, Voxt appends a runtime glossary block that prefers exact dictionary spellings when the transcript context matches.
+- If dictionary recognition finds relevant terms, SayIt appends a runtime glossary block that prefers exact dictionary spellings when the transcript context matches.
 
 ### Usage Guidelines
 
@@ -569,7 +569,7 @@ The translation prompt is used for dedicated translation actions, such as the de
 ### Default Prompt
 
 ```text
-You are Voxt's content cleanup and translation assistant, responsible for organizing user-provided content and translating it into the target language.
+You are SayIt's content cleanup and translation assistant, responsible for organizing user-provided content and translating it into the target language.
 
 User main language:
 {{USER_MAIN_LANGUAGE}}
@@ -597,11 +597,11 @@ Return only the cleaned and translated text, with no extra explanation.
 
 - `{{TARGET_LANGUAGE}}`
 - `{{USER_MAIN_LANGUAGE}}`
-- `{{SOURCE_TEXT}}` is still supported for custom prompts, but the default prompt does not embed it because Voxt supplies the source text at runtime.
+- `{{SOURCE_TEXT}}` is still supported for custom prompts, but the default prompt does not embed it because SayIt supplies the source text at runtime.
 
 ### Runtime Enforcement
 
-When translation is actually executed, Voxt appends an additional layer of mandatory rules after the base prompt:
+When translation is actually executed, SayIt appends an additional layer of mandatory rules after the base prompt:
 
 - Normal translation mode:
   - must translate into the target language
@@ -610,13 +610,13 @@ When translation is actually executed, Voxt appends an additional layer of manda
   - do not output explanations
   - return only the translated result
 - Strict retry mode:
-  - if the first output looks untranslated, Voxt retries with stricter translation rules
+  - if the first output looks untranslated, SayIt retries with stricter translation rules
   - it more strongly enforces "do not copy source-language wording"
 - Dictionary guidance:
-  - if the source text hits dictionary terms, Voxt appends a runtime glossary instructing the model to preserve exact spellings unless translation clearly requires otherwise
+  - if the source text hits dictionary terms, SayIt appends a runtime glossary instructing the model to preserve exact spellings unless translation clearly requires otherwise
 
 > [!IMPORTANT]
-> This means the final translation prompt is not only the text you wrote. Voxt appends an extra runtime layer that enforces "must translate" and "return only the result".
+> This means the final translation prompt is not only the text you wrote. SayIt appends an extra runtime layer that enforces "must translate" and "return only the result".
 
 ### Usage Guidelines
 
@@ -650,7 +650,7 @@ It has two typical scenarios:
 ### Default Prompt
 
 ```text
-You are Voxt's content writing assistant. Use the spoken instruction and the optional selected source text to produce the final text that should be inserted into the current input field.
+You are SayIt's content writing assistant. Use the spoken instruction and the optional selected source text to produce the final text that should be inserted into the current input field.
 
 Spoken instruction:
 <spoken_instruction>
@@ -676,17 +676,17 @@ Rules:
 
 ### Runtime Enforcement
 
-When rewrite is executed, Voxt may append additional runtime constraints after the base prompt:
+When rewrite is executed, SayIt may append additional runtime constraints after the base prompt:
 
 - Direct-answer mode:
-  - if there is no selected source text, Voxt explicitly tells the model to treat the spoken instruction as the full request and to output the actual answer directly
+  - if there is no selected source text, SayIt explicitly tells the model to treat the spoken instruction as the full request and to output the actual answer directly
 - Structured answer mode:
-  - when the rewrite answer card expects structured output, Voxt temporarily requires a JSON object with exactly `title` and `content`
+  - when the rewrite answer card expects structured output, SayIt temporarily requires a JSON object with exactly `title` and `content`
   - `content` must contain the final answer text only
 - Non-empty retry:
-  - if a previous structured answer returned empty content, Voxt retries once with a stronger non-empty requirement
+  - if a previous structured answer returned empty content, SayIt retries once with a stronger non-empty requirement
 - Dictionary guidance:
-  - if relevant terms match the dictionary, Voxt appends a glossary block asking the model to prefer exact spellings in the final output
+  - if relevant terms match the dictionary, SayIt appends a glossary block asking the model to prefer exact spellings in the final output
 
 ### Usage Guidelines
 

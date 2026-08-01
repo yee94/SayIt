@@ -58,7 +58,7 @@ enum OnboardingStep: String, CaseIterable, Identifiable {
         case .appEnhancement:
             return AppLocalization.localizedString("Review how app-aware prompt switching works across apps and pages.")
         case .finish:
-            return AppLocalization.localizedString("Review your setup, then start using Voxt.")
+            return AppLocalization.localizedString("Review your setup, then start using SayIt.")
         }
     }
 

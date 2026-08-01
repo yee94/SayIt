@@ -97,7 +97,7 @@ struct RemoteLLMRuntimeClient {
             : resolvedLLMEndpoint(provider: provider, endpoint: configuration.endpoint, model: model)
         guard let url = URL(string: endpointValue) else {
             throw NSError(
-                domain: "Voxt.RemoteLLM",
+                domain: "SayIt.RemoteLLM",
                 code: -900,
                 userInfo: [NSLocalizedDescriptionKey: "Invalid remote LLM endpoint URL: \(endpointValue)"]
             )
@@ -120,7 +120,7 @@ struct RemoteLLMRuntimeClient {
         guard let httpResponse = response as? HTTPURLResponse else { return }
         guard (200..<500).contains(httpResponse.statusCode) else {
             throw NSError(
-                domain: "Voxt.RemoteLLM",
+                domain: "SayIt.RemoteLLM",
                 code: httpResponse.statusCode,
                 userInfo: [NSLocalizedDescriptionKey: "Remote warmup failed with HTTP \(httpResponse.statusCode)."]
             )
@@ -200,7 +200,7 @@ struct RemoteLLMRuntimeClient {
                 )
             } catch let error as NSError where
                 textFormat != nil &&
-                error.domain == "Voxt.RemoteLLM" &&
+                error.domain == "SayIt.RemoteLLM" &&
                 [-308, -309].contains(error.code) {
                 let retryConfiguration = structuredResponsesRetryConfiguration(
                     configuration,
@@ -714,11 +714,11 @@ struct RemoteLLMRuntimeClient {
         let (data, response) = try await VoxtNetworkSession.active.data(for: request)
         let responseElapsedMs = Int(Date().timeIntervalSince(requestStartedAt) * 1000)
         guard let http = response as? HTTPURLResponse else {
-            throw NSError(domain: "Voxt.RemoteLLM", code: -305, userInfo: [NSLocalizedDescriptionKey: "Invalid remote LLM response."])
+            throw NSError(domain: "SayIt.RemoteLLM", code: -305, userInfo: [NSLocalizedDescriptionKey: "Invalid remote LLM response."])
         }
         guard (200...299).contains(http.statusCode) else {
             throw NSError(
-                domain: "Voxt.RemoteLLM",
+                domain: "SayIt.RemoteLLM",
                 code: http.statusCode,
                 userInfo: [NSLocalizedDescriptionKey: "Remote LLM request failed (HTTP \(http.statusCode))."]
             )
@@ -740,7 +740,7 @@ struct RemoteLLMRuntimeClient {
 
         if let errorMessage = extractStreamingErrorMessage(from: object) ?? responsesErrorMessage(from: object) {
             throw NSError(
-                domain: "Voxt.RemoteLLM",
+                domain: "SayIt.RemoteLLM",
                 code: -307,
                 userInfo: [NSLocalizedDescriptionKey: errorMessage]
             )
@@ -751,7 +751,7 @@ struct RemoteLLMRuntimeClient {
                 "Remote LLM Responses response incomplete. provider=\(provider.rawValue), endpoint=\(endpointValue), status=\(http.statusCode), detail=\(completionIssue)"
             )
             throw NSError(
-                domain: "Voxt.RemoteLLM",
+                domain: "SayIt.RemoteLLM",
                 code: -308,
                 userInfo: [NSLocalizedDescriptionKey: completionIssue]
             )
@@ -762,14 +762,14 @@ struct RemoteLLMRuntimeClient {
             VoxtLog.llmWarning(
                 "Remote LLM Responses response has no usable text. provider=\(provider.rawValue), endpoint=\(endpointValue), status=\(http.statusCode), bytes=\(data.count), payloadChars=\(payloadPreview.count)"
             )
-            throw NSError(domain: "Voxt.RemoteLLM", code: -306, userInfo: [NSLocalizedDescriptionKey: "Remote LLM returned no text content."])
+            throw NSError(domain: "SayIt.RemoteLLM", code: -306, userInfo: [NSLocalizedDescriptionKey: "Remote LLM returned no text content."])
         }
         if textFormat != nil, !isValidStructuredJSONObject(content) {
             VoxtLog.llmWarning(
                 "Remote LLM Responses structured output is not a complete JSON object. provider=\(provider.rawValue), endpoint=\(endpointValue), outputChars=\(content.count)"
             )
             throw NSError(
-                domain: "Voxt.RemoteLLM",
+                domain: "SayIt.RemoteLLM",
                 code: -309,
                 userInfo: [NSLocalizedDescriptionKey: "Remote LLM returned incomplete structured output."]
             )
@@ -838,11 +838,11 @@ struct RemoteLLMRuntimeClient {
         do {
             let (bytes, response) = try await VoxtNetworkSession.active.bytes(for: request)
             guard let http = response as? HTTPURLResponse else {
-                throw NSError(domain: "Voxt.RemoteLLM", code: -305, userInfo: [NSLocalizedDescriptionKey: "Invalid remote LLM response."])
+                throw NSError(domain: "SayIt.RemoteLLM", code: -305, userInfo: [NSLocalizedDescriptionKey: "Invalid remote LLM response."])
             }
             guard (200...299).contains(http.statusCode) else {
                 throw NSError(
-                    domain: "Voxt.RemoteLLM",
+                    domain: "SayIt.RemoteLLM",
                     code: http.statusCode,
                     userInfo: [NSLocalizedDescriptionKey: "Remote LLM request failed (HTTP \(http.statusCode)) while opening stream."]
                 )
@@ -872,7 +872,7 @@ struct RemoteLLMRuntimeClient {
 
                 if let errorMessage = extractStreamingErrorMessage(from: object) ?? responsesErrorMessage(from: object) {
                     throw NSError(
-                        domain: "Voxt.RemoteLLM",
+                        domain: "SayIt.RemoteLLM",
                         code: -307,
                         userInfo: [NSLocalizedDescriptionKey: errorMessage]
                     )
@@ -1045,7 +1045,7 @@ struct RemoteLLMRuntimeClient {
                         )
                         let trimmed = streamed.trimmingCharacters(in: .whitespacesAndNewlines)
                         guard !trimmed.isEmpty else {
-                            throw NSError(domain: "Voxt.RemoteLLM", code: -306, userInfo: [NSLocalizedDescriptionKey: "Remote LLM returned no text content."])
+                            throw NSError(domain: "SayIt.RemoteLLM", code: -306, userInfo: [NSLocalizedDescriptionKey: "Remote LLM returned no text content."])
                         }
                         return trimmed
                     } catch let streamingFailure as StreamingFailure where streamingFailure.emittedChunkCount == 0 {
@@ -1089,11 +1089,11 @@ struct RemoteLLMRuntimeClient {
                 let (data, response) = try await VoxtNetworkSession.active.data(for: request)
                 let responseElapsedMs = Int(Date().timeIntervalSince(requestStartedAt) * 1000)
                 guard let http = response as? HTTPURLResponse else {
-                    throw NSError(domain: "Voxt.RemoteLLM", code: -305, userInfo: [NSLocalizedDescriptionKey: "Invalid remote LLM response."])
+                    throw NSError(domain: "SayIt.RemoteLLM", code: -305, userInfo: [NSLocalizedDescriptionKey: "Invalid remote LLM response."])
                 }
                 guard (200...299).contains(http.statusCode) else {
                     throw NSError(
-                        domain: "Voxt.RemoteLLM",
+                        domain: "SayIt.RemoteLLM",
                         code: http.statusCode,
                         userInfo: [NSLocalizedDescriptionKey: "Remote LLM request failed (HTTP \(http.statusCode))."]
                     )
@@ -1106,7 +1106,7 @@ struct RemoteLLMRuntimeClient {
                 let attempt = index + 1
                 if let errorMessage = extractStreamingErrorMessage(from: object) {
                     throw NSError(
-                        domain: "Voxt.RemoteLLM",
+                        domain: "SayIt.RemoteLLM",
                         code: -307,
                         userInfo: [NSLocalizedDescriptionKey: errorMessage]
                     )
@@ -1134,7 +1134,7 @@ struct RemoteLLMRuntimeClient {
                 VoxtLog.llmWarning(
                     "Remote LLM response has no usable text. provider=\(provider.rawValue), endpoint=\(endpointValue), status=\(http.statusCode), attempt=\(attempt)/\(endpoints.count), bytes=\(data.count), networkMs=\(responseElapsedMs), decodeMs=\(decodeElapsedMs), totalMs=\(totalElapsedMs)"
                 )
-                throw NSError(domain: "Voxt.RemoteLLM", code: -306, userInfo: [NSLocalizedDescriptionKey: "Remote LLM returned no text content."])
+                throw NSError(domain: "SayIt.RemoteLLM", code: -306, userInfo: [NSLocalizedDescriptionKey: "Remote LLM returned no text content."])
             } catch {
                 lastError = error
                 let elapsedMs = Int(Date().timeIntervalSince(attemptStartedAt) * 1000)
@@ -1167,7 +1167,7 @@ struct RemoteLLMRuntimeClient {
             }
         }
 
-        throw lastError ?? NSError(domain: "Voxt.RemoteLLM", code: -306, userInfo: [NSLocalizedDescriptionKey: "Remote LLM returned no text content."])
+        throw lastError ?? NSError(domain: "SayIt.RemoteLLM", code: -306, userInfo: [NSLocalizedDescriptionKey: "Remote LLM returned no text content."])
     }
 
     private func makeCompletionRequest(
@@ -1199,7 +1199,7 @@ struct RemoteLLMRuntimeClient {
         }
         guard let url = URL(string: resolvedEndpoint) else {
             throw NSError(
-                domain: "Voxt.RemoteLLM",
+                domain: "SayIt.RemoteLLM",
                 code: -300,
                 userInfo: [NSLocalizedDescriptionKey: "Invalid remote LLM endpoint URL: \(resolvedEndpoint)"]
             )
@@ -1217,7 +1217,7 @@ struct RemoteLLMRuntimeClient {
         switch provider {
         case .anthropic:
             guard !configuration.apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                throw NSError(domain: "Voxt.RemoteLLM", code: -301, userInfo: [NSLocalizedDescriptionKey: "Anthropic API key is empty."])
+                throw NSError(domain: "SayIt.RemoteLLM", code: -301, userInfo: [NSLocalizedDescriptionKey: "Anthropic API key is empty."])
             }
             request.setValue(configuration.apiKey, forHTTPHeaderField: "x-api-key")
             request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
@@ -1251,10 +1251,10 @@ struct RemoteLLMRuntimeClient {
         case .google:
             let apiKey = configuration.apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !apiKey.isEmpty else {
-                throw NSError(domain: "Voxt.RemoteLLM", code: -302, userInfo: [NSLocalizedDescriptionKey: "Google API key is empty."])
+                throw NSError(domain: "SayIt.RemoteLLM", code: -302, userInfo: [NSLocalizedDescriptionKey: "Google API key is empty."])
             }
             guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
-                throw NSError(domain: "Voxt.RemoteLLM", code: -303, userInfo: [NSLocalizedDescriptionKey: "Invalid Google endpoint URL."])
+                throw NSError(domain: "SayIt.RemoteLLM", code: -303, userInfo: [NSLocalizedDescriptionKey: "Invalid Google endpoint URL."])
             }
             var items = components.queryItems ?? []
             if !items.contains(where: { $0.name == "key" }) {
@@ -1286,7 +1286,7 @@ struct RemoteLLMRuntimeClient {
         case .minimax:
             let apiKey = configuration.apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !apiKey.isEmpty else {
-                throw NSError(domain: "Voxt.RemoteLLM", code: -304, userInfo: [NSLocalizedDescriptionKey: "MiniMax API key is empty."])
+                throw NSError(domain: "SayIt.RemoteLLM", code: -304, userInfo: [NSLocalizedDescriptionKey: "MiniMax API key is empty."])
             }
             request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
             var payload: [String: Any] = [
@@ -1940,14 +1940,14 @@ struct RemoteLLMRuntimeClient {
     ) throws -> [String: Any] {
         guard let data = source.data(using: .utf8) else {
             throw NSError(
-                domain: "Voxt.RemoteLLM",
+                domain: "SayIt.RemoteLLM",
                 code: -308,
                 userInfo: [NSLocalizedDescriptionKey: "\(fieldName) is not valid UTF-8 JSON."]
             )
         }
         guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw NSError(
-                domain: "Voxt.RemoteLLM",
+                domain: "SayIt.RemoteLLM",
                 code: -309,
                 userInfo: [NSLocalizedDescriptionKey: "\(fieldName) must be a JSON object."]
             )
@@ -2031,7 +2031,7 @@ struct RemoteLLMRuntimeClient {
             )
         ) else { return }
         throw NSError(
-            domain: "Voxt.RemoteLLM",
+            domain: "SayIt.RemoteLLM",
             code: -901,
             userInfo: [NSLocalizedDescriptionKey: message]
         )
@@ -2054,11 +2054,11 @@ struct RemoteLLMRuntimeClient {
         do {
             let (bytes, response) = try await VoxtNetworkSession.active.bytes(for: request)
             guard let http = response as? HTTPURLResponse else {
-                throw NSError(domain: "Voxt.RemoteLLM", code: -305, userInfo: [NSLocalizedDescriptionKey: "Invalid remote LLM response."])
+                throw NSError(domain: "SayIt.RemoteLLM", code: -305, userInfo: [NSLocalizedDescriptionKey: "Invalid remote LLM response."])
             }
             guard (200...299).contains(http.statusCode) else {
                 throw NSError(
-                    domain: "Voxt.RemoteLLM",
+                    domain: "SayIt.RemoteLLM",
                     code: http.statusCode,
                     userInfo: [NSLocalizedDescriptionKey: "Remote LLM request failed (HTTP \(http.statusCode)) while opening stream."]
                 )
@@ -2082,7 +2082,7 @@ struct RemoteLLMRuntimeClient {
                    let object = try? JSONSerialization.jsonObject(with: data) {
                     if let errorMessage = extractStreamingErrorMessage(from: object) {
                         throw NSError(
-                            domain: "Voxt.RemoteLLM",
+                            domain: "SayIt.RemoteLLM",
                             code: -307,
                             userInfo: [NSLocalizedDescriptionKey: errorMessage]
                         )
@@ -2331,7 +2331,7 @@ struct RemoteLLMRuntimeClient {
                 NSURLErrorNotConnectedToInternet
             ].contains(nsError.code)
         }
-        if nsError.domain == "Voxt.RemoteLLM" {
+        if nsError.domain == "SayIt.RemoteLLM" {
             return (500...599).contains(nsError.code)
         }
         return false

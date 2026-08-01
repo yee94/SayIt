@@ -47,8 +47,8 @@ final class RecordingSessionSupportTests: XCTestCase {
     }
 
     func testPromptEchoSuppressionDropsCustomPromptEcho() {
-        let prompt = "Always preserve the phrase Voxt Server and product names exactly when transcribing user speech."
-        let echoed = "Always preserve the phrase Voxt Server and product names exactly when transcribing user speech."
+        let prompt = "Always preserve the phrase SayIt Server and product names exactly when transcribing user speech."
+        let echoed = "Always preserve the phrase SayIt Server and product names exactly when transcribing user speech."
 
         XCTAssertTrue(RecordingSessionSupport.isLikelyPromptEcho(echoed, prompt: prompt))
         XCTAssertEqual(RecordingSessionSupport.textAfterSuppressingPromptEcho(echoed, prompt: prompt), "")

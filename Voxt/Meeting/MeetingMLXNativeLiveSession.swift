@@ -169,7 +169,7 @@ private final class MeetingMLXNativeLiveSession: MeetingLiveTranscribingSession 
         let configuration = try await streamingTranscriber.makeMeetingNativeStreamingConfiguration()
         guard configuration.liveMode != .nativeVoxtralLive else {
             throw NSError(
-                domain: "Voxt.Meeting.NativeMLX",
+                domain: "SayIt.Meeting.NativeMLX",
                 code: -10,
                 userInfo: [NSLocalizedDescriptionKey: "Hidden support models are excluded from meeting optimization."]
             )

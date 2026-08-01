@@ -121,7 +121,7 @@ extension RemoteLLMRuntimeClient {
         let configuration = runtimeConfiguration.value
         guard let url = URL(string: endpointValue) else {
             throw NSError(
-                domain: "Voxt.RemoteLLM",
+                domain: "SayIt.RemoteLLM",
                 code: -300,
                 userInfo: [NSLocalizedDescriptionKey: "Invalid remote LLM endpoint URL: \(endpointValue)"]
             )

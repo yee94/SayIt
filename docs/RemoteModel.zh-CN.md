@@ -1,6 +1,6 @@
 # 远程模型
 
-Voxt 支持分别为 `Remote ASR` 和 `Remote LLM` 选择独立的远程服务商。下面只介绍 app 当前内置的服务商与模型范围，方便你先了解各家定位；API Key、端点填写、模型选型建议等操作说明可以在后续章节继续补充。
+SayIt 支持分别为 `Remote ASR` 和 `Remote LLM` 选择独立的远程服务商。下面只介绍 app 当前内置的服务商与模型范围，方便你先了解各家定位；API Key、端点填写、模型选型建议等操作说明可以在后续章节继续补充。
 
 ## ASR 模型
 
@@ -8,8 +8,8 @@ Voxt 支持分别为 `Remote ASR` 和 `Remote LLM` 选择独立的远程服务�
 
 - 默认推荐：`whisper-1`
 - 内置模型：`whisper-1`、`gpt-4o-mini-transcribe`、`gpt-4o-transcribe`
-- 简介：适合通用多语言音频转写。Voxt 当前按文件转写方式接入，适合追求兼容性和稳定体验的用户。
-- Voxt 说明：这一档也支持填写自定义模型 ID，以及 OpenAI-compatible 的转写 endpoint。
+- 简介：适合通用多语言音频转写。SayIt 当前按文件转写方式接入，适合追求兼容性和稳定体验的用户。
+- SayIt 说明：这一档也支持填写自定义模型 ID，以及 OpenAI-compatible 的转写 endpoint。
 
 - [官网](https://openai.com/)
 - [API 文档](https://developers.openai.com/api/reference/resources/audio)
@@ -29,10 +29,10 @@ key: `$OPENAI_API_KEY`
 
 重要说明：
 
-- 在 Voxt 里，只有 `OpenAI Whisper` 这一档支持自定义 ASR 模型 ID。
+- 在 SayIt 里，只有 `OpenAI Whisper` 这一档支持自定义 ASR 模型 ID。
 - endpoint 需要填写完整的转写路径，不能只填 API 根地址。
-- Voxt 当前在这条链路上统一使用文件上传转写。即使兼容服务本身支持 URL 或 Base64 输入，Voxt 也仍然走文件上传。
-- 如果兼容服务返回了额外的结构化字段，例如 diarization 分段，Voxt 当前会读取转写文本，但不会把这些字段作为独立 UI 能力展示。
+- SayIt 当前在这条链路上统一使用文件上传转写。即使兼容服务本身支持 URL 或 Base64 输入，SayIt 也仍然走文件上传。
+- 如果兼容服务返回了额外的结构化字段，例如 diarization 分段，SayIt 当前会读取转写文本，但不会把这些字段作为独立 UI 能力展示。
 
 <img width="923" height="676" alt="image" src="https://github.com/user-attachments/assets/62be17c8-78f5-418e-a4ba-873d18d58f18" />
 
@@ -77,7 +77,7 @@ key: `xxx.xxx`
   - Qwen3 ASR Flash Realtime：`qwen3-asr-flash-realtime`、`qwen3-asr-flash-realtime-2026-02-10`、`qwen3-asr-flash-realtime-2025-10-27`
   - Fun ASR Realtime：`fun-asr-realtime`、`fun-asr-realtime-2026-02-28`、`fun-asr-realtime-2025-11-07`、`fun-asr-realtime-2025-09-15`、`fun-asr-flash-8k-realtime`、`fun-asr-flash-8k-realtime-2026-01-28`
   - Paraformer Realtime：`paraformer-realtime-v2`、`paraformer-realtime-v1`、`paraformer-realtime-8k-v2`、`paraformer-realtime-8k-v1`
-- 简介：阿里云百炼在 Voxt 中是目前远程 ASR 里预置模型最多的一组，既有 Qwen3 ASR，也有 Fun ASR 和 Paraformer，适合需要实时识别、并希望在同一平台内比较不同 ASR 系列的用户。
+- 简介：阿里云百炼在 SayIt 中是目前远程 ASR 里预置模型最多的一组，既有 Qwen3 ASR，也有 Fun ASR 和 Paraformer，适合需要实时识别、并希望在同一平台内比较不同 ASR 系列的用户。
 
 - [官网](https://bailian.console.aliyun.com/cn-beijing)
 - [key 管理](https://bailian.console.aliyun.com/cn-beijing/?tab=model#/api-key)
@@ -96,7 +96,7 @@ key：`xxxx`
 
 ## LLM 模型
 
-Voxt 的远程 LLM 配置页除了内置预置模型外，也支持手动填写自定义模型 ID；下面先列出每个服务商在 app 中已经预置好的主流模型范围。
+SayIt 的远程 LLM 配置页除了内置预置模型外，也支持手动填写自定义模型 ID；下面先列出每个服务商在 app 中已经预置好的主流模型范围。
 
 ### Anthropic
 
@@ -144,9 +144,9 @@ Voxt 的远程 LLM 配置页除了内置预置模型外，也支持手动填写�
 - 内置模型范围：由本机 oMLX 服务暴露的 Qwen、Llama、DeepSeek、Gemma、Mixtral、GPT-OSS 等 MLX 本地模型别名
 - 代表模型：`qwen3`、`Qwen3-Coder-Next-8bit`、`gpt-oss-120b-MXFP4-Q8`、`Qwen3.5-122B-A10B-4bit`、`Step-3.5-Flash-8bit`
 - Key：可选。默认本机 `localhost` 场景通常留空即可；如果你启动 oMLX 时配置了 `--api-key`，再填 bearer token。
-- 端点：Voxt 默认使用 oMLX 的 OpenAI-compatible 根地址 `http://localhost:8000/v1`，实际请求会自动落到 `/v1/chat/completions`。
+- 端点：SayIt 默认使用 oMLX 的 OpenAI-compatible 根地址 `http://localhost:8000/v1`，实际请求会自动落到 `/v1/chat/completions`。
 - 模型 ID：既可以直接填 `/v1/models` 返回的别名，也可以使用 oMLX 自动发现的本地模型目录名。
-- 简介：适合在 Apple Silicon 上运行 MLX 原生本地推理，并希望通过一个独立本地模型服务把能力接入 Voxt 的用户。
+- 简介：适合在 Apple Silicon 上运行 MLX 原生本地推理，并希望通过一个独立本地模型服务把能力接入 SayIt 的用户。
 
 *Soon*
 
@@ -216,7 +216,7 @@ key: `xxx`
 
 - 默认推荐：`llama3.1`
 - 内置模型：`llama3.1`、`qwen2.5-14b-instruct`
-- 简介：适合已经在本机使用 LM Studio 暴露 OpenAI-compatible 接口的用户，能快速把本地模型接入 Voxt。
+- 简介：适合已经在本机使用 LM Studio 暴露 OpenAI-compatible 接口的用户，能快速把本地模型接入 SayIt。
 
 *Soon*
 

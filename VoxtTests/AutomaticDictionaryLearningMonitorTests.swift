@@ -51,7 +51,7 @@ final class AutomaticDictionaryLearningMonitorTests: XCTestCase {
         let outcome = AutomaticDictionaryLearningMonitor.makeLearningRequest(
             insertedText: "Waxed",
             baselineText: "Our app is named Waxed.",
-            finalText: "Our app is named Voxt."
+            finalText: "Our app is named SayIt."
         )
 
         guard case .ready(let request) = outcome else {
@@ -59,7 +59,7 @@ final class AutomaticDictionaryLearningMonitorTests: XCTestCase {
         }
 
         XCTAssertEqual(request.baselineChangedFragment, "Waxed.")
-        XCTAssertEqual(request.finalChangedFragment, "Voxt.")
+        XCTAssertEqual(request.finalChangedFragment, "SayIt.")
         XCTAssertLessThanOrEqual(request.editRatio, AutomaticDictionaryLearningMonitor.maximumEditRatio)
     }
 
@@ -246,7 +246,7 @@ final class AutomaticDictionaryLearningMonitorTests: XCTestCase {
         XCTAssertEqual(
             AutomaticDictionaryLearningMonitor.directCandidateTerms(
                 for: request,
-                existingTerms: ["Voxt"]
+                existingTerms: ["SayIt"]
             ),
             ["Claude Code"]
         )
@@ -741,11 +741,11 @@ final class AutomaticDictionaryLearningMonitorTests: XCTestCase {
 
     func testBuildPromptUsesEmptyPlaceholderForExistingTerms() {
         let request = AutomaticDictionaryLearningRequest(
-            insertedText: "Voxt",
-            baselineContext: "Voxt",
-            finalContext: "Voxt",
+            insertedText: "SayIt",
+            baselineContext: "SayIt",
+            finalContext: "SayIt",
             baselineChangedFragment: "vox",
-            finalChangedFragment: "Voxt",
+            finalChangedFragment: "SayIt",
             editRatio: 0.1
         )
 
@@ -783,11 +783,11 @@ final class AutomaticDictionaryLearningMonitorTests: XCTestCase {
 
     func testBuildPromptCapsExistingTermListToTwentyItems() {
         let request = AutomaticDictionaryLearningRequest(
-            insertedText: "Voxt",
-            baselineContext: "Voxt",
-            finalContext: "Voxt",
+            insertedText: "SayIt",
+            baselineContext: "SayIt",
+            finalContext: "SayIt",
             baselineChangedFragment: "vox",
-            finalChangedFragment: "Voxt",
+            finalChangedFragment: "SayIt",
             editRatio: 0.1
         )
 

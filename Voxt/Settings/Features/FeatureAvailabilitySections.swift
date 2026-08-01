@@ -10,7 +10,7 @@ extension FeatureSettingsView {
         let _ = appBranchGroupsData
         return featurePage(
             title: AppLocalization.localizedString("Feature"),
-            subtitle: AppLocalization.localizedString("Choose which features are available in Voxt."),
+            subtitle: AppLocalization.localizedString("Choose which features are available in SayIt."),
             iconKind: .features,
             pills: [],
             showsHeroHeader: false,

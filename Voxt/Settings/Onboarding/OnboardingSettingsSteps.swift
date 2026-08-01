@@ -377,7 +377,7 @@ extension OnboardingSettingsView {
                     .foregroundStyle(.secondary)
 
                 Toggle(localized("Mute other media audio while recording"), isOn: $muteSystemAudioWhileRecording)
-                Text(localized("Requires system audio recording permission, and only affects other apps' media playback while Voxt is recording."))
+                Text(localized("Requires system audio recording permission, and only affects other apps' media playback while SayIt is recording."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -534,7 +534,7 @@ extension OnboardingSettingsView {
     var appEnhancementStep: some View {
         VStack(alignment: .leading, spacing: 16) {
             GeneralSettingsCard(title: "App Enhancement") {
-                Text(localized("App Enhancement lets Voxt switch prompts based on the current app or browser tab, so translation, rewrite, and cleanup can behave differently across contexts."))
+                Text(localized("App Enhancement lets SayIt switch prompts based on the current app or browser tab, so translation, rewrite, and cleanup can behave differently across contexts."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -607,7 +607,7 @@ extension OnboardingSettingsView {
     var finishStep: some View {
         VStack(alignment: .leading, spacing: 16) {
             GeneralSettingsCard(title: "You're Ready") {
-                Text(localized("Voxt is configured enough to start. You can still refine any detail later from the normal settings pages."))
+                Text(localized("SayIt is configured enough to start. You can still refine any detail later from the normal settings pages."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -657,7 +657,7 @@ extension OnboardingSettingsView {
 
                 HStack {
                     Spacer()
-                    Button(localized("Start Voxt")) {
+                    Button(localized("Start SayIt")) {
                         onFinish()
                     }
                     .buttonStyle(SettingsPrimaryButtonStyle())

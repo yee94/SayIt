@@ -27,7 +27,7 @@ enum VoxtLogFormatter {
         line: UInt
     ) -> String {
         var parts = [
-            "[Voxt]",
+            "[SayIt]",
             Self.timestamp(for: timestamp),
             "[\(levelLabel(level))]",
             "[\(category.rawValue)]",

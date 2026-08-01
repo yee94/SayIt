@@ -375,7 +375,7 @@ final class VoxtObsidianSyncCoordinator {
         let trimmed = value
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        return trimmed.isEmpty ? "Voxt" : trimmed
+        return trimmed.isEmpty ? "SayIt" : trimmed
     }
 
     private static func readableFileStem(for note: VoxtNoteItem) -> String {
@@ -468,12 +468,12 @@ final class VoxtObsidianSyncCoordinator {
     ) -> String {
         switch groupingMode {
         case .session:
-            return notes.first?.title ?? "Voxt Session Notes"
+            return notes.first?.title ?? "SayIt Session Notes"
         case .daily:
-            guard let date = notes.first?.createdAt else { return "Voxt Daily Notes" }
+            guard let date = notes.first?.createdAt else { return "SayIt Daily Notes" }
             return "\(dayFolderFormatter.string(from: date)) Notes"
         case .file:
-            return notes.first?.title ?? "Voxt Note"
+            return notes.first?.title ?? "SayIt Note"
         }
     }
 

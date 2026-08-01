@@ -199,7 +199,7 @@ enum VoxtNetworkSession {
 
         guard likelyProxyConflict else { return nil }
         return AppLocalization.format(
-            "Voxt is set to direct connection, but macOS system proxy is still enabled (%@). This WebSocket request was still routed to that proxy. Disable the system proxy or TUN mode in Clash/your proxy app, or switch Voxt to System Proxy mode.",
+            "SayIt is set to direct connection, but macOS system proxy is still enabled (%@). This WebSocket request was still routed to that proxy. Disable the system proxy or TUN mode in Clash/your proxy app, or switch SayIt to System Proxy mode.",
             proxySummary
         )
     }
@@ -223,13 +223,13 @@ enum VoxtNetworkSession {
             let status = currentSystemProxyStatus
             guard status.hasEnabledProxy, let proxySummary = status.preferredSummary else { return nil }
             return AppLocalization.format(
-                "Voxt is using the macOS system proxy (%@), but that proxy is unreachable. Make sure Clash/your proxy app is running, or switch Voxt to Direct Connection if you don't need a proxy.",
+                "SayIt is using the macOS system proxy (%@), but that proxy is unreachable. Make sure Clash/your proxy app is running, or switch SayIt to Direct Connection if you don't need a proxy.",
                 proxySummary
             )
         case .custom:
             guard settings.hasValidCustomEndpoint, let port = settings.port else { return nil }
             return AppLocalization.format(
-                "Voxt is using the custom proxy (%@://%@:%d), but that proxy is unreachable. Check the proxy address, port, and whether the proxy app is running.",
+                "SayIt is using the custom proxy (%@://%@:%d), but that proxy is unreachable. Check the proxy address, port, and whether the proxy app is running.",
                 settings.scheme.rawValue.uppercased(),
                 settings.host,
                 port

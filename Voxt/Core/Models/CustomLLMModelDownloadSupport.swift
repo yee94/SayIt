@@ -49,7 +49,7 @@ enum CustomLLMModelDownloadSupport {
     ) async throws -> DownloadContext {
         guard let repoID = Repo.ID(rawValue: repo) else {
             throw NSError(
-                domain: "Voxt.CustomLLM",
+                domain: "SayIt.CustomLLM",
                 code: 1000,
                 userInfo: [NSLocalizedDescriptionKey: "Invalid model identifier"]
             )
@@ -64,7 +64,7 @@ enum CustomLLMModelDownloadSupport {
         )
         guard !entries.isEmpty else {
             throw NSError(
-                domain: "Voxt.CustomLLM",
+                domain: "SayIt.CustomLLM",
                 code: 1001,
                 userInfo: [NSLocalizedDescriptionKey: "No downloadable files were found for this model."]
             )

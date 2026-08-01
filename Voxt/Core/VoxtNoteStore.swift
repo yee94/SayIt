@@ -817,12 +817,12 @@ final class VoxtNoteStore: ObservableObject {
             try context.save()
             try archiveMigratedLegacyFile(at: legacyURL)
             migrationErrorMessage = nil
-            VoxtLog.history("Migrated legacy Voxt notes. count=\(legacyItems.count)")
+            VoxtLog.history("Migrated legacy SayIt notes. count=\(legacyItems.count)")
         } catch {
             context.rollback()
             migrationErrorMessage = error.localizedDescription
             lastErrorMessage = error.localizedDescription
-            VoxtLog.historyWarning("Legacy Voxt note migration failed. error=\(error.localizedDescription)")
+            VoxtLog.historyWarning("Legacy SayIt note migration failed. error=\(error.localizedDescription)")
         }
     }
 
@@ -856,7 +856,7 @@ final class VoxtNoteStore: ObservableObject {
         availability = .unavailable(message: message)
         detachStorage(clearPublishedItems: true)
         lastErrorMessage = message
-        VoxtLog.historyWarning("Voxt note storage unavailable. error=\(message)")
+        VoxtLog.historyWarning("SayIt note storage unavailable. error=\(message)")
     }
 
     private func archivePersistentStoreFamily(at storeURL: URL) throws -> URL? {
@@ -891,7 +891,7 @@ final class VoxtNoteStore: ObservableObject {
             throw error
         }
 
-        VoxtLog.history("Archived unavailable Voxt note storage. path=\(archiveURL.path)")
+        VoxtLog.history("Archived unavailable SayIt note storage. path=\(archiveURL.path)")
         return archiveURL
     }
 

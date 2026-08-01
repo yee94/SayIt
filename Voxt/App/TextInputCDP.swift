@@ -356,7 +356,7 @@ extension AppDelegate {
 
             if let error = response.error {
                 throw NSError(
-                    domain: "Voxt.ElectronCDP",
+                    domain: "SayIt.ElectronCDP",
                     code: port,
                     userInfo: [NSLocalizedDescriptionKey: error.message]
                 )

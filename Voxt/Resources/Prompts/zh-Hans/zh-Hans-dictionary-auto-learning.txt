@@ -3,7 +3,7 @@
 用户主要口语语言：{{USER_MAIN_LANGUAGE}}
 用户其他常用语言：{{USER_OTHER_LANGUAGES}}
 
-Voxt 初次插入的文本：
+SayIt 初次插入的文本：
 <inserted_text>
 {{INSERTED}}
 </inserted_text>

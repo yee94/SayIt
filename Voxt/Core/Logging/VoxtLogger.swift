@@ -10,7 +10,7 @@ struct VoxtLogger: Sendable {
     nonisolated init(category: VoxtLogCategory) {
         self.category = category
         LoggingBootstrap.bootstrapIfNeeded()
-        let logger = Logger(label: "Voxt.\(category.rawValue)")
+        let logger = Logger(label: "SayIt.\(category.rawValue)")
         self.logger = logger
     }
 

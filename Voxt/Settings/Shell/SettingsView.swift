@@ -272,8 +272,14 @@ struct SettingsView: View {
                 },
                 onReturnToRoot: {
                     navigationRequest = nil
+                    if selectedTab == .feature {
+                        // Feature configuration lives under Settings; return there instead of Home.
+                        sidebarMode = .settings
+                        selectedTab = .feature
+                        return
+                    }
                     sidebarMode = .root
-                    if selectedTab == .feature || selectedTab == .history || Self.isSettingsTab(selectedTab) {
+                    if selectedTab == .history || Self.isSettingsTab(selectedTab) {
                         selectedTab = .report
                     }
                 },
@@ -1830,7 +1836,7 @@ private struct SettingsSidebarInfoBlock: View {
                 HStack(spacing: 6) {
                     SettingsWebsiteIconView()
                         .frame(width: 14, height: 14)
-                    Text("Voxt")
+                    Text("SayIt")
                         .font(.system(size: 12, weight: .semibold))
                         .lineLimit(1)
                         .truncationMode(.tail)

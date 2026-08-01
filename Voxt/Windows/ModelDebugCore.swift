@@ -160,7 +160,7 @@ private final class DebugAudioRecorder: NSObject {
         recorder.isMeteringEnabled = false
         guard recorder.record() else {
             throw NSError(
-                domain: "Voxt.ModelDebug",
+                domain: "SayIt.ModelDebug",
                 code: -10,
                 userInfo: [NSLocalizedDescriptionKey: modelDebugLocalized("Failed to start recording.")]
             )
@@ -837,7 +837,7 @@ final class LLMDebugViewModel: ObservableObject {
         case .enhancement, .appGroup, .translation, .rewrite:
             guard let compiledRequest = promptResolution.compiledRequest else {
                 throw NSError(
-                    domain: "Voxt.ModelDebug",
+                    domain: "SayIt.ModelDebug",
                     code: -100,
                     userInfo: [NSLocalizedDescriptionKey: "Debug preset request compilation failed."]
                 )

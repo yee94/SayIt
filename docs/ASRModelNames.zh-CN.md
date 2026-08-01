@@ -1,12 +1,12 @@
 # ASR 模型系列与模型名称清单
 
-> 用途：整理当前 Voxt ASR 相关的模型系列名称、模型显示名称和内部 ID，方便后续统一改名、分组或精简。
+> 用途：整理当前 SayIt ASR 相关的模型系列名称、模型显示名称和内部 ID，方便后续统一改名、分组或精简。
 >
 > 来源：
-> - 本地 MLX ASR：`Voxt/Transcription/MLXModelSupport.swift`
-> - 本地 sherpa-onnx ASR：`Voxt/Transcription/SherpaOnnxModelSupport.swift`
-> - 本地 Whisper：`Voxt/Transcription/MLXModelSupport.swift` 中的 MLX Whisper family，旧 Whisper ID 仅保留迁移解析
-> - 远程 ASR：`Voxt/Core/Models/RemoteModelConfiguration.swift`
+> - 本地 MLX ASR：`SayIt/Transcription/MLXModelSupport.swift`
+> - 本地 sherpa-onnx ASR：`SayIt/Transcription/SherpaOnnxModelSupport.swift`
+> - 本地 Whisper：`SayIt/Transcription/MLXModelSupport.swift` 中的 MLX Whisper family，旧 Whisper ID 仅保留迁移解析
+> - 远程 ASR：`SayIt/Core/Models/RemoteModelConfiguration.swift`
 
 ## 本地 ASR 系列总览
 

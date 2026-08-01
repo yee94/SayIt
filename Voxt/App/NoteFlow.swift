@@ -111,7 +111,7 @@ extension AppDelegate {
             ?? overlayState.transcribedText.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedText = capturedText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedText.isEmpty else {
-            VoxtLog.info("Voxt note capture skipped because current transcript tail is empty. reason=\(reason)")
+            VoxtLog.info("SayIt note capture skipped because current transcript tail is empty. reason=\(reason)")
             return false
         }
 
@@ -129,7 +129,7 @@ extension AppDelegate {
         configureTranscriptionCapturePipelineForCurrentSession()
         overlayState.sessionIconMode = currentRecordingOverlayIconMode
         refreshVoxtNoteTranscriptDisplay()
-        VoxtLog.info("Voxt note captured. reason=\(reason), characters=\(trimmedText.count)")
+        VoxtLog.info("SayIt note captured. reason=\(reason), characters=\(trimmedText.count)")
         return true
     }
 
@@ -153,7 +153,7 @@ extension AppDelegate {
             return false
         }
         refreshVoxtNoteTranscriptDisplay()
-        VoxtLog.info("Voxt note trailing segment captured at session end. characters=\(trimmedCapturedText.count)")
+        VoxtLog.info("SayIt note trailing segment captured at session end. characters=\(trimmedCapturedText.count)")
         return true
     }
 

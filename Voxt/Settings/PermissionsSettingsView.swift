@@ -136,7 +136,7 @@ struct PermissionsSettingsView: View {
                                 Text(permissionsLocalized("App Branch Authorization"))
                                     .font(.headline)
 
-                                Text(permissionsLocalized("Allow Voxt to read active browser URLs for app grouping."))
+                                Text(permissionsLocalized("Allow SayIt to read active browser URLs for app grouping."))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                     .lineLimit(2)

@@ -81,21 +81,21 @@ extension AppDelegate {
         let trimmedText = entry.text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedQuestion.isEmpty else {
             throw NSError(
-                domain: "Voxt.TranscriptionDetail",
+                domain: "SayIt.TranscriptionDetail",
                 code: -1,
                 userInfo: [NSLocalizedDescriptionKey: AppLocalization.localizedString("Please enter a follow-up question.")]
             )
         }
         guard !trimmedText.isEmpty else {
             throw NSError(
-                domain: "Voxt.TranscriptionDetail",
+                domain: "SayIt.TranscriptionDetail",
                 code: -2,
                 userInfo: [NSLocalizedDescriptionKey: AppLocalization.localizedString("No saved transcription result is available yet.")]
             )
         }
         guard let model = resolvedTranscriptionFollowUpModel(for: entry.kind) else {
             throw NSError(
-                domain: "Voxt.TranscriptionDetail",
+                domain: "SayIt.TranscriptionDetail",
                 code: -3,
                 userInfo: [NSLocalizedDescriptionKey: unavailableTranscriptionFollowUpProviderMessage(for: entry.kind)]
             )
@@ -130,7 +130,7 @@ extension AppDelegate {
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             guard !output.isEmpty else {
                 throw NSError(
-                    domain: "Voxt.TranscriptionDetail",
+                    domain: "SayIt.TranscriptionDetail",
                     code: -4,
                     userInfo: [NSLocalizedDescriptionKey: AppLocalization.localizedString("Unable to generate answer.")]
                 )
@@ -254,7 +254,7 @@ extension AppDelegate {
         case .appleIntelligence:
             guard let enhancer else {
                 throw NSError(
-                    domain: "Voxt.TranscriptionDetail",
+                    domain: "SayIt.TranscriptionDetail",
                     code: -5,
                     userInfo: [NSLocalizedDescriptionKey: AppLocalization.localizedString("Apple Intelligence is unavailable.")]
                 )
@@ -263,7 +263,7 @@ extension AppDelegate {
                 return try await enhancer.enhance(userPrompt: trimmedPrompt)
             }
             throw NSError(
-                domain: "Voxt.TranscriptionDetail",
+                domain: "SayIt.TranscriptionDetail",
                 code: -6,
                 userInfo: [NSLocalizedDescriptionKey: AppLocalization.localizedString("Apple Intelligence requires macOS 26 or later.")]
             )

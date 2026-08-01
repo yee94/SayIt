@@ -43,7 +43,7 @@ final class SQLiteStorageRepositoryTests: XCTestCase {
         let legacyURL = try makeTemporaryDirectory().appendingPathComponent("dictionary.json")
         let groupID = UUID()
         let entry = DictionaryEntry(
-            term: "Voxt Term",
+            term: "SayIt Term",
             normalizedTerm: "voxt term",
             groupID: groupID,
             groupNameSnapshot: "Focused Group",
@@ -71,7 +71,7 @@ final class SQLiteStorageRepositoryTests: XCTestCase {
         let migratedEntries = try repository.allEntries()
 
         XCTAssertEqual(migratedEntries.count, 1)
-        XCTAssertEqual(migratedEntries[0].term, "Voxt Term")
+        XCTAssertEqual(migratedEntries[0].term, "SayIt Term")
         XCTAssertEqual(migratedEntries[0].categoryID, groupID)
         XCTAssertEqual(migratedEntries[0].categoryNameSnapshot, "Focused Group")
         XCTAssertEqual(migratedEntries[0].groupID, groupID)

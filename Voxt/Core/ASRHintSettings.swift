@@ -76,7 +76,7 @@ enum ASRHintTarget: String, CaseIterable, Codable, Identifiable {
         case .openAIWhisper:
             return AppLocalization.localizedString("OpenAI ASR uses the resolved main language and a short prompt bias. Keep the prompt concise and focused on recognition.")
         case .glmASR:
-            return AppLocalization.localizedString("Z ai uses a short prompt bias. It does not use hotwords in Voxt.")
+            return AppLocalization.localizedString("Z ai uses a short prompt bias. It does not use hotwords in SayIt.")
         case .doubaoASR:
             return AppLocalization.localizedString("Doubao ASR uses language hints. Chinese output follows your selected simplified or traditional main language automatically.")
         case .aliyunBailianASR:

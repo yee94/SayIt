@@ -12,7 +12,7 @@ extension RemoteASRTranscriber {
     ) throws {
         let token = configuration.apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !token.isEmpty else {
-            throw NSError(domain: "Voxt.RemoteASR", code: -6, userInfo: [NSLocalizedDescriptionKey: "StepFun API key is empty."])
+            throw NSError(domain: "SayIt.RemoteASR", code: -6, userInfo: [NSLocalizedDescriptionKey: "StepFun API key is empty."])
         }
 
         let configuredModel = configuration.model.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -21,7 +21,7 @@ extension RemoteASRTranscriber {
             : configuredModel
         let endpoint = RemoteASREndpointSupport.resolvedStepFunRealtimeEndpoint(configuration.endpoint)
         guard let wsURL = URL(string: endpoint) else {
-            throw NSError(domain: "Voxt.RemoteASR", code: -5, userInfo: [NSLocalizedDescriptionKey: "Invalid StepFun realtime endpoint URL."])
+            throw NSError(domain: "SayIt.RemoteASR", code: -5, userInfo: [NSLocalizedDescriptionKey: "Invalid StepFun realtime endpoint URL."])
         }
 
         var request = URLRequest(url: wsURL)
@@ -168,7 +168,7 @@ extension RemoteASRTranscriber {
                 ?? (dict["message"] as? String)
                 ?? "StepFun realtime stream error."
             let error = NSError(
-                domain: "Voxt.RemoteASR",
+                domain: "SayIt.RemoteASR",
                 code: -11,
                 userInfo: [NSLocalizedDescriptionKey: "StepFun ASR realtime error: \(message)"]
             )
@@ -315,7 +315,7 @@ extension RemoteASRTranscriber {
         do {
             let data = try JSONSerialization.data(withJSONObject: payload)
             guard let text = String(data: data, encoding: .utf8) else {
-                throw NSError(domain: "Voxt.RemoteASR", code: -12, userInfo: [NSLocalizedDescriptionKey: "Failed to encode StepFun realtime payload."])
+                throw NSError(domain: "SayIt.RemoteASR", code: -12, userInfo: [NSLocalizedDescriptionKey: "Failed to encode StepFun realtime payload."])
             }
             ws.send(.string(text)) { error in
                 onError(error)

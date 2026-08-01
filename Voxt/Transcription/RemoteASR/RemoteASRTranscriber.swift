@@ -141,7 +141,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
             firstPCMReadyGate.cancel()
             notifyStartFailure(
                 NSError(
-                    domain: "Voxt.RemoteASR",
+                    domain: "SayIt.RemoteASR",
                     code: -20,
                     userInfo: [NSLocalizedDescriptionKey: message]
                 )
@@ -344,7 +344,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
         else {
             notifyRuntimeFailure(
                 NSError(
-                    domain: "Voxt.RemoteASR",
+                    domain: "SayIt.RemoteASR",
                     code: -102,
                     userInfo: [NSLocalizedDescriptionKey: "Remote ASR session configuration is unavailable."]
                 )
@@ -472,7 +472,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
         }
 
         throw NSError(
-            domain: "Voxt.RemoteASR",
+            domain: "SayIt.RemoteASR",
             code: -101,
             userInfo: [NSLocalizedDescriptionKey: "Remote ASR file recording cannot switch microphones during an active session."]
         )
@@ -633,7 +633,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
     ) async throws -> String {
         if let message = endpointSecurityValidationMessage(for: configuration) {
             throw NSError(
-                domain: "Voxt.RemoteASR",
+                domain: "SayIt.RemoteASR",
                 code: -20,
                 userInfo: [NSLocalizedDescriptionKey: message]
             )
@@ -679,7 +679,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
         let recorder = try AVAudioRecorder(url: fileURL, settings: settings)
         recorder.isMeteringEnabled = true
         guard recorder.record() else {
-            throw NSError(domain: "Voxt.RemoteASR", code: -100, userInfo: [NSLocalizedDescriptionKey: "Recorder start failed"])
+            throw NSError(domain: "SayIt.RemoteASR", code: -100, userInfo: [NSLocalizedDescriptionKey: "Recorder start failed"])
         }
         self.recorder = recorder
         self.recordingFileURL = fileURL
@@ -708,7 +708,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
     ) async throws -> String {
         guard configuration.isConfigured else {
             throw NSError(
-                domain: "Voxt.RemoteASR",
+                domain: "SayIt.RemoteASR",
                 code: -111,
                 userInfo: [NSLocalizedDescriptionKey: "Remote ASR is not configured yet."]
             )
@@ -724,7 +724,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
         } catch {
             let message = userVisibleRemoteErrorMessage(for: error)
             throw NSError(
-                domain: "Voxt.RemoteASR",
+                domain: "SayIt.RemoteASR",
                 code: (error as NSError).code,
                 userInfo: [
                     NSLocalizedDescriptionKey: message,
@@ -791,7 +791,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
         let endpoint = URL(string: RemoteASREndpointSupport.normalizedEndpoint(configuration.endpoint, defaultValue: "https://api.openai.com/v1/audio/transcriptions"))!
         let token = configuration.apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !token.isEmpty else {
-            throw NSError(domain: "Voxt.RemoteASR", code: -1, userInfo: [NSLocalizedDescriptionKey: "OpenAI API key is empty."])
+            throw NSError(domain: "SayIt.RemoteASR", code: -1, userInfo: [NSLocalizedDescriptionKey: "OpenAI API key is empty."])
         }
         return try await transcribeOpenAIJSON(
             endpoint: endpoint,
@@ -834,12 +834,12 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
 
         let (data, response) = try await VoxtNetworkSession.active.upload(for: request, fromFile: body.url)
         guard let http = response as? HTTPURLResponse else {
-            throw NSError(domain: "Voxt.RemoteASR", code: -10, userInfo: [NSLocalizedDescriptionKey: "Invalid HTTP response."])
+            throw NSError(domain: "SayIt.RemoteASR", code: -10, userInfo: [NSLocalizedDescriptionKey: "Invalid HTTP response."])
         }
         guard (200...299).contains(http.statusCode) else {
             let payload = String(data: data.prefix(500), encoding: .utf8) ?? ""
             throw NSError(
-                domain: "Voxt.RemoteASR",
+                domain: "SayIt.RemoteASR",
                 code: http.statusCode,
                 userInfo: [NSLocalizedDescriptionKey: "HTTP \(http.statusCode): \(payload)"]
             )
@@ -858,7 +858,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
         }
 
         throw NSError(
-            domain: "Voxt.RemoteASR",
+            domain: "SayIt.RemoteASR",
             code: -11,
             userInfo: [NSLocalizedDescriptionKey: "OpenAI transcription response did not contain text."]
         )
@@ -872,7 +872,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
         let endpoint = URL(string: RemoteASREndpointSupport.normalizedEndpoint(configuration.endpoint, defaultValue: "https://open.bigmodel.cn/api/paas/v4/audio/transcriptions"))!
         let token = configuration.apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !token.isEmpty else {
-            throw NSError(domain: "Voxt.RemoteASR", code: -2, userInfo: [NSLocalizedDescriptionKey: "GLM API key is empty."])
+            throw NSError(domain: "SayIt.RemoteASR", code: -2, userInfo: [NSLocalizedDescriptionKey: "GLM API key is empty."])
         }
         var extraFields = ["stream": "true"]
         if let prompt = hintPayload.prompt?.trimmingCharacters(in: .whitespacesAndNewlines), !prompt.isEmpty {
@@ -895,7 +895,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
         let endpointValue = RemoteASREndpointSupport.resolvedXiaomiMiMoASREndpoint(configuration.endpoint)
         guard let endpoint = URL(string: endpointValue) else {
             throw NSError(
-                domain: "Voxt.RemoteASR",
+                domain: "SayIt.RemoteASR",
                 code: -70,
                 userInfo: [NSLocalizedDescriptionKey: AppLocalization.localizedString("Invalid Xiaomi MiMo ASR endpoint URL.")]
             )
@@ -904,7 +904,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
         let token = configuration.apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !token.isEmpty else {
             throw NSError(
-                domain: "Voxt.RemoteASR",
+                domain: "SayIt.RemoteASR",
                 code: -71,
                 userInfo: [NSLocalizedDescriptionKey: AppLocalization.localizedString("Xiaomi MiMo API key is empty.")]
             )
@@ -931,7 +931,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
         let (data, response) = try await VoxtNetworkSession.active.data(for: request)
         guard let http = response as? HTTPURLResponse else {
             throw NSError(
-                domain: "Voxt.RemoteASR",
+                domain: "SayIt.RemoteASR",
                 code: -72,
                 userInfo: [NSLocalizedDescriptionKey: AppLocalization.localizedString("Invalid Xiaomi MiMo ASR HTTP response.")]
             )
@@ -939,7 +939,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
         guard (200...299).contains(http.statusCode) else {
             let message = String(data: data.prefix(500), encoding: .utf8) ?? ""
             throw NSError(
-                domain: "Voxt.RemoteASR",
+                domain: "SayIt.RemoteASR",
                 code: http.statusCode,
                 userInfo: [
                     NSLocalizedDescriptionKey: AppLocalization.format(
@@ -958,7 +958,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
             return normalized
         }
         throw NSError(
-            domain: "Voxt.RemoteASR",
+            domain: "SayIt.RemoteASR",
             code: -73,
             userInfo: [NSLocalizedDescriptionKey: AppLocalization.localizedString("Xiaomi MiMo ASR returned no text content.")]
         )
@@ -977,7 +977,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
         let token = configuration.apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !token.isEmpty else {
             throw NSError(
-                domain: "Voxt.RemoteASR",
+                domain: "SayIt.RemoteASR",
                 code: -6,
                 userInfo: [NSLocalizedDescriptionKey: "StepFun API key is empty."]
             )
@@ -1017,7 +1017,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
 
         guard let http = response as? HTTPURLResponse else {
             throw NSError(
-                domain: "Voxt.RemoteASR",
+                domain: "SayIt.RemoteASR",
                 code: -10,
                 userInfo: [NSLocalizedDescriptionKey: "Invalid HTTP response."]
             )
@@ -1026,7 +1026,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
         if !(200...299).contains(http.statusCode) {
             let payload = try await RemoteASRTextSupport.collectText(from: bytes)
             throw NSError(
-                domain: "Voxt.RemoteASR",
+                domain: "SayIt.RemoteASR",
                 code: http.statusCode,
                 userInfo: [NSLocalizedDescriptionKey: "HTTP \(http.statusCode): \(payload)"]
             )
@@ -1058,7 +1058,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
             if sseEvent == "error" {
                 let message = RemoteASRTextSupport.extractStreamErrorMessage(fromLine: line) ?? line
                 throw NSError(
-                    domain: "Voxt.RemoteASR",
+                    domain: "SayIt.RemoteASR",
                     code: -11,
                     userInfo: [NSLocalizedDescriptionKey: "StepFun ASR stream error: \(message)"]
                 )
@@ -1066,7 +1066,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
 
             if let message = RemoteASRTextSupport.extractStreamErrorMessage(fromLine: line) {
                 throw NSError(
-                    domain: "Voxt.RemoteASR",
+                    domain: "SayIt.RemoteASR",
                     code: -11,
                     userInfo: [NSLocalizedDescriptionKey: "StepFun ASR stream error: \(message)"]
                 )
@@ -1086,7 +1086,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
                 }
             case .error(let message):
                 throw NSError(
-                    domain: "Voxt.RemoteASR",
+                    domain: "SayIt.RemoteASR",
                     code: -11,
                     userInfo: [NSLocalizedDescriptionKey: "StepFun ASR stream error: \(message)"]
                 )
@@ -1112,10 +1112,10 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
         let endpoint = RemoteASREndpointSupport.resolvedDoubaoStreamingEndpoint(from: configuration)
 
         guard !accessToken.isEmpty else {
-            throw NSError(domain: "Voxt.RemoteASR", code: -3, userInfo: [NSLocalizedDescriptionKey: "Doubao Access Token is empty."])
+            throw NSError(domain: "SayIt.RemoteASR", code: -3, userInfo: [NSLocalizedDescriptionKey: "Doubao Access Token is empty."])
         }
         guard !appID.isEmpty else {
-            throw NSError(domain: "Voxt.RemoteASR", code: -4, userInfo: [NSLocalizedDescriptionKey: "Doubao App ID is empty."])
+            throw NSError(domain: "SayIt.RemoteASR", code: -4, userInfo: [NSLocalizedDescriptionKey: "Doubao App ID is empty."])
         }
         if DoubaoASRConfiguration.isFlashRecognitionModel(resourceID) {
             return try await transcribeDoubaoFlashRecognition(
@@ -1149,7 +1149,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
         configuration: RemoteProviderConfiguration
     ) async throws -> String {
         guard let url = URL(string: endpoint) else {
-            throw NSError(domain: "Voxt.RemoteASR", code: -34, userInfo: [NSLocalizedDescriptionKey: "Invalid Doubao ASR endpoint URL."])
+            throw NSError(domain: "SayIt.RemoteASR", code: -34, userInfo: [NSLocalizedDescriptionKey: "Invalid Doubao ASR endpoint URL."])
         }
 
         let audioData = try Data(contentsOf: fileURL)
@@ -1175,12 +1175,12 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
 
         let (data, response) = try await VoxtNetworkSession.active.data(for: request)
         guard let http = response as? HTTPURLResponse else {
-            throw NSError(domain: "Voxt.RemoteASR", code: -35, userInfo: [NSLocalizedDescriptionKey: "Invalid Doubao ASR HTTP response."])
+            throw NSError(domain: "SayIt.RemoteASR", code: -35, userInfo: [NSLocalizedDescriptionKey: "Invalid Doubao ASR HTTP response."])
         }
         guard (200...299).contains(http.statusCode) else {
             let payload = String(data: data.prefix(500), encoding: .utf8) ?? ""
             throw NSError(
-                domain: "Voxt.RemoteASR",
+                domain: "SayIt.RemoteASR",
                 code: http.statusCode,
                 userInfo: [NSLocalizedDescriptionKey: "Doubao ASR request failed (HTTP \(http.statusCode)): \(payload)"]
             )
@@ -1207,15 +1207,15 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
                 || AliyunRemoteASRConfiguration.routing(for: model) == .compatibleShortAudio
         else {
             throw NSError(
-                domain: "Voxt.RemoteASR",
+                domain: "SayIt.RemoteASR",
                 code: -33,
-                userInfo: [NSLocalizedDescriptionKey: "Aliyun ASR in Voxt supports Qwen/Omni/Fun/Paraformer transcription models only."]
+                userInfo: [NSLocalizedDescriptionKey: "Aliyun ASR in SayIt supports Qwen/Omni/Fun/Paraformer transcription models only."]
             )
         }
 
         let token = configuration.apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !token.isEmpty else {
-            throw NSError(domain: "Voxt.RemoteASR", code: -30, userInfo: [NSLocalizedDescriptionKey: "Aliyun Bailian API key is empty."])
+            throw NSError(domain: "SayIt.RemoteASR", code: -30, userInfo: [NSLocalizedDescriptionKey: "Aliyun Bailian API key is empty."])
         }
         if RemoteASREndpointSupport.aliyunQwenRealtimeSessionKind(for: model) != nil {
             return try await transcribeAliyunQwenRealtimeFile(
@@ -1236,7 +1236,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
             )
         }
         if let validationError = AliyunRemoteASRConfiguration.validationError(model: model, endpoint: configuration.endpoint) {
-            throw NSError(domain: "Voxt.RemoteASR", code: -36, userInfo: [NSLocalizedDescriptionKey: validationError])
+            throw NSError(domain: "SayIt.RemoteASR", code: -36, userInfo: [NSLocalizedDescriptionKey: validationError])
         }
         if RemoteASREndpointSupport.isAliyunFileTranscriptionModel(model) {
             return try await AliyunRemoteASRClient.transcribe(
@@ -1279,12 +1279,12 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
 
         let (data, response) = try await VoxtNetworkSession.active.data(for: request)
         guard let http = response as? HTTPURLResponse else {
-            throw NSError(domain: "Voxt.RemoteASR", code: -31, userInfo: [NSLocalizedDescriptionKey: "Invalid Aliyun Bailian HTTP response."])
+            throw NSError(domain: "SayIt.RemoteASR", code: -31, userInfo: [NSLocalizedDescriptionKey: "Invalid Aliyun Bailian HTTP response."])
         }
         guard (200...299).contains(http.statusCode) else {
             let message = String(data: data.prefix(300), encoding: .utf8) ?? ""
             throw NSError(
-                domain: "Voxt.RemoteASR",
+                domain: "SayIt.RemoteASR",
                 code: http.statusCode,
                 userInfo: [NSLocalizedDescriptionKey: "Aliyun Bailian ASR request failed (HTTP \(http.statusCode)): \(message)"]
             )
@@ -1294,7 +1294,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
         if let text = AliyunRemoteASRClient.extractText(from: object), !text.isEmpty {
             return text
         }
-        throw NSError(domain: "Voxt.RemoteASR", code: -32, userInfo: [NSLocalizedDescriptionKey: "Aliyun Bailian ASR returned no text content."])
+        throw NSError(domain: "SayIt.RemoteASR", code: -32, userInfo: [NSLocalizedDescriptionKey: "Aliyun Bailian ASR returned no text content."])
     }
 
     private func startAliyunFunStreaming(
@@ -1303,7 +1303,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
     ) throws {
         let token = configuration.apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !token.isEmpty else {
-            throw NSError(domain: "Voxt.RemoteASR", code: -40, userInfo: [NSLocalizedDescriptionKey: "Aliyun Bailian API key is empty."])
+            throw NSError(domain: "SayIt.RemoteASR", code: -40, userInfo: [NSLocalizedDescriptionKey: "Aliyun Bailian API key is empty."])
         }
 
         let configuredModel = configuration.model.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1312,7 +1312,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
             : configuredModel
         let endpoint = RemoteASREndpointSupport.resolvedAliyunFunRealtimeEndpoint(configuration.endpoint)
         guard let wsURL = URL(string: endpoint) else {
-            throw NSError(domain: "Voxt.RemoteASR", code: -41, userInfo: [NSLocalizedDescriptionKey: "Invalid Aliyun realtime WebSocket endpoint URL."])
+            throw NSError(domain: "SayIt.RemoteASR", code: -41, userInfo: [NSLocalizedDescriptionKey: "Invalid Aliyun realtime WebSocket endpoint URL."])
         }
 
         var request = URLRequest(url: wsURL)
@@ -1409,7 +1409,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
             let errorText = AliyunRemoteASRConfiguration.realtimeSocketErrorMessage(from: object)
                 ?? "Aliyun fun ASR task failed."
             VoxtLog.model("Aliyun fun error event. event=\(event), detail=\(errorText)")
-            throw NSError(domain: "Voxt.RemoteASR", code: -42, userInfo: [NSLocalizedDescriptionKey: errorText])
+            throw NSError(domain: "SayIt.RemoteASR", code: -42, userInfo: [NSLocalizedDescriptionKey: errorText])
         }
 
         if event == "task-started", !context.didStartAudioStream {
@@ -1516,7 +1516,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
         do {
             let data = try JSONSerialization.data(withJSONObject: payload)
             guard let text = String(data: data, encoding: .utf8) else {
-                onError(NSError(domain: "Voxt.RemoteASR", code: -43, userInfo: [NSLocalizedDescriptionKey: "Failed to encode Aliyun fun control message."]))
+                onError(NSError(domain: "SayIt.RemoteASR", code: -43, userInfo: [NSLocalizedDescriptionKey: "Failed to encode Aliyun fun control message."]))
                 return
             }
             ws.send(.string(text)) { error in
@@ -1534,7 +1534,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
     ) throws {
         let token = configuration.apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !token.isEmpty else {
-            throw NSError(domain: "Voxt.RemoteASR", code: -44, userInfo: [NSLocalizedDescriptionKey: "Aliyun Bailian API key is empty."])
+            throw NSError(domain: "SayIt.RemoteASR", code: -44, userInfo: [NSLocalizedDescriptionKey: "Aliyun Bailian API key is empty."])
         }
 
         let configuredModel = configuration.model.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1543,7 +1543,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
             : configuredModel
         let endpoint = RemoteASREndpointSupport.resolvedAliyunQwenRealtimeEndpoint(configuration.endpoint, model: model)
         guard let wsURL = URL(string: endpoint) else {
-            throw NSError(domain: "Voxt.RemoteASR", code: -45, userInfo: [NSLocalizedDescriptionKey: "Invalid Aliyun Qwen realtime WebSocket endpoint URL."])
+            throw NSError(domain: "SayIt.RemoteASR", code: -45, userInfo: [NSLocalizedDescriptionKey: "Invalid Aliyun Qwen realtime WebSocket endpoint URL."])
         }
 
         var request = URLRequest(url: wsURL)
@@ -1637,7 +1637,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
             }
             VoxtLog.model("Aliyun qwen error event. detail=\(detail)")
             VoxtLog.asr("Aliyun qwen realtime error packet received. detail=\(detail)", verbose: true)
-            throw NSError(domain: "Voxt.RemoteASR", code: -46, userInfo: [NSLocalizedDescriptionKey: detail])
+            throw NSError(domain: "SayIt.RemoteASR", code: -46, userInfo: [NSLocalizedDescriptionKey: detail])
         }
 
         if type == "session.updated", !context.didStartAudioStream {
@@ -1787,7 +1787,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
         do {
             let data = try JSONSerialization.data(withJSONObject: payload)
             guard let text = String(data: data, encoding: .utf8) else {
-                onError(NSError(domain: "Voxt.RemoteASR", code: -47, userInfo: [NSLocalizedDescriptionKey: "Failed to encode Aliyun Qwen realtime event."]))
+                onError(NSError(domain: "SayIt.RemoteASR", code: -47, userInfo: [NSLocalizedDescriptionKey: "Failed to encode Aliyun Qwen realtime event."]))
                 return
             }
             ws.send(.string(text)) { error in
@@ -1809,7 +1809,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
         configuration: RemoteProviderConfiguration
     ) async throws -> String {
         guard let wsURL = URL(string: endpoint) else {
-            throw NSError(domain: "Voxt.RemoteASR", code: -5, userInfo: [NSLocalizedDescriptionKey: "Invalid Doubao endpoint URL."])
+            throw NSError(domain: "SayIt.RemoteASR", code: -5, userInfo: [NSLocalizedDescriptionKey: "Invalid Doubao endpoint URL."])
         }
 
         var request = URLRequest(url: wsURL)
@@ -1870,7 +1870,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
                 ) {
                     VoxtLog.asrWarning("Doubao websocket receive failed. detail=\(detail)")
                     let detailedError = NSError(
-                        domain: "Voxt.RemoteASR",
+                        domain: "SayIt.RemoteASR",
                         code: (error as NSError).code,
                         userInfo: [NSLocalizedDescriptionKey: detail]
                     )
@@ -1923,14 +1923,14 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
         configuration: RemoteProviderConfiguration
     ) async throws -> String {
         guard let wsURL = URL(string: endpoint) else {
-            throw NSError(domain: "Voxt.RemoteASR", code: -5, userInfo: [NSLocalizedDescriptionKey: "Invalid Doubao endpoint URL."])
+            throw NSError(domain: "SayIt.RemoteASR", code: -5, userInfo: [NSLocalizedDescriptionKey: "Invalid Doubao endpoint URL."])
         }
 
         let (samples, sampleRate) = try DebugAudioClipIO.loadMonoSamples(from: fileURL)
         guard let pcmData = Self.makePCM16MonoData(from: samples, inputSampleRate: sampleRate),
               !pcmData.isEmpty else {
             throw NSError(
-                domain: "Voxt.RemoteASR",
+                domain: "SayIt.RemoteASR",
                 code: -52,
                 userInfo: [NSLocalizedDescriptionKey: "Unable to decode audio samples."]
             )
@@ -1994,7 +1994,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
                 ) {
                     VoxtLog.asrWarning("Doubao websocket receive failed. detail=\(detail)")
                     let detailedError = NSError(
-                        domain: "Voxt.RemoteASR",
+                        domain: "SayIt.RemoteASR",
                         code: (error as NSError).code,
                         userInfo: [NSLocalizedDescriptionKey: detail]
                     )
@@ -2045,15 +2045,15 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
         let resourceID = RemoteASREndpointSupport.resolvedDoubaoResourceID(from: configuration)
 
         guard !accessToken.isEmpty else {
-            throw NSError(domain: "Voxt.RemoteASR", code: -3, userInfo: [NSLocalizedDescriptionKey: "Doubao Access Token is empty."])
+            throw NSError(domain: "SayIt.RemoteASR", code: -3, userInfo: [NSLocalizedDescriptionKey: "Doubao Access Token is empty."])
         }
         guard !appID.isEmpty else {
-            throw NSError(domain: "Voxt.RemoteASR", code: -4, userInfo: [NSLocalizedDescriptionKey: "Doubao App ID is empty."])
+            throw NSError(domain: "SayIt.RemoteASR", code: -4, userInfo: [NSLocalizedDescriptionKey: "Doubao App ID is empty."])
         }
 
         let endpoint = RemoteASREndpointSupport.resolvedDoubaoStreamingEndpoint(from: configuration)
         guard let wsURL = URL(string: endpoint) else {
-            throw NSError(domain: "Voxt.RemoteASR", code: -5, userInfo: [NSLocalizedDescriptionKey: "Invalid Doubao endpoint URL."])
+            throw NSError(domain: "SayIt.RemoteASR", code: -5, userInfo: [NSLocalizedDescriptionKey: "Invalid Doubao endpoint URL."])
         }
 
         var request = URLRequest(url: wsURL)
@@ -2386,7 +2386,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
                             VoxtLog.asrWarning("Doubao stream receive failed. detail=\(detail), state=\(context.debugSummary())")
                         }
                         let detailedError = NSError(
-                            domain: "Voxt.RemoteASR",
+                            domain: "SayIt.RemoteASR",
                             code: nsError.code,
                             userInfo: [NSLocalizedDescriptionKey: detail]
                         )
@@ -2671,7 +2671,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
                 Int32(MemoryLayout<z_stream>.size)
             )
             guard initStatus == Z_OK else {
-                throw NSError(domain: "Voxt.RemoteASR", code: -12, userInfo: [NSLocalizedDescriptionKey: "Failed to initialize Doubao GZIP compression."])
+                throw NSError(domain: "SayIt.RemoteASR", code: -12, userInfo: [NSLocalizedDescriptionKey: "Failed to initialize Doubao GZIP compression."])
             }
             defer { deflateEnd(&stream) }
 
@@ -2691,7 +2691,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
             status = statusCode
             if status != Z_OK && status != Z_STREAM_END {
                 throw NSError(
-                    domain: "Voxt.RemoteASR",
+                    domain: "SayIt.RemoteASR",
                     code: -13,
                     userInfo: [NSLocalizedDescriptionKey: "Failed to compress Doubao payload."]
                 )
@@ -2859,7 +2859,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
                 payload = (try? decodeDoubaoGzipPayload(rawPayload)) ?? rawPayload
             } else {
                 throw NSError(
-                    domain: "Voxt.RemoteASR",
+                    domain: "SayIt.RemoteASR",
                     code: -6,
                     userInfo: [NSLocalizedDescriptionKey: "Doubao response compression is unsupported in current client."]
                 )
@@ -2868,7 +2868,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
 
         if messageType == DoubaoProtocol.messageTypeServerErrorResponse {
             let errorText = String(data: payload, encoding: .utf8) ?? "Unknown Doubao server error."
-            throw NSError(domain: "Voxt.RemoteASR", code: -7, userInfo: [NSLocalizedDescriptionKey: errorText])
+            throw NSError(domain: "SayIt.RemoteASR", code: -7, userInfo: [NSLocalizedDescriptionKey: errorText])
         }
 
         guard !payload.isEmpty else {
@@ -2910,7 +2910,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
 
             let initStatus = inflateInit2_(&stream, 16 + MAX_WBITS, ZLIB_VERSION, Int32(MemoryLayout<z_stream>.size))
             guard initStatus == Z_OK else {
-                throw NSError(domain: "Voxt.RemoteASR", code: -8, userInfo: [NSLocalizedDescriptionKey: "Failed to initialize Doubao GZIP decompression."])
+                throw NSError(domain: "SayIt.RemoteASR", code: -8, userInfo: [NSLocalizedDescriptionKey: "Failed to initialize Doubao GZIP decompression."])
             }
             defer { inflateEnd(&stream) }
 
@@ -2931,7 +2931,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
                 }
                 decompressStatus = status
                 guard status == Z_OK || status == Z_STREAM_END else {
-                    throw NSError(domain: "Voxt.RemoteASR", code: -9, userInfo: [NSLocalizedDescriptionKey: "Failed to decode Doubao GZIP response payload."])
+                    throw NSError(domain: "SayIt.RemoteASR", code: -9, userInfo: [NSLocalizedDescriptionKey: "Failed to decode Doubao GZIP response payload."])
                 }
             }
             return output
@@ -3018,13 +3018,13 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
 
         let (bytes, response) = try await VoxtNetworkSession.active.bytes(for: request)
         guard let http = response as? HTTPURLResponse else {
-            throw NSError(domain: "Voxt.RemoteASR", code: -10, userInfo: [NSLocalizedDescriptionKey: "Invalid HTTP response."])
+            throw NSError(domain: "SayIt.RemoteASR", code: -10, userInfo: [NSLocalizedDescriptionKey: "Invalid HTTP response."])
         }
 
         if !(200...299).contains(http.statusCode) {
             let payload = try await RemoteASRTextSupport.collectText(from: bytes)
             throw NSError(
-                domain: "Voxt.RemoteASR",
+                domain: "SayIt.RemoteASR",
                 code: http.statusCode,
                 userInfo: [NSLocalizedDescriptionKey: "HTTP \(http.statusCode): \(payload)"]
             )

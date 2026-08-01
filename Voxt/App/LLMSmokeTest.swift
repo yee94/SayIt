@@ -70,7 +70,7 @@ extension AppDelegate {
             do {
                 guard self.customLLMManager.isModelDownloaded(repo: repo) else {
                     throw NSError(
-                        domain: "Voxt.LLMSmoke",
+                        domain: "SayIt.LLMSmoke",
                         code: 404,
                         userInfo: [NSLocalizedDescriptionKey: "Local model is not downloaded: \(repo)"]
                     )
@@ -98,7 +98,7 @@ extension AppDelegate {
                         executionStrategy: strategy
                     ) else {
                         throw NSError(
-                            domain: "Voxt.LLMSmoke",
+                            domain: "SayIt.LLMSmoke",
                             code: -1,
                             userInfo: [NSLocalizedDescriptionKey: "Unable to build enhancement execution plan."]
                         )
@@ -128,7 +128,7 @@ extension AppDelegate {
                         executionStrategy: strategy
                     ) else {
                         throw NSError(
-                            domain: "Voxt.LLMSmoke",
+                            domain: "SayIt.LLMSmoke",
                             code: -2,
                             userInfo: [NSLocalizedDescriptionKey: "Unable to build translation execution plan."]
                         )

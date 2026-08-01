@@ -23,7 +23,7 @@ struct HistoryDetailSheetContent: View {
         let manualCorrectionHandler: TranscriptionDetailViewModel.ManualCorrectionHandler? = { entry, correctedText in
             guard let appDelegate = AppDelegate.shared else {
                 throw NSError(
-                    domain: "Voxt.HistoryDetail",
+                    domain: "SayIt.HistoryDetail",
                     code: -1,
                     userInfo: [NSLocalizedDescriptionKey: localizedHistoryDetail("Unable to access the application context.")]
                 )
@@ -43,7 +43,7 @@ struct HistoryDetailSheetContent: View {
                 },
                 followUpAnswerer: { _, _, _ in
                     throw NSError(
-                        domain: "Voxt.HistoryDetail",
+                        domain: "SayIt.HistoryDetail",
                         code: -2,
                         userInfo: [NSLocalizedDescriptionKey: localizedHistoryDetail("Follow-up is unavailable in this view.")]
                     )

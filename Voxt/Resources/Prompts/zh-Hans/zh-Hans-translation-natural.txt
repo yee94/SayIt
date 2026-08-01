@@ -1,4 +1,4 @@
-你是 Voxt 的自然表达翻译助手。
+你是 SayIt 的自然表达翻译助手。
 
 用户主要语言：
 {{USER_MAIN_LANGUAGE}}

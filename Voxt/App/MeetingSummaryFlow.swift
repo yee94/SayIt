@@ -206,7 +206,7 @@ extension AppDelegate {
         let trimmedTranscript = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedTranscript.isEmpty else {
             throw NSError(
-                domain: "Voxt.MeetingSummary",
+                domain: "SayIt.MeetingSummary",
                 code: -1,
                 userInfo: [NSLocalizedDescriptionKey: AppLocalization.localizedString("No meeting transcript is available yet.")]
             )
@@ -218,7 +218,7 @@ extension AppDelegate {
         ) else {
             let status = meetingSummaryProviderStatus(settings: settings)
             throw NSError(
-                domain: "Voxt.MeetingSummary",
+                domain: "SayIt.MeetingSummary",
                 code: -2,
                 userInfo: [NSLocalizedDescriptionKey: status.message]
             )
@@ -242,7 +242,7 @@ extension AppDelegate {
                     "Meeting summary generation parse failed. model=\(modelLabel), outputChars=\(output.count), elapsedMs=\(elapsedMs)"
                 )
                 throw NSError(
-                    domain: "Voxt.MeetingSummary",
+                    domain: "SayIt.MeetingSummary",
                     code: -5,
                     userInfo: [NSLocalizedDescriptionKey: AppLocalization.localizedString("Meeting summary output could not be parsed.")]
                 )
@@ -270,14 +270,14 @@ extension AppDelegate {
         let trimmedQuestion = question.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedTranscript.isEmpty else {
             throw NSError(
-                domain: "Voxt.MeetingSummaryChat",
+                domain: "SayIt.MeetingSummaryChat",
                 code: -1,
                 userInfo: [NSLocalizedDescriptionKey: AppLocalization.localizedString("No meeting transcript is available yet.")]
             )
         }
         guard !trimmedQuestion.isEmpty else {
             throw NSError(
-                domain: "Voxt.MeetingSummaryChat",
+                domain: "SayIt.MeetingSummaryChat",
                 code: -2,
                 userInfo: [NSLocalizedDescriptionKey: AppLocalization.localizedString("Please enter a follow-up question.")]
             )
@@ -290,7 +290,7 @@ extension AppDelegate {
         ) else {
             let status = meetingSummaryProviderStatus(settings: settings)
             throw NSError(
-                domain: "Voxt.MeetingSummaryChat",
+                domain: "SayIt.MeetingSummaryChat",
                 code: -3,
                 userInfo: [NSLocalizedDescriptionKey: status.message]
             )
@@ -468,7 +468,7 @@ extension AppDelegate {
         case .appleIntelligence:
             guard let enhancer else {
                 throw NSError(
-                    domain: "Voxt.MeetingSummary",
+                    domain: "SayIt.MeetingSummary",
                     code: -3,
                     userInfo: [NSLocalizedDescriptionKey: AppLocalization.localizedString("Apple Intelligence is unavailable.")]
                 )
@@ -478,7 +478,7 @@ extension AppDelegate {
                 return .appleIntelligence
             }
             throw NSError(
-                domain: "Voxt.MeetingSummary",
+                domain: "SayIt.MeetingSummary",
                 code: -4,
                 userInfo: [NSLocalizedDescriptionKey: AppLocalization.localizedString("Apple Intelligence requires macOS 26 or later.")]
             )

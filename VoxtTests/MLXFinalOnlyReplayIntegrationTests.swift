@@ -27,7 +27,7 @@ final class MLXFinalOnlyReplayIntegrationTests: XCTestCase {
     }
 
     private func discoveredRecentHistoryPaths(limit: Int = 4) -> [URL] {
-        let directory = "/Users/guanwei/Library/Application Support/Voxt/transcription-history-audio/transcription"
+        let directory = "/Users/guanwei/Library/Application Support/SayIt/transcription-history-audio/transcription"
         guard let enumerator = FileManager.default.enumerator(
             at: URL(fileURLWithPath: directory),
             includingPropertiesForKeys: [.isRegularFileKey, .contentModificationDateKey],

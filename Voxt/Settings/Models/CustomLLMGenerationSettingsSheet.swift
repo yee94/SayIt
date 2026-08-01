@@ -58,7 +58,7 @@ struct CustomLLMGenerationSettingsSheet: View {
                                 selectedTitle: selectedThinkingTitle,
                                 width: 240
                             )
-                            Text(customLLMLocalized("Use Voxt's default thinking behavior for this model."))
+                            Text(customLLMLocalized("Use SayIt's default thinking behavior for this model."))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)

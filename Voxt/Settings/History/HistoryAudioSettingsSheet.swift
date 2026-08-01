@@ -48,7 +48,7 @@ struct HistoryAudioSettingsSheet: View {
                         )
                     }
                 } else {
-                    Text(localizedHistoryAudioSettings("When disabled, Voxt keeps history entries until you delete them manually."))
+                    Text(localizedHistoryAudioSettings("When disabled, SayIt keeps history entries until you delete them manually."))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

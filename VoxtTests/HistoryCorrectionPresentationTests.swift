@@ -12,8 +12,8 @@ final class HistoryCorrectionPresentationTests: XCTestCase {
             snapshots: [
                 DictionaryCorrectionSnapshot(
                     originalText: "Waxed",
-                    correctedText: "Voxt",
-                    finalLocation: (text as NSString).range(of: "Voxt").location,
+                    correctedText: "SayIt",
+                    finalLocation: (text as NSString).range(of: "SayIt").location,
                     finalLength: 4
                 )
             ]
@@ -29,8 +29,8 @@ final class HistoryCorrectionPresentationTests: XCTestCase {
             snapshots: [
                 DictionaryCorrectionSnapshot(
                     originalText: "Waxed",
-                    correctedText: "Voxt",
-                    finalLocation: (text as NSString).range(of: "Voxt").location,
+                    correctedText: "SayIt",
+                    finalLocation: (text as NSString).range(of: "SayIt").location,
                     finalLength: 4
                 )
             ]
@@ -41,14 +41,14 @@ final class HistoryCorrectionPresentationTests: XCTestCase {
             [
                 .plain("我们创建了新的APP，名字叫"),
                 .original("Waxed"),
-                .corrected("Voxt"),
+                .corrected("SayIt"),
                 .plain("，支持语音转文本。")
             ]
         )
     }
 
     func testSegmentsPreserveMultipleCorrectionsInOrder() {
-        let text = "OpenAI 和 Voxt 都支持语音。"
+        let text = "OpenAI 和 SayIt 都支持语音。"
         let nsText = text as NSString
         let segments = HistoryCorrectionPresentation.segments(
             for: text,
@@ -61,8 +61,8 @@ final class HistoryCorrectionPresentationTests: XCTestCase {
                 ),
                 DictionaryCorrectionSnapshot(
                     originalText: "Waxed",
-                    correctedText: "Voxt",
-                    finalLocation: nsText.range(of: "Voxt").location,
+                    correctedText: "SayIt",
+                    finalLocation: nsText.range(of: "SayIt").location,
                     finalLength: 4
                 )
             ]
@@ -75,7 +75,7 @@ final class HistoryCorrectionPresentationTests: XCTestCase {
                 .corrected("OpenAI"),
                 .plain(" 和 "),
                 .original("Waxed"),
-                .corrected("Voxt"),
+                .corrected("SayIt"),
                 .plain(" 都支持语音。")
             ]
         )
@@ -83,17 +83,17 @@ final class HistoryCorrectionPresentationTests: XCTestCase {
 
     func testSegmentsIgnoreInvalidSnapshots() {
         let segments = HistoryCorrectionPresentation.segments(
-            for: "Voxt",
+            for: "SayIt",
             snapshots: [
                 DictionaryCorrectionSnapshot(
                     originalText: "Waxed",
-                    correctedText: "Voxt",
+                    correctedText: "SayIt",
                     finalLocation: 99,
                     finalLength: 4
                 )
             ]
         )
 
-        XCTAssertEqual(segments, [.plain("Voxt")])
+        XCTAssertEqual(segments, [.plain("SayIt")])
     }
 }

@@ -287,7 +287,7 @@ struct MeetingDetailSummarySidebar: View {
                 summaryEmptyState(
                     icon: "clock.arrow.circlepath",
                     title: AppLocalization.localizedString("Preparing Summary"),
-                    message: AppLocalization.localizedString("Voxt will start summary generation after the final meeting record is saved.")
+                    message: AppLocalization.localizedString("SayIt will start summary generation after the final meeting record is saved.")
                 )
             } else if viewModel.mode == .live {
                 summaryEmptyState(

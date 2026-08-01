@@ -143,7 +143,7 @@ struct MicrophonePriorityDialog: View {
 
             Text(localized(
                 mode == .selectionOnly
-                    ? "Choose the microphone Voxt should use."
+                    ? "Choose the microphone SayIt should use."
                     : "Drag to set the preferred microphone order."
             ))
                 .font(.caption)

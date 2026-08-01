@@ -219,7 +219,7 @@ struct ObsidianNoteSyncSettings: Codable, Hashable, Sendable {
         enabled: Bool = false,
         vaultPath: String = "",
         vaultBookmarkData: Data? = nil,
-        relativeFolder: String = "Voxt",
+        relativeFolder: String = "SayIt",
         groupingMode: ObsidianNoteGroupingMode = .file
     ) {
         self.enabled = enabled

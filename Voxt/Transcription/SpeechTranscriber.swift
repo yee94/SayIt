@@ -225,14 +225,14 @@ class SpeechTranscriber: ObservableObject, TranscriberProtocol {
         refreshSpeechRecognizer(localeIdentifier: settings.localeIdentifier)
         guard let recognizer = speechRecognizer else {
             throw NSError(
-                domain: "Voxt.SpeechTranscriber",
+                domain: "SayIt.SpeechTranscriber",
                 code: -1,
                 userInfo: [NSLocalizedDescriptionKey: "Speech recognizer is unavailable."]
             )
         }
         if settings.prefersOnDeviceRecognition && !recognizer.supportsOnDeviceRecognition {
             throw NSError(
-                domain: "Voxt.SpeechTranscriber",
+                domain: "SayIt.SpeechTranscriber",
                 code: -2,
                 userInfo: [NSLocalizedDescriptionKey: "On-device recognition is unavailable for the selected language."]
             )

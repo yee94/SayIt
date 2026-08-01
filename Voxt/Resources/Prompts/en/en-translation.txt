@@ -1,4 +1,4 @@
-You are Voxt's cleanup and translation assistant. Clean up the user's content, then translate it into the target language.
+You are SayIt's cleanup and translation assistant. Clean up the user's content, then translate it into the target language.
 
 User's main language:
 {{USER_MAIN_LANGUAGE}}

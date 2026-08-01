@@ -70,7 +70,7 @@ class CustomLLMModelManager: ObservableObject {
 
     static let defaultHubBaseURL = URL(string: "https://huggingface.co")!
     static let mirrorHubBaseURL = URL(string: "https://hf-mirror.com")!
-    static let hubUserAgent = "Voxt/1.0 (CustomLLM)"
+    static let hubUserAgent = "SayIt/1.0 (CustomLLM)"
 
     enum ModelState: Equatable {
         case notDownloaded
@@ -228,7 +228,7 @@ class CustomLLMModelManager: ObservableObject {
         try await withActiveInference {
             guard isModelDownloaded(repo: canonicalRepo) else {
                 throw NSError(
-                    domain: "Voxt.CustomLLM",
+                    domain: "SayIt.CustomLLM",
                     code: 404,
                     userInfo: [NSLocalizedDescriptionKey: "Custom LLM model is not installed locally."]
                 )
@@ -462,7 +462,7 @@ class CustomLLMModelManager: ObservableObject {
             try Task.checkCancellation()
             guard isModelDownloaded(repo: request.repo) else {
                 throw NSError(
-                    domain: "Voxt.CustomLLM",
+                    domain: "SayIt.CustomLLM",
                     code: 404,
                     userInfo: [NSLocalizedDescriptionKey: "Custom LLM model is not installed locally."]
                 )
@@ -655,7 +655,7 @@ class CustomLLMModelManager: ObservableObject {
 
         guard let directory = readableCacheDirectory(for: repo, requireValid: true) else {
             throw NSError(
-                domain: "Voxt.CustomLLM",
+                domain: "SayIt.CustomLLM",
                 code: -10,
                 userInfo: [NSLocalizedDescriptionKey: "Invalid local model path."]
             )
@@ -1199,7 +1199,7 @@ class CustomLLMModelManager: ObservableObject {
 
         guard let modelDir = writeCacheDirectory(for: canonicalRepo) else {
             throw NSError(
-                domain: "Voxt.CustomLLM",
+                domain: "SayIt.CustomLLM",
                 code: 1002,
                 userInfo: [NSLocalizedDescriptionKey: "Invalid model cache directory."]
             )

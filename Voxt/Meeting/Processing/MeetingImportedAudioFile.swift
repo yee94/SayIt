@@ -84,7 +84,7 @@ nonisolated struct MeetingImportedAudioFile: Sendable {
         progress: (@Sendable (Double) async -> Void)? = nil
     ) async throws -> MeetingImportedAudioFile {
         let destinationURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("Voxt-Imported-Meeting-\(UUID().uuidString)")
+            .appendingPathComponent("SayIt-Imported-Meeting-\(UUID().uuidString)")
             .appendingPathExtension("wav")
 
         do {
@@ -215,7 +215,7 @@ nonisolated enum MeetingImportedAudioFileError: LocalizedError, Equatable {
         case .unsupportedMedia:
             return AppLocalization.localizedString("This audio or video file cannot be analyzed.")
         case .unableToDecode:
-            return AppLocalization.localizedString("Voxt could not decode the selected media file.")
+            return AppLocalization.localizedString("SayIt could not decode the selected media file.")
         case .emptyAudio:
             return AppLocalization.localizedString("The selected file does not contain usable audio.")
         case .fileTooLarge:

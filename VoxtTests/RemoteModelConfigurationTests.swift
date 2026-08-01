@@ -1141,7 +1141,7 @@ final class RemoteModelConfigurationTests: XCTestCase {
     func testCodexCredentialProviderUsesUserHomeOutsideAppContainer() {
         let provider = CodexOAuthCredentialProvider(
             environment: [
-                "HOME": "/Users/test/Library/Containers/com.voxt.Voxt/Data"
+                "HOME": "/Users/test/Library/Containers/com.voxt.SayIt/Data"
             ],
             userHomeDirectory: "/Users/test"
         )
@@ -1153,7 +1153,7 @@ final class RemoteModelConfigurationTests: XCTestCase {
         let provider = CodexOAuthCredentialProvider(
             environment: [
                 "CODEX_HOME": "~/.config/codex",
-                "HOME": "/Users/test/Library/Containers/com.voxt.Voxt/Data"
+                "HOME": "/Users/test/Library/Containers/com.voxt.SayIt/Data"
             ],
             userHomeDirectory: "/Users/test"
         )

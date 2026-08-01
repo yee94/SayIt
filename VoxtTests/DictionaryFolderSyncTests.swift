@@ -35,7 +35,7 @@ final class DictionaryFolderSyncTests: XCTestCase {
     func testMergeTakesMaxWeightAndPrefersManualSource() {
         let a = DictionarySyncSnapshotEntry(
             id: "a",
-            term: "Voxt",
+            term: "SayIt",
             weight: 2,
             source: "ai",
             createdAt: "2026-01-01T00:00:00Z"

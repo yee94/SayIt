@@ -14,7 +14,7 @@ final class VoxtRemindersSyncCoordinatorTests: XCTestCase {
         let settings = RemindersNoteSyncSettings(
             enabled: false,
             selectedListIdentifier: "list-1",
-            selectedListTitle: "Voxt"
+            selectedListTitle: "SayIt"
         )
 
         let coordinator = VoxtRemindersSyncCoordinator(
@@ -46,7 +46,7 @@ final class VoxtRemindersSyncCoordinatorTests: XCTestCase {
         let settings = RemindersNoteSyncSettings(
             enabled: true,
             selectedListIdentifier: "list-1",
-            selectedListTitle: "Voxt"
+            selectedListTitle: "SayIt"
         )
 
         let coordinator = VoxtRemindersSyncCoordinator(
@@ -125,7 +125,7 @@ final class VoxtRemindersSyncCoordinatorTests: XCTestCase {
         let settings = RemindersNoteSyncSettings(
             enabled: true,
             selectedListIdentifier: "list-1",
-            selectedListTitle: "Voxt"
+            selectedListTitle: "SayIt"
         )
 
         let coordinator = VoxtRemindersSyncCoordinator(
@@ -172,7 +172,7 @@ final class VoxtRemindersSyncCoordinatorTests: XCTestCase {
         var settings = RemindersNoteSyncSettings(
             enabled: true,
             selectedListIdentifier: "list-1",
-            selectedListTitle: "Voxt"
+            selectedListTitle: "SayIt"
         )
 
         let coordinator = VoxtRemindersSyncCoordinator(
@@ -218,7 +218,7 @@ final class VoxtRemindersSyncCoordinatorTests: XCTestCase {
         var settings = RemindersNoteSyncSettings(
             enabled: false,
             selectedListIdentifier: "list-1",
-            selectedListTitle: "Voxt"
+            selectedListTitle: "SayIt"
         )
         let coordinator = VoxtRemindersSyncCoordinator(
             noteStore: noteStore,
@@ -252,7 +252,7 @@ final class VoxtRemindersSyncCoordinatorTests: XCTestCase {
         let settings = RemindersNoteSyncSettings(
             enabled: true,
             selectedListIdentifier: "list-1",
-            selectedListTitle: "Voxt"
+            selectedListTitle: "SayIt"
         )
         let coordinator = VoxtRemindersSyncCoordinator(
             noteStore: noteStore,
@@ -288,7 +288,7 @@ private final class BlockingVoxtRemindersSyncBackend: VoxtRemindersSyncBackend, 
     }
 
     func writableLists() throws -> [RemindersListDescriptor] {
-        [RemindersListDescriptor(identifier: "list-1", title: "Voxt", sourceTitle: "iCloud")]
+        [RemindersListDescriptor(identifier: "list-1", title: "SayIt", sourceTitle: "iCloud")]
     }
 
     func reminder(with identifier: String) throws -> RemindersReminderRecord? {
@@ -307,7 +307,7 @@ private final class FakeVoxtRemindersSyncBackend: VoxtRemindersSyncBackend {
 
     var authorizationStateValue: RemindersAuthorizationState = .authorized
     var writableListDescriptors: [RemindersListDescriptor] = [
-        RemindersListDescriptor(identifier: "list-1", title: "Voxt", sourceTitle: "iCloud")
+        RemindersListDescriptor(identifier: "list-1", title: "SayIt", sourceTitle: "iCloud")
     ]
 
     private var remindersByIdentifier: [String: RemindersReminderRecord] = [:]

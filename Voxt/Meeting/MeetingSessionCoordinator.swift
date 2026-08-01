@@ -1283,7 +1283,7 @@ final class MeetingSessionCoordinator {
 
     private func persistMeetingAudioArchive() async throws -> URL? {
         let tempURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("Voxt-Meeting-\(UUID().uuidString)")
+            .appendingPathComponent("SayIt-Meeting-\(UUID().uuidString)")
             .appendingPathExtension("wav")
         let didExport = try await audioArchive.exportWAV(to: tempURL)
         return didExport ? tempURL : nil
@@ -1743,7 +1743,7 @@ final class MeetingSessionCoordinator {
             return MeetingSherpaOnnxSegmentTranscriber(modelManager: sherpaOnnxModelManager)
         case .dictation:
             throw NSError(
-                domain: "Voxt.Meeting",
+                domain: "SayIt.Meeting",
                 code: -1,
                 userInfo: [NSLocalizedDescriptionKey: "Direct Dictation is not supported for Meeting Notes."]
             )

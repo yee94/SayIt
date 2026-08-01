@@ -1,13 +1,8 @@
 name: V2 Signed Migration Build
 
+# Migration feed for legacy Tauri clients. After the Swift mainline cutover,
+# only run this manually so push-to-main / push-to-v2 cannot double-publish.
 on:
-  push:
-    branches:
-      - v2
-    paths-ignore:
-      - "README.md"
-      - "docs/**"
-      - "**/*.md"
   workflow_dispatch:
 
 concurrency:

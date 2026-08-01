@@ -116,31 +116,31 @@ final class ASRHintSettingsTests: XCTestCase {
     func testResolveAliyunBuildsHotwordsFromContextAndDictionaryTerms() {
         let payload = ASRHintResolver.resolve(
             target: .aliyunBailianASR,
-            settings: ASRHintSettings(contextualPhrasesText: "Voxt\nFireRed\nVoxt"),
+            settings: ASRHintSettings(contextualPhrasesText: "SayIt\nFireRed\nVoxt"),
             userLanguageCodes: ["zh-Hans"],
             dictionaryTerms: "Codex\nFireRed"
         )
 
         XCTAssertEqual(payload.language, "zh")
-        XCTAssertEqual(payload.contextualPhrases, ["Voxt", "FireRed", "Codex"])
+        XCTAssertEqual(payload.contextualPhrases, ["SayIt", "FireRed", "Codex"])
     }
 
     func testResolveStepFunBuildsPromptFromTerms() {
         let payload = ASRHintResolver.resolve(
             target: .stepFunASR,
-            settings: ASRHintSettings(contextualPhrasesText: "Voxt\nFireRed\nVoxt"),
+            settings: ASRHintSettings(contextualPhrasesText: "SayIt\nFireRed\nVoxt"),
             userLanguageCodes: ["zh-Hans"],
             dictionaryTerms: "Codex\nFireRed"
         )
 
         XCTAssertEqual(payload.language, "zh")
-        XCTAssertEqual(payload.contextualPhrases, ["Voxt", "FireRed", "Codex"])
+        XCTAssertEqual(payload.contextualPhrases, ["SayIt", "FireRed", "Codex"])
         XCTAssertNotNil(payload.prompt)
         XCTAssertContains(payload.prompt ?? "", "Preserve names")
-        XCTAssertContains(payload.prompt ?? "", "Voxt")
+        XCTAssertContains(payload.prompt ?? "", "SayIt")
         XCTAssertContains(payload.prompt ?? "", "FireRed")
         XCTAssertContains(payload.prompt ?? "", "Codex")
-        XCTAssertEqual(payload.prompt?.components(separatedBy: "Voxt").count, 2)
+        XCTAssertEqual(payload.prompt?.components(separatedBy: "SayIt").count, 2)
         XCTAssertEqual(payload.prompt?.components(separatedBy: "FireRed").count, 2)
     }
 
@@ -272,7 +272,7 @@ final class ASRHintSettingsTests: XCTestCase {
         let stored = SherpaOnnxLocalTuningSettingsStore.save(
             SherpaOnnxLocalTuningSettings(
                 numThreads: 99,
-                contextBias: "  Voxt\nCodex  ",
+                contextBias: "  SayIt\nCodex  ",
                 funASRMaxNewTokens: 8,
                 funASRTopP: 2,
                 funASRUseITN: false
@@ -288,7 +288,7 @@ final class ASRHintSettingsTests: XCTestCase {
         )
 
         XCTAssertEqual(settings.numThreads, 8)
-        XCTAssertEqual(settings.contextBias, "Voxt\nCodex")
+        XCTAssertEqual(settings.contextBias, "SayIt\nCodex")
         XCTAssertEqual(settings.funASRMaxNewTokens, 64)
         XCTAssertEqual(settings.funASRTopP, 1.0)
         XCTAssertFalse(settings.funASRUseITN)
@@ -297,13 +297,13 @@ final class ASRHintSettingsTests: XCTestCase {
     func testResolveSherpaOnnxUsesLanguageAndMergedTerms() {
         let payload = ASRHintResolver.resolve(
             target: .sherpaOnnx,
-            settings: ASRHintSettings(contextualPhrasesText: "Voxt\nFireRed\nVoxt"),
+            settings: ASRHintSettings(contextualPhrasesText: "SayIt\nFireRed\nVoxt"),
             userLanguageCodes: ["zh-Hans"],
             dictionaryTerms: "Codex\nFireRed"
         )
 
         XCTAssertEqual(payload.language, "zh")
-        XCTAssertEqual(payload.contextualPhrases, ["Voxt", "FireRed", "Codex"])
+        XCTAssertEqual(payload.contextualPhrases, ["SayIt", "FireRed", "Codex"])
     }
 
     func testMLXLocalTuningLoadsStoredSettingsWithoutWhisperTemperature() throws {
@@ -573,7 +573,7 @@ final class ASRHintSettingsTests: XCTestCase {
         let stored = MLXLocalTuningSettingsStore.save(
             MLXLocalTuningSettings(
                 mossOutputMode: .customPrompt,
-                mossHotwords: "  Voxt\nCodex  ",
+                mossHotwords: "  SayIt\nCodex  ",
                 mossCustomPrompt: "  Transcribe with concise paragraphs.  ",
                 mossMeetingOutputMode: .speakerOnly,
                 mossMeetingHotwords: "  Alice\nBob  ",
@@ -588,7 +588,7 @@ final class ASRHintSettingsTests: XCTestCase {
             rawValue: stored
         )
         XCTAssertEqual(settings.mossOutputMode, .customPrompt)
-        XCTAssertEqual(settings.mossHotwords, "Voxt\nCodex")
+        XCTAssertEqual(settings.mossHotwords, "SayIt\nCodex")
         XCTAssertEqual(settings.mossCustomPrompt, "Transcribe with concise paragraphs.")
         XCTAssertEqual(settings.mossMeetingOutputMode, .speakerOnly)
         XCTAssertEqual(settings.mossMeetingHotwords, "Alice\nBob")
@@ -599,7 +599,7 @@ final class ASRHintSettingsTests: XCTestCase {
 
     func testMOSSLocalTuningMigratesLegacyConfigurationToMeetingScope() throws {
         let legacy = """
-        {"mossTranscribeDiarize":{"mossOutputMode":"timestampedDiarization","mossHotwords":"Voxt","mossCustomPrompt":"Legacy prompt"}}
+        {"mossTranscribeDiarize":{"mossOutputMode":"timestampedDiarization","mossHotwords":"SayIt","mossCustomPrompt":"Legacy prompt"}}
         """
 
         let settings = MLXLocalTuningSettingsStore.resolvedSettings(
@@ -608,9 +608,9 @@ final class ASRHintSettingsTests: XCTestCase {
         )
 
         XCTAssertEqual(settings.mossOutputMode, .plainText)
-        XCTAssertEqual(settings.mossHotwords, "Voxt")
+        XCTAssertEqual(settings.mossHotwords, "SayIt")
         XCTAssertEqual(settings.mossMeetingOutputMode, .timestampedDiarization)
-        XCTAssertEqual(settings.mossMeetingHotwords, "Voxt")
+        XCTAssertEqual(settings.mossMeetingHotwords, "SayIt")
         XCTAssertEqual(settings.mossMeetingCustomPrompt, "Legacy prompt")
     }
 
@@ -743,9 +743,9 @@ final class ASRHintSettingsTests: XCTestCase {
             MossASRPromptSupport.resolvedPrompt(
                 outputMode: .speakerOnly,
                 customPrompt: "",
-                hotwords: "Voxt\nCodex"
+                hotwords: "SayIt\nCodex"
             ),
-            "Transcribe the audio as text using speaker labels such as [S01], [S02], and [S03]. Hotwords: Voxt, Codex"
+            "Transcribe the audio as text using speaker labels such as [S01], [S02], and [S03]. Hotwords: SayIt, Codex"
         )
         XCTAssertEqual(
             MossASRPromptSupport.resolvedPrompt(
@@ -786,12 +786,12 @@ final class ASRHintSettingsTests: XCTestCase {
             requestedOutputMode: .plainText,
             scope: .meeting,
             customPrompt: "Keep product names verbatim.",
-            hotwords: "Voxt"
+            hotwords: "SayIt"
         )
 
         XCTAssertContains(prompt, "start with the timestamp and speaker ID")
         XCTAssertContains(prompt, "Additional transcription instructions: Keep product names verbatim.")
-        XCTAssertContains(prompt, "Hotwords: Voxt")
+        XCTAssertContains(prompt, "Hotwords: SayIt")
     }
 
     func testMOSSRenderingRemovesOnlyConfiguredStructuredTags() {
@@ -892,7 +892,7 @@ final class ASRHintSettingsTests: XCTestCase {
     func testResolveDictationSettingsUsesMainLanguageAndContextualPhrases() {
         let settings = ASRHintSettings(
             followsUserMainLanguage: true,
-            contextualPhrasesText: "Voxt\nFireRed\n Voxt \n",
+            contextualPhrasesText: "SayIt\nFireRed\n SayIt \n",
             prefersOnDeviceRecognition: true,
             addsPunctuation: false,
             reportsPartialResults: false
@@ -904,7 +904,7 @@ final class ASRHintSettingsTests: XCTestCase {
         )
 
         XCTAssertEqual(resolved.localeIdentifier, "zh-TW")
-        XCTAssertEqual(resolved.contextualPhrases, ["Voxt", "FireRed", "Voxt"])
+        XCTAssertEqual(resolved.contextualPhrases, ["SayIt", "FireRed", "SayIt"])
         XCTAssertTrue(resolved.prefersOnDeviceRecognition)
         XCTAssertFalse(resolved.addsPunctuation)
         XCTAssertFalse(resolved.reportsPartialResults)
@@ -913,12 +913,12 @@ final class ASRHintSettingsTests: XCTestCase {
     func testSanitizedDictationContextualPhrasesTrimBlankLines() {
         let settings = ASRHintSettingsStore.sanitized(
             ASRHintSettings(
-                contextualPhrasesText: "\n  Voxt  \n\n FireRed ASR \n"
+                contextualPhrasesText: "\n  SayIt  \n\n FireRed ASR \n"
             ),
             for: .dictation
         )
 
-        XCTAssertEqual(settings.contextualPhrasesText, "Voxt\nFireRed ASR")
+        XCTAssertEqual(settings.contextualPhrasesText, "SayIt\nFireRed ASR")
     }
 
     func testLanguageSummaryAndOutputVariantDescription() {

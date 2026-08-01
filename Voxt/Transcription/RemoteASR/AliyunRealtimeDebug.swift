@@ -12,14 +12,14 @@ extension RemoteASRTranscriber {
         hintPayload: ResolvedASRHintPayload
     ) async throws -> String {
         guard let wsURL = URL(string: RemoteASREndpointSupport.resolvedAliyunFunRealtimeEndpoint(endpoint)) else {
-            throw NSError(domain: "Voxt.RemoteASR", code: -41, userInfo: [NSLocalizedDescriptionKey: "Invalid Aliyun realtime WebSocket endpoint URL."])
+            throw NSError(domain: "SayIt.RemoteASR", code: -41, userInfo: [NSLocalizedDescriptionKey: "Invalid Aliyun realtime WebSocket endpoint URL."])
         }
 
         let (samples, sampleRate) = try DebugAudioClipIO.loadMonoSamples(from: fileURL)
         guard let pcmData = Self.makePCM16MonoData(from: samples, inputSampleRate: sampleRate),
               !pcmData.isEmpty else {
             throw NSError(
-                domain: "Voxt.RemoteASR",
+                domain: "SayIt.RemoteASR",
                 code: -52,
                 userInfo: [NSLocalizedDescriptionKey: "Unable to decode audio samples."]
             )
@@ -124,14 +124,14 @@ extension RemoteASRTranscriber {
     ) async throws -> String {
         let resolvedEndpoint = RemoteASREndpointSupport.resolvedAliyunQwenRealtimeEndpoint(endpoint, model: model)
         guard let wsURL = URL(string: resolvedEndpoint) else {
-            throw NSError(domain: "Voxt.RemoteASR", code: -45, userInfo: [NSLocalizedDescriptionKey: "Invalid Aliyun Qwen realtime WebSocket endpoint URL."])
+            throw NSError(domain: "SayIt.RemoteASR", code: -45, userInfo: [NSLocalizedDescriptionKey: "Invalid Aliyun Qwen realtime WebSocket endpoint URL."])
         }
 
         let (samples, sampleRate) = try DebugAudioClipIO.loadMonoSamples(from: fileURL)
         guard let pcmData = Self.makePCM16MonoData(from: samples, inputSampleRate: sampleRate),
               !pcmData.isEmpty else {
             throw NSError(
-                domain: "Voxt.RemoteASR",
+                domain: "SayIt.RemoteASR",
                 code: -52,
                 userInfo: [NSLocalizedDescriptionKey: "Unable to decode audio samples."]
             )
@@ -243,7 +243,7 @@ extension RemoteASRTranscriber {
         if event == "task-failed" || event == "error" {
             let errorText = AliyunRemoteASRConfiguration.realtimeSocketErrorMessage(from: object)
                 ?? "Aliyun fun ASR task failed."
-            throw NSError(domain: "Voxt.RemoteASR", code: -42, userInfo: [NSLocalizedDescriptionKey: errorText])
+            throw NSError(domain: "SayIt.RemoteASR", code: -42, userInfo: [NSLocalizedDescriptionKey: errorText])
         }
 
         if event == "task-started" {
@@ -281,7 +281,7 @@ extension RemoteASRTranscriber {
         let type = (object["type"] as? String ?? "").lowercased()
         if type == "error" {
             let detail = (object["message"] as? String) ?? "Aliyun Qwen realtime ASR task failed."
-            throw NSError(domain: "Voxt.RemoteASR", code: -46, userInfo: [NSLocalizedDescriptionKey: detail])
+            throw NSError(domain: "SayIt.RemoteASR", code: -46, userInfo: [NSLocalizedDescriptionKey: detail])
         }
 
         if type == "session.updated" {

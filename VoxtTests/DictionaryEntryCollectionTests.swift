@@ -7,15 +7,15 @@ import XCTest
 final class DictionaryEntryCollectionTests: XCTestCase {
     func testFilteredEntriesSeparatesManualAndAutoSources() {
         let entries = DictionaryEntryCollection.sortedEntries([
-            makeEntry(term: "Voxt", source: .manual, updatedAt: Date(timeIntervalSince1970: 100)),
+            makeEntry(term: "SayIt", source: .manual, updatedAt: Date(timeIntervalSince1970: 100)),
             makeEntry(term: "Waxed", source: .auto, updatedAt: Date(timeIntervalSince1970: 200)),
             makeEntry(term: "Ghostty", source: .manual, updatedAt: Date(timeIntervalSince1970: 300))
         ])
 
         let cache = DictionaryEntryCollection.filteredEntriesCache(for: entries)
 
-        XCTAssertEqual(cache[.all]?.map(\.term), ["Ghostty", "Waxed", "Voxt"])
-        XCTAssertEqual(cache[.manualAdded]?.map(\.term), ["Ghostty", "Voxt"])
+        XCTAssertEqual(cache[.all]?.map(\.term), ["Ghostty", "Waxed", "SayIt"])
+        XCTAssertEqual(cache[.manualAdded]?.map(\.term), ["Ghostty", "SayIt"])
         XCTAssertEqual(cache[.autoAdded]?.map(\.term), ["Waxed"])
     }
 
@@ -50,7 +50,7 @@ final class DictionaryEntryCollectionTests: XCTestCase {
     }
 
     func testPromptBiasTermsTextPrefersScopedEntriesOverBlockedGlobals() {
-        let sharedKey = "Voxt"
+        let sharedKey = "SayIt"
         let groupID = UUID()
         let global = makeEntry(
             term: sharedKey,
@@ -79,7 +79,7 @@ final class DictionaryEntryCollectionTests: XCTestCase {
             maxCharacters: 80
         )
 
-        XCTAssertEqual(bias, "Voxt\nGhostty")
+        XCTAssertEqual(bias, "SayIt\nGhostty")
     }
 
     func testASRPromptTermsTextUsesTypefluxSizedLimitAndFrequencyRanking() {

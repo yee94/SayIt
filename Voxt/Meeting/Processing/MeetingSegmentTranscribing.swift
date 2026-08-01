@@ -499,7 +499,7 @@ final class MeetingRemoteASRSegmentTranscriber: MeetingSegmentTranscribing {
         guard !isCancelled else { return nil }
 
         let tempURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("Voxt-Meeting-Chunk-\(UUID().uuidString)")
+            .appendingPathComponent("SayIt-Meeting-Chunk-\(UUID().uuidString)")
             .appendingPathExtension("wav")
         defer {
             try? FileManager.default.removeItem(at: tempURL)
@@ -562,7 +562,7 @@ final class MeetingRemoteASRSegmentTranscriber: MeetingSegmentTranscribing {
         }
 
         throw lastError ?? NSError(
-            domain: "Voxt.Meeting",
+            domain: "SayIt.Meeting",
             code: -1,
             userInfo: [NSLocalizedDescriptionKey: "Meeting Remote ASR transcription failed."]
         )

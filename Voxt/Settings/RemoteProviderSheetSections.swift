@@ -120,7 +120,7 @@ extension RemoteProviderConfigurationSheet {
 
             if isCodexLLMProvider {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(AppLocalization.localizedString("Codex Credentials, Voxt uses local Codex OAuth credentials."))
+                    Text(AppLocalization.localizedString("Codex Credentials, SayIt uses local Codex OAuth credentials."))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -416,7 +416,7 @@ extension RemoteProviderConfigurationSheet {
                                         placeholder: extraBodyJSONPlaceholder,
                                         height: 112
                                     )
-                                    Text(AppLocalization.localizedString("Merged into the request body after Voxt defaults, so matching keys override generated values."))
+                                    Text(AppLocalization.localizedString("Merged into the request body after SayIt defaults, so matching keys override generated values."))
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                         .fixedSize(horizontal: false, vertical: true)
@@ -433,7 +433,7 @@ extension RemoteProviderConfigurationSheet {
                                         placeholder: ollamaOptionsJSONPlaceholder,
                                         height: 112
                                     )
-                                    Text(AppLocalization.localizedString("Merged into provider options after Voxt defaults, so matching keys override generated values."))
+                                    Text(AppLocalization.localizedString("Merged into provider options after SayIt defaults, so matching keys override generated values."))
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                         .fixedSize(horizontal: false, vertical: true)

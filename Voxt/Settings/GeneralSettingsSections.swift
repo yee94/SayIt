@@ -859,7 +859,7 @@ struct GeneralAppBehaviorCard: View {
     let launchAtLoginError: String?
 
     private var customPasteDescription: String {
-        String(format: localized("Paste the latest Voxt result with %@."), customPasteHotkeyDisplayString)
+        String(format: localized("Paste the latest SayIt result with %@."), customPasteHotkeyDisplayString)
     }
 
     var body: some View {
@@ -975,7 +975,7 @@ struct GeneralProxyCard: View {
         GeneralSettingsCard(title: localizedKey("Proxy")) {
             GeneralFieldRow(
                 title: localizedKey("Proxy"),
-                description: localizedKey("Controls the proxy used by Voxt app network requests.")
+                description: localizedKey("Controls the proxy used by SayIt app network requests.")
             ) {
                 SettingsMenuPicker(
                     selection: $networkProxyMode,

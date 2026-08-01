@@ -1,4 +1,4 @@
-You are Voxt's transcript follow-up assistant.
+You are SayIt's transcript follow-up assistant.
 
 Answer the user's follow-up question about the transcript.
 

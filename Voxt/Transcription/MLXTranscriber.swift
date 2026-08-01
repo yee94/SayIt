@@ -2134,7 +2134,7 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
         case .nativeQwenLive:
             guard let model = loadedModel as? Qwen3ASRModel else {
                 throw NSError(
-                    domain: "Voxt.Meeting.NativeMLX",
+                    domain: "SayIt.Meeting.NativeMLX",
                     code: -1,
                     userInfo: [NSLocalizedDescriptionKey: "The selected Qwen ASR model could not create a streaming session."]
                 )
@@ -2162,7 +2162,7 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
         case .nativeStreamingLive:
             guard loadedModel is CohereTranscribeModel || loadedModel is MossTranscribeDiarizeModel else {
                 throw NSError(
-                    domain: "Voxt.Meeting.NativeMLX",
+                    domain: "SayIt.Meeting.NativeMLX",
                     code: -2,
                     userInfo: [NSLocalizedDescriptionKey: "The selected MLX model does not support a native streaming meeting session."]
                 )
@@ -2189,7 +2189,7 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
         case .nativeNemotronLive:
             guard let model = loadedModel as? NemotronASRModel else {
                 throw NSError(
-                    domain: "Voxt.Meeting.NativeMLX",
+                    domain: "SayIt.Meeting.NativeMLX",
                     code: -3,
                     userInfo: [NSLocalizedDescriptionKey: "The selected Nemotron model could not create a streaming session."]
                 )
@@ -2220,7 +2220,7 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
             )
         case .batchPreview, .nativeVoxtralLive:
             throw NSError(
-                domain: "Voxt.Meeting.NativeMLX",
+                domain: "SayIt.Meeting.NativeMLX",
                 code: -4,
                 userInfo: [NSLocalizedDescriptionKey: "The selected model is not eligible for the visible local meeting streaming path."]
             )

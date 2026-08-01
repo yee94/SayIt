@@ -392,7 +392,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         VoxtNetworkSession.clearProcessProxyEnvironmentOverridesIfNeeded(log: true)
         if VoxtNetworkSession.currentProxySettings.mode == .disabled,
            let systemProxy = VoxtNetworkSession.currentSystemProxyStatus.preferredSummary {
-            VoxtLog.warning("Voxt direct proxy mode is enabled while macOS system proxy remains active. systemProxy=\(systemProxy)")
+            VoxtLog.warning("SayIt direct proxy mode is enabled while macOS system proxy remains active. systemProxy=\(systemProxy)")
         }
         super.init()
         AppDelegate.shared = self
@@ -494,7 +494,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         LoggingBootstrap.bootstrap()
         _ = noteObsidianSyncCoordinator
         _ = noteRemindersSyncCoordinator
-        VoxtLog.info("Voxt launching.")
+        VoxtLog.info("SayIt launching.")
         VoxtLog.info("Runtime system version: \(currentSystemVersionLogDescription)")
         UserDefaults.standard.set(false, forKey: "NSQuitAlwaysKeepsWindows")
         migrateLegacyPreferences()
@@ -507,14 +507,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         if isRunningUnitTests {
-            VoxtLog.info("Voxt launch running under XCTest; skipping app startup services.")
+            VoxtLog.info("SayIt launch running under XCTest; skipping app startup services.")
             return
         }
 
         dictionaryCloudSyncService.bootstrap()
 
         if maybeRunLLMSmokeAndTerminate() {
-            VoxtLog.info("Voxt launch entering LLM smoke mode.")
+            VoxtLog.info("SayIt launch entering LLM smoke mode.")
             return
         }
 
@@ -534,9 +534,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 icon.isTemplate = true
                 button.image = icon
             } else {
-                button.image = NSImage(systemSymbolName: "waveform.circle", accessibilityDescription: "Voxt")
+                button.image = NSImage(systemSymbolName: "waveform.circle", accessibilityDescription: "SayIt")
             }
-            button.image?.accessibilityDescription = "Voxt"
+            button.image?.accessibilityDescription = "SayIt"
         }
         appUpdateManager.syncAutomaticallyChecksForUpdates(autoCheckForUpdates)
         startObservingAudioInputDevices()
@@ -646,7 +646,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         presentMainWindowOnLaunchIfNeeded()
         scheduleLLMIdleWarmupIfNeeded()
-        VoxtLog.info("Voxt launch completed. engine=\(transcriptionEngine.rawValue), enhancement=\(enhancementMode.rawValue)")
+        VoxtLog.info("SayIt launch completed. engine=\(transcriptionEngine.rawValue), enhancement=\(enhancementMode.rawValue)")
     }
 
     func applyFeatureAvailabilityLifecycle() {

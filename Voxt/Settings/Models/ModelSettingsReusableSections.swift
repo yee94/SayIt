@@ -41,19 +41,19 @@ enum PromptAuthoringGuidance {
     static let optionalVariablesTitle = AppLocalization.localizedString("Optional variables")
 
     static let enhancement = AppLocalization.localizedString(
-        "Write stable cleanup rules only. Do not paste raw transcription here. Voxt injects the transcription, glossary, and app context automatically."
+        "Write stable cleanup rules only. Do not paste raw transcription here. SayIt injects the transcription, glossary, and app context automatically."
     )
 
     static let translation = AppLocalization.localizedString(
-        "Write translation rules only. Do not paste source text here. Voxt injects the source text, target language, and glossary automatically."
+        "Write translation rules only. Do not paste source text here. SayIt injects the source text, target language, and glossary automatically."
     )
 
     static let rewrite = AppLocalization.localizedString(
-        "Write rewrite behavior rules only. Do not paste spoken instructions or source text here. Voxt injects both automatically at runtime."
+        "Write rewrite behavior rules only. Do not paste spoken instructions or source text here. SayIt injects both automatically at runtime."
     )
 
     static let appEnhancement = AppLocalization.localizedString(
-        "Recommended: describe only app-specific tone or formatting preferences. Do not paste raw transcription here. Voxt injects the transcription automatically."
+        "Recommended: describe only app-specific tone or formatting preferences. Do not paste raw transcription here. SayIt injects the transcription automatically."
     )
 }
 

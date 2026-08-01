@@ -203,7 +203,7 @@ struct HelpNavigationCommands: Commands {
         let _ = interfaceLanguageRaw
         CommandGroup(after: .help) {
             Divider()
-            Button(AppLocalization.localizedString("Voxt")) {
+            Button(AppLocalization.localizedString("SayIt")) {
                 appDelegate.openMainWindow(target: SettingsNavigationTarget(tab: .about, section: .aboutVoxt))
             }
             Button(AppLocalization.localizedString("GitHub")) {

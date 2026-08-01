@@ -22,7 +22,7 @@ struct CodexOAuthCredentialProvider {
             case .authFileNotFound(let path):
                 return AppLocalization.format("Codex auth not found at %@. Run `codex login` first.", path)
             case .authFilePermissionDenied(let path):
-                return AppLocalization.format("Codex auth.json permission denied at %@. Click Choose and select auth.json to grant Voxt access.", path)
+                return AppLocalization.format("Codex auth.json permission denied at %@. Click Choose and select auth.json to grant SayIt access.", path)
             case .missingTokens:
                 return AppLocalization.localizedString("Codex auth.json has no ChatGPT OAuth tokens. Run `codex login` first.")
             case .invalidAuthFile(let detail):
@@ -102,7 +102,7 @@ struct CodexOAuthCredentialProvider {
         let credential = try await credential()
         var headers = [
             "Authorization": "Bearer \(credential.accessToken)",
-            "User-Agent": "codex_cli_rs/0.0.0 (Voxt)",
+            "User-Agent": "codex_cli_rs/0.0.0 (SayIt)",
             "originator": "codex_cli_rs"
         ]
         if let accountID = credential.accountID, !accountID.isEmpty {

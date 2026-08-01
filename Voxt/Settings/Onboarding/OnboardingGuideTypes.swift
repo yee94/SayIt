@@ -83,7 +83,7 @@ enum OnboardingGuideStep: String, CaseIterable, Identifiable {
     var subtitle: String {
         switch self {
         case .permissions:
-            return AppLocalization.localizedString("Allow Voxt to hear you, read shortcuts, and insert text into active apps.")
+            return AppLocalization.localizedString("Allow SayIt to hear you, read shortcuts, and insert text into active apps.")
         case .models:
             return AppLocalization.localizedString("Pick local models or configure remote providers before testing voice workflows.")
         case .transcriptionShortcut:
@@ -97,13 +97,13 @@ enum OnboardingGuideStep: String, CaseIterable, Identifiable {
         case .rewriteShortcut:
             return AppLocalization.localizedString("Use voice rewrite mode to answer or transform text.")
         case .rewriteSelection:
-            return AppLocalization.localizedString("Select source text and ask Voxt to rewrite it.")
+            return AppLocalization.localizedString("Select source text and ask SayIt to rewrite it.")
         case .appEnhancement:
-            return AppLocalization.localizedString("Test temporary app-aware instructions while Voxt is focused.")
+            return AppLocalization.localizedString("Test temporary app-aware instructions while SayIt is focused.")
         case .meeting:
             return AppLocalization.localizedString("Check the meeting shortcut and confirm the audio, summary, and speaker separation setup.")
         case .finish:
-            return AppLocalization.localizedString("Review the active shortcuts and start using Voxt.")
+            return AppLocalization.localizedString("Review the active shortcuts and start using SayIt.")
         }
     }
 

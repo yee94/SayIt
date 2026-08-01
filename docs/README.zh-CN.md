@@ -1,8 +1,8 @@
 <div align="center"><a name="readme-top"></a>
 
-<img src="../Voxt/logo.svg" width="118" alt="Voxt Logo">
+<img src="../SayIt/logo.svg" width="118" alt="SayIt Logo">
 
-# Voxt
+# SayIt
 
 MacOS 语音输入与翻译工具，支持不同应用和网址文本增强。笔记模式会议模式让你的音频不只是文本。
 

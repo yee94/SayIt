@@ -99,7 +99,7 @@ struct AboutSettingsView: View {
 
                 GeneralToggleRow(
                     title: localizedKey("Beta Updates"),
-                    description: localizedKey("Check beta appcast updates when Voxt checks for app updates."),
+                    description: localizedKey("Check beta appcast updates when SayIt checks for app updates."),
                     isOn: $betaUpdatesEnabled
                 )
                 .font(.caption)

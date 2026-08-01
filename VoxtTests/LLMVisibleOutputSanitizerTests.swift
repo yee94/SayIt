@@ -8,7 +8,7 @@ final class LLMVisibleOutputSanitizerTests: XCTestCase {
     func testExtractsFinalOutputFromThinkingProcessLeakForEnhancement() {
         let output = """
         Thinking Process:
-        Role: Voxt transcription cleanup assistant.
+        Role: SayIt transcription cleanup assistant.
         Apply Rules:
         1. Preserve final text.
 

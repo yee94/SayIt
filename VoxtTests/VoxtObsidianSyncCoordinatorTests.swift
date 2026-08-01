@@ -16,7 +16,7 @@ final class VoxtObsidianSyncCoordinatorTests: XCTestCase {
         let settings = ObsidianNoteSyncSettings(
             enabled: false,
             vaultPath: vaultURL.path,
-            relativeFolder: "Voxt",
+            relativeFolder: "SayIt",
             groupingMode: .file
         )
 
@@ -35,7 +35,7 @@ final class VoxtObsidianSyncCoordinatorTests: XCTestCase {
         )
 
         try await Task.sleep(for: .milliseconds(700))
-        XCTAssertFalse(FileManager.default.fileExists(atPath: vaultURL.appendingPathComponent("Voxt").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: vaultURL.appendingPathComponent("SayIt").path))
     }
 
     func testSessionAndSingleFileGroupingWriteReadableFiles() async throws {
@@ -48,7 +48,7 @@ final class VoxtObsidianSyncCoordinatorTests: XCTestCase {
         var settings = ObsidianNoteSyncSettings(
             enabled: true,
             vaultPath: vaultURL.path,
-            relativeFolder: "Voxt",
+            relativeFolder: "SayIt",
             groupingMode: .session
         )
 
@@ -73,7 +73,7 @@ final class VoxtObsidianSyncCoordinatorTests: XCTestCase {
 
         let firstRecord = try XCTUnwrap(exportStore.recordsByNoteID[firstItem.id])
         XCTAssertEqual(firstRecord.groupingMode, .session)
-        XCTAssertTrue(firstRecord.relativeFilePath.contains("Voxt/Sessions/"))
+        XCTAssertTrue(firstRecord.relativeFilePath.contains("SayIt/Sessions/"))
         XCTAssertTrue(firstRecord.relativeFilePath.contains("Session note"))
         XCTAssertFalse(firstRecord.relativeFilePath.contains(firstSessionID.uuidString))
 
@@ -99,7 +99,7 @@ final class VoxtObsidianSyncCoordinatorTests: XCTestCase {
 
         let record = try XCTUnwrap(exportStore.recordsByNoteID[secondItem.id])
         XCTAssertEqual(record.groupingMode, .file)
-        XCTAssertTrue(record.relativeFilePath.contains("Voxt/Notes/"))
+        XCTAssertTrue(record.relativeFilePath.contains("SayIt/Notes/"))
         XCTAssertTrue(record.relativeFilePath.contains("Single file note"))
         XCTAssertFalse(record.relativeFilePath.contains(secondItem.id.uuidString))
 
@@ -133,7 +133,7 @@ final class VoxtObsidianSyncCoordinatorTests: XCTestCase {
         let settings = ObsidianNoteSyncSettings(
             enabled: true,
             vaultPath: vaultURL.path,
-            relativeFolder: "Voxt",
+            relativeFolder: "SayIt",
             groupingMode: .file
         )
 
@@ -147,7 +147,7 @@ final class VoxtObsidianSyncCoordinatorTests: XCTestCase {
         let item = try XCTUnwrap(
             noteStore.append(
                 sessionID: UUID(),
-                text: "Original body from Voxt.",
+                text: "Original body from SayIt.",
                 title: "Initial title",
                 titleGenerationState: .generated
             )
@@ -158,16 +158,16 @@ final class VoxtObsidianSyncCoordinatorTests: XCTestCase {
         let record = try XCTUnwrap(exportStore.recordsByNoteID[item.id])
         let fileURL = vaultURL.appendingPathComponent(record.relativeFilePath)
         var content = try String(contentsOf: fileURL, encoding: .utf8)
-        XCTAssertTrue(content.contains("Original body from Voxt."))
+        XCTAssertTrue(content.contains("Original body from SayIt."))
 
         let editedBody = "Edited in Obsidian.\n\nSecond paragraph."
-        content = content.replacingOccurrences(of: "Original body from Voxt.", with: editedBody)
+        content = content.replacingOccurrences(of: "Original body from SayIt.", with: editedBody)
         try content.write(to: fileURL, atomically: true, encoding: .utf8)
 
         XCTAssertTrue(noteStore.updateDetails(
             item.id,
             title: "Updated title",
-            text: "Updated body from Voxt."
+            text: "Updated body from SayIt."
         ))
         XCTAssertTrue(noteStore.setPriority(.high, for: item.id))
         XCTAssertTrue(noteStore.setStatus(.done, for: item.id))
@@ -177,14 +177,14 @@ final class VoxtObsidianSyncCoordinatorTests: XCTestCase {
             exportStore: exportStore,
             noteID: item.id,
             vaultURL: vaultURL,
-            expectedBody: "Updated body from Voxt."
+            expectedBody: "Updated body from SayIt."
         )
         XCTAssertTrue(updatedContent.contains("# Updated title"))
         XCTAssertTrue(updatedContent.contains("status: \"done\""))
         XCTAssertTrue(updatedContent.contains("priority: \"high\""))
-        XCTAssertTrue(updatedContent.contains("Updated body from Voxt."))
+        XCTAssertTrue(updatedContent.contains("Updated body from SayIt."))
         XCTAssertFalse(updatedContent.contains(editedBody))
-        XCTAssertFalse(updatedContent.contains("Original body from Voxt."))
+        XCTAssertFalse(updatedContent.contains("Original body from SayIt."))
         XCTAssertEqual(updatedFileURL, fileURL)
         XCTAssertTrue(FileManager.default.fileExists(atPath: fileURL.path))
     }
@@ -210,7 +210,7 @@ final class VoxtObsidianSyncCoordinatorTests: XCTestCase {
         let settings = ObsidianNoteSyncSettings(
             enabled: true,
             vaultPath: vaultURL.path,
-            relativeFolder: "Voxt",
+            relativeFolder: "SayIt",
             groupingMode: .file
         )
 
@@ -248,7 +248,7 @@ final class VoxtObsidianSyncCoordinatorTests: XCTestCase {
         _ = noteStore.updateCompletion(true, for: item.id)
 
         let dayFolder = Self.dayFolderFormatter.string(from: item.createdAt)
-        let readablePath = "Voxt/Sessions/\(dayFolder)/\(Self.timeFormatter.string(from: item.createdAt)) - 笔记应用优化建议.md"
+        let readablePath = "SayIt/Sessions/\(dayFolder)/\(Self.timeFormatter.string(from: item.createdAt)) - 笔记应用优化建议.md"
         let readableURL = vaultURL.appendingPathComponent(readablePath)
         try FileManager.default.createDirectory(at: readableURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Self.renderExistingSessionFile(sessionID: item.sessionID).write(to: readableURL, atomically: true, encoding: .utf8)
@@ -257,14 +257,14 @@ final class VoxtObsidianSyncCoordinatorTests: XCTestCase {
             VoxtNoteObsidianExportRecord(
                 noteID: item.id,
                 groupingMode: .session,
-                relativeFilePath: "Voxt/Sessions/\(dayFolder)/\(item.sessionID.uuidString).md"
+                relativeFilePath: "SayIt/Sessions/\(dayFolder)/\(item.sessionID.uuidString).md"
             )
         )
 
         let settings = ObsidianNoteSyncSettings(
             enabled: true,
             vaultPath: vaultURL.path,
-            relativeFolder: "Voxt",
+            relativeFolder: "SayIt",
             groupingMode: .session
         )
 
@@ -300,7 +300,7 @@ final class VoxtObsidianSyncCoordinatorTests: XCTestCase {
         _ = noteStore.updateCompletion(true, for: item.id)
 
         let dayFolder = Self.dayFolderFormatter.string(from: item.createdAt)
-        let basePath = "Voxt/Sessions/\(dayFolder)/\(Self.timeFormatter.string(from: item.createdAt)) - 笔记应用优化建议.md"
+        let basePath = "SayIt/Sessions/\(dayFolder)/\(Self.timeFormatter.string(from: item.createdAt)) - 笔记应用优化建议.md"
         let suffixedPath = basePath.replacingOccurrences(of: ".md", with: " (2).md")
         let suffixedURL = vaultURL.appendingPathComponent(suffixedPath)
         try FileManager.default.createDirectory(at: suffixedURL.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -317,7 +317,7 @@ final class VoxtObsidianSyncCoordinatorTests: XCTestCase {
         let settings = ObsidianNoteSyncSettings(
             enabled: true,
             vaultPath: vaultURL.path,
-            relativeFolder: "Voxt",
+            relativeFolder: "SayIt",
             groupingMode: .session
         )
 
@@ -353,7 +353,7 @@ final class VoxtObsidianSyncCoordinatorTests: XCTestCase {
         _ = noteStore.updateCompletion(true, for: item.id)
 
         let dayFolder = Self.dayFolderFormatter.string(from: item.createdAt)
-        let basePath = "Voxt/Notes/\(dayFolder)/\(Self.timeFormatter.string(from: item.createdAt)) - 完成 wax API 接口连接.md"
+        let basePath = "SayIt/Notes/\(dayFolder)/\(Self.timeFormatter.string(from: item.createdAt)) - 完成 wax API 接口连接.md"
         let suffixedPath = basePath.replacingOccurrences(of: ".md", with: " (2).md")
         let suffixedURL = vaultURL.appendingPathComponent(suffixedPath)
         try FileManager.default.createDirectory(at: suffixedURL.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -370,7 +370,7 @@ final class VoxtObsidianSyncCoordinatorTests: XCTestCase {
         let settings = ObsidianNoteSyncSettings(
             enabled: true,
             vaultPath: vaultURL.path,
-            relativeFolder: "Voxt",
+            relativeFolder: "SayIt",
             groupingMode: .file
         )
 
@@ -398,7 +398,7 @@ final class VoxtObsidianSyncCoordinatorTests: XCTestCase {
         let settings = ObsidianNoteSyncSettings(
             enabled: true,
             vaultPath: vaultURL.path,
-            relativeFolder: "Voxt",
+            relativeFolder: "SayIt",
             groupingMode: .daily
         )
 
@@ -421,7 +421,7 @@ final class VoxtObsidianSyncCoordinatorTests: XCTestCase {
         try await Task.sleep(for: .milliseconds(700))
 
         let dayFolder = Self.dayFolderFormatter.string(from: item.createdAt)
-        let dailyFileURL = vaultURL.appendingPathComponent("Voxt/Daily/\(dayFolder) Notes.md")
+        let dailyFileURL = vaultURL.appendingPathComponent("SayIt/Daily/\(dayFolder) Notes.md")
         XCTAssertTrue(FileManager.default.fileExists(atPath: dailyFileURL.path))
 
         noteStore.delete(id: item.id)
@@ -439,7 +439,7 @@ final class VoxtObsidianSyncCoordinatorTests: XCTestCase {
         var settings = ObsidianNoteSyncSettings(
             enabled: false,
             vaultPath: vaultURL.path,
-            relativeFolder: "Voxt",
+            relativeFolder: "SayIt",
             groupingMode: .file
         )
         let coordinator = VoxtObsidianSyncCoordinator(
@@ -461,7 +461,7 @@ final class VoxtObsidianSyncCoordinatorTests: XCTestCase {
 
         try await Task.sleep(for: .milliseconds(300))
         XCTAssertTrue(exportStore.recordsByNoteID.isEmpty)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: vaultURL.appendingPathComponent("Voxt").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: vaultURL.appendingPathComponent("SayIt").path))
         let didFinishPendingSync = await coordinator.waitForPendingApplicationTerminationSync(timeout: 0.2)
         XCTAssertTrue(didFinishPendingSync)
     }
@@ -499,7 +499,7 @@ final class VoxtObsidianSyncCoordinatorTests: XCTestCase {
                 if let content = try? String(contentsOf: fileURL, encoding: .utf8),
                    content.contains("status: \"done\""),
                    expectedBody.map({ content.contains($0) }) ?? true,
-                   !content.contains("Original body from Voxt.") {
+                   !content.contains("Original body from SayIt.") {
                     return (fileURL, content)
                 }
             }

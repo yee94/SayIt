@@ -89,7 +89,7 @@ enum SettingsNavigationSection: String, Hashable {
         case .historyEntries: return "History Entries"
         case .permissionsMain: return "Permissions"
         case .permissionsAppBranchURLAuthorization: return "App Branch URL Authorization"
-        case .aboutVoxt: return "Voxt"
+        case .aboutVoxt: return "SayIt"
         case .aboutProject: return "Project"
         case .aboutAuthor: return "Author"
         case .aboutThanks: return "Thanks"
@@ -245,7 +245,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .history: return "History"
         case .report: return "Home"
         case .model: return "Model"
-        case .feature: return "Custom"
+        case .feature: return "Feature Configuration"
         case .dictionary: return "Dictionary"
         case .appEnhancement: return "App Branch"
         case .hotkey: return "Hotkey"
@@ -262,7 +262,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .history: return "History"
         case .report: return "Home"
         case .model: return "Model"
-        case .feature: return "Custom"
+        case .feature: return "Feature Configuration"
         case .dictionary: return "Dictionary"
         case .appEnhancement: return "App Branch"
         case .hotkey: return "Hotkey"
@@ -288,7 +288,6 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     static func visibleTabs(appEnhancementEnabled: Bool) -> [SettingsTab] {
         [
             .report,
-            .feature,
             .dictionary,
             .history
         ]
@@ -298,6 +297,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         [
             .general,
             .model,
+            .feature,
             .permissions,
             .hotkey,
             .about

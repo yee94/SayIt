@@ -21,7 +21,7 @@ struct DictionaryHistoryScanRequest: Hashable {
 }
 
 private enum DictionaryHistoryScanParseError {
-    static let domain = "Voxt.DictionaryHistoryScan"
+    static let domain = "SayIt.DictionaryHistoryScan"
 
     static func invalidText(code: Int) -> NSError {
         NSError(

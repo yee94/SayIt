@@ -2,9 +2,9 @@ application = defines["app"]
 background = defines["background"]
 icon = defines["volume_icon"]
 
-files = [(application, "Voxt.app")]
+files = [(application, "SayIt.app")]
 symlinks = {"Applications": "/Applications"}
-hide_extensions = ["Voxt.app"]
+hide_extensions = ["SayIt.app"]
 
 format = "UDZO"
 filesystem = "HFS+"
@@ -22,6 +22,6 @@ label_pos = "bottom"
 text_size = 14
 icon_size = 112
 icon_locations = {
-    "Voxt.app": (170, 205),
+    "SayIt.app": (170, 205),
     "Applications": (550, 205),
 }

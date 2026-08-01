@@ -24,7 +24,7 @@ final class MLXModelLifecycleMemoryIntegrationTests: XCTestCase {
         let modelRoot = environment["VOXT_MODEL_STORAGE_ROOT"]?
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard let modelRoot, !modelRoot.isEmpty else {
-            throw XCTSkip("Set VOXT_MODEL_STORAGE_ROOT to an installed Voxt model directory.")
+            throw XCTSkip("Set VOXT_MODEL_STORAGE_ROOT to an installed SayIt model directory.")
         }
 
         let repo = environment["VOXT_MEMORY_STRESS_MODEL_REPO"]?
@@ -124,7 +124,7 @@ final class MLXModelLifecycleMemoryIntegrationTests: XCTestCase {
         let modelRoot = environment["VOXT_MODEL_STORAGE_ROOT"]?
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard let modelRoot, !modelRoot.isEmpty else {
-            throw XCTSkip("Set VOXT_MODEL_STORAGE_ROOT to an installed Voxt model directory.")
+            throw XCTSkip("Set VOXT_MODEL_STORAGE_ROOT to an installed SayIt model directory.")
         }
 
         let repo = environment["VOXT_MEMORY_STRESS_LLM_REPO"]?
@@ -199,7 +199,7 @@ final class MLXModelLifecycleMemoryIntegrationTests: XCTestCase {
         let modelRoot = environment["VOXT_MODEL_STORAGE_ROOT"]?
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard let modelRoot, !modelRoot.isEmpty else {
-            throw XCTSkip("Set VOXT_MODEL_STORAGE_ROOT to an installed Voxt model directory.")
+            throw XCTSkip("Set VOXT_MODEL_STORAGE_ROOT to an installed SayIt model directory.")
         }
         let repo = environment["VOXT_MEMORY_STRESS_LLM_REPO"]?
             .trimmingCharacters(in: .whitespacesAndNewlines)

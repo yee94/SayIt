@@ -91,7 +91,7 @@ final class MeetingDiarizationModelManager: ObservableObject {
         #if canImport(FluidAudio)
         guard #available(macOS 14.0, *) else {
             throw NSError(
-                domain: "Voxt.MeetingDiarization",
+                domain: "SayIt.MeetingDiarization",
                 code: 2001,
                 userInfo: [NSLocalizedDescriptionKey: AppLocalization.localizedString("Offline VBx requires macOS 14 or later.")]
             )
@@ -109,7 +109,7 @@ final class MeetingDiarizationModelManager: ObservableObject {
         )
         #else
         throw NSError(
-            domain: "Voxt.MeetingDiarization",
+            domain: "SayIt.MeetingDiarization",
             code: 2002,
             userInfo: [NSLocalizedDescriptionKey: AppLocalization.localizedString("Offline VBx is not available in this build.")]
         )
@@ -161,7 +161,7 @@ final class MeetingDiarizationModelManager: ObservableObject {
               let tempDir = MeetingSortformerModelStorage.downloadTempDirectory()
         else {
             throw NSError(
-                domain: "Voxt.MeetingDiarization",
+                domain: "SayIt.MeetingDiarization",
                 code: 2000,
                 userInfo: [NSLocalizedDescriptionKey: "Invalid meeting diarization model identifier."]
             )

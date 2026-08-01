@@ -17,7 +17,7 @@ enum VoxtLogExportStore {
             AppLocalization.localizedString("App Meta")
         }
         let logText = selectedLines.isEmpty
-            ? "[Voxt] <\(unavailableText)>"
+            ? "[SayIt] <\(unavailableText)>"
             : selectedLines.joined(separator: "\n")
 
         return [

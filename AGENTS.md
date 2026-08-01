@@ -2,7 +2,7 @@
 
 ## Project Shape
 
-Voxt is a macOS menu bar voice input and translation app written in Swift with an Xcode project at `Voxt.xcodeproj`.
+SayIt is a macOS menu bar voice input and translation app written in Swift with an Xcode project at `Voxt.xcodeproj`.
 
 - Main app sources live under `Voxt/`.
 - Tests live under `VoxtTests/`, with shared helpers in `VoxtTests/TestSupport/`.

@@ -1,13 +1,13 @@
 # 提示词
 
-本文档整理 Voxt 当前应用中的默认提示词、模板变量、运行规则和推荐写法，方便你在主窗口里自定义提示词时保持输出稳定。
+本文档整理 SayIt 当前应用中的默认提示词、模板变量、运行规则和推荐写法，方便你在主窗口里自定义提示词时保持输出稳定。
 
 > [!IMPORTANT]
-> Voxt 中的大多数提示词都不是“聊天式对话提示词”，而是“单轮任务提示词”。推荐写得明确、约束清楚、输出边界严格，避免让模型自由发挥。
+> SayIt 中的大多数提示词都不是“聊天式对话提示词”，而是“单轮任务提示词”。推荐写得明确、约束清楚、输出边界严格，避免让模型自由发挥。
 
 ## 调用流
 
-Voxt 中与提示词相关的能力，核心上有三条主链路：
+SayIt 中与提示词相关的能力，核心上有三条主链路：
 
 - 普通转录：`ASR -> 文本增强 -> 输出`
 - 翻译：`ASR / 选中文本 -> 可选增强 -> 翻译 -> 输出`
@@ -195,7 +195,7 @@ flowchart LR
 5. 直接翻译
    - 走 `TranslateStage`
 6. 严格重试
-   - 如果第一次结果看起来和原文几乎一样，Voxt 会触发 `StrictRetryTranslateStage`
+   - 如果第一次结果看起来和原文几乎一样，SayIt 会触发 `StrictRetryTranslateStage`
    - 用更强约束的翻译提示词重试一次
 7. 提交输出
    - 将译文写回选区 / 输入位置
@@ -262,7 +262,7 @@ flowchart LR
 
 如果转写阶段失败：
 
-- Voxt 会尝试把“增强后的口述指令”直接作为 fallback 输出
+- SayIt 会尝试把“增强后的口述指令”直接作为 fallback 输出
 - 也就是说，最差情况下不会完全丢结果，而是尽量回退到可用文本
 
 ### 统一提交与收尾阶段
@@ -468,7 +468,7 @@ flowchart TD
 
 ## 模板变量
 
-Voxt 当前内置的模板变量如下：
+SayIt 当前内置的模板变量如下：
 
 | 变量 | 用途 | 适用位置 |
 | --- | --- | --- |
@@ -496,7 +496,7 @@ Voxt 当前内置的模板变量如下：
 ### 默认提示词
 
 ```text
-你是 Voxt 的转写清理助手，负责对语音识别生成的原始文本进行精准清理。
+你是 SayIt 的转写清理助手，负责对语音识别生成的原始文本进行精准清理。
 
 用户主要语言为：
 {{USER_MAIN_LANGUAGE}}
@@ -546,7 +546,7 @@ Voxt 当前内置的模板变量如下：
 ### 运行时说明
 
 - 如果当前 App 或 URL 命中了 App Branch，增强阶段实际使用的 prompt 可能会被该分组 prompt 替换。
-- 如果词典识别到了相关术语，Voxt 会在运行时自动追加 glossary guidance，要求模型优先使用词典里的准确拼写。
+- 如果词典识别到了相关术语，SayIt 会在运行时自动追加 glossary guidance，要求模型优先使用词典里的准确拼写。
 
 ### 使用规范
 
@@ -578,7 +578,7 @@ Voxt 当前内置的模板变量如下：
 ### 默认提示词
 
 ```text
-你是 Voxt 的内容整理翻译助手，负责对用户提供的内容进行整理并翻译为目标语言。
+你是 SayIt 的内容整理翻译助手，负责对用户提供的内容进行整理并翻译为目标语言。
 
 用户主要语言为：
 {{USER_MAIN_LANGUAGE}}
@@ -606,7 +606,7 @@ Voxt 当前内置的模板变量如下：
 
 - `{{TARGET_LANGUAGE}}`
 - `{{USER_MAIN_LANGUAGE}}`
-- `{{SOURCE_TEXT}}` 仍兼容自定义提示词；默认提示词不内嵌源文本，因为 Voxt 会在运行时提供待处理文本。
+- `{{SOURCE_TEXT}}` 仍兼容自定义提示词；默认提示词不内嵌源文本，因为 SayIt 会在运行时提供待处理文本。
 
 ### 运行时补充规则
 
@@ -619,13 +619,13 @@ Voxt 当前内置的模板变量如下：
   - 不输出解释
   - 只返回翻译结果
 - 严格重试模式：
-  - 如果第一轮结果看起来“像没翻译”，Voxt 会用更严格的规则重试
+  - 如果第一轮结果看起来“像没翻译”，SayIt 会用更严格的规则重试
   - 会更强地要求“不要复制源语言措辞”
 - 词典 guidance：
-  - 如果源文本命中了词典词，Voxt 会追加 glossary 规则，要求模型尽量保留这些术语的准确拼写，除非翻译语义明确要求变化
+  - 如果源文本命中了词典词，SayIt 会追加 glossary 规则，要求模型尽量保留这些术语的准确拼写，除非翻译语义明确要求变化
 
 > [!IMPORTANT]
-> 这意味着翻译提示词最终不是只用你写的那一段，Voxt 还会在运行时追加一层“必须翻译、只返回结果”的约束。
+> 这意味着翻译提示词最终不是只用你写的那一段，SayIt 还会在运行时追加一层“必须翻译、只返回结果”的约束。
 
 ### 使用规范
 
@@ -659,7 +659,7 @@ Voxt 当前内置的模板变量如下：
 ### 默认提示词
 
 ```text
-You are Voxt's content writing assistant. Use the spoken instruction and the optional selected source text to produce the final text that should be inserted into the current input field.
+You are SayIt's content writing assistant. Use the spoken instruction and the optional selected source text to produce the final text that should be inserted into the current input field.
 
 Spoken instruction:
 <spoken_instruction>
@@ -685,17 +685,17 @@ Rules:
 
 ### 运行时约束
 
-真正执行转写时，Voxt 可能会在基础 prompt 后追加额外约束：
+真正执行转写时，SayIt 可能会在基础 prompt 后追加额外约束：
 
 - 直接回答模式：
-  - 如果当前没有选中文本，Voxt 会明确告诉模型“把口述指令当成完整请求”，直接输出真正答案
+  - 如果当前没有选中文本，SayIt 会明确告诉模型“把口述指令当成完整请求”，直接输出真正答案
 - 结构化答案模式：
-  - 当转写答案卡片要求结构化输出时，Voxt 会临时要求模型返回一个只包含 `title` 和 `content` 的 JSON 对象
+  - 当转写答案卡片要求结构化输出时，SayIt 会临时要求模型返回一个只包含 `title` 和 `content` 的 JSON 对象
   - `content` 必须只包含最终答案文本
 - 非空重试：
-  - 如果上一次结构化结果返回了空 `content`，Voxt 会再重试一次，并强制要求返回非空内容
+  - 如果上一次结构化结果返回了空 `content`，SayIt 会再重试一次，并强制要求返回非空内容
 - 词典 guidance：
-  - 如果命中了相关词典术语，Voxt 会追加 glossary guidance，要求最终输出优先采用词典里的准确拼写
+  - 如果命中了相关词典术语，SayIt 会追加 glossary guidance，要求最终输出优先采用词典里的准确拼写
 
 ### 使用规范
 

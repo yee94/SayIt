@@ -98,7 +98,7 @@ actor MeetingAudioArchive {
         let dataByteCount = sampleCount * MemoryLayout<Int16>.size
         guard dataByteCount <= Int(UInt32.max) else {
             throw NSError(
-                domain: "Voxt.MeetingAudioArchive",
+                domain: "SayIt.MeetingAudioArchive",
                 code: -1,
                 userInfo: [NSLocalizedDescriptionKey: "Meeting audio is too large to export as a single WAV file."]
             )
@@ -260,7 +260,7 @@ actor MeetingAudioArchive {
         let pendingBytes = Int64(max(additionalSampleCount, 0) * MemoryLayout<Float>.size)
         guard available - pendingBytes >= reserve else {
             throw NSError(
-                domain: "Voxt.MeetingAudioArchive",
+                domain: "SayIt.MeetingAudioArchive",
                 code: -2,
                 userInfo: [NSLocalizedDescriptionKey: "Insufficient disk reserve for safe meeting capture."]
             )
@@ -449,7 +449,7 @@ actor MeetingAudioArchive {
             return tempDirectoryURL
         }
         let url = fileManager.temporaryDirectory
-            .appendingPathComponent("Voxt-MeetingAudioArchive-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("SayIt-MeetingAudioArchive-\(UUID().uuidString)", isDirectory: true)
         try fileManager.createDirectory(at: url, withIntermediateDirectories: true)
         tempDirectoryURL = url
         return url

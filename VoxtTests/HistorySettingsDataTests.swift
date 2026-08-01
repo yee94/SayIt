@@ -53,7 +53,7 @@ final class HistorySettingsDataTests: XCTestCase {
 
     func testEmptyStatePrefersHistoryAndNoteSpecificMessages() {
         let note = makeNote(title: "todo")
-        let entry = makeHistoryEntry(kind: .normal, text: "Voxt")
+        let entry = makeHistoryEntry(kind: .normal, text: "SayIt")
 
         XCTAssertEqual(
             HistorySettingsData.emptyState(

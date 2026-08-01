@@ -40,12 +40,12 @@ final class InstalledASRLongFormMatrixIntegrationTests: XCTestCase {
                 maximumReasonableCharacters: 8000
             ),
             ClipCase(
-                path: "/Users/guanwei/Library/Application Support/Voxt/transcription-history-audio/transcription/transcription-6247D986-B2EC-4758-AB40-7C1030296D7A.wav",
+                path: "/Users/guanwei/Library/Application Support/SayIt/transcription-history-audio/transcription/transcription-6247D986-B2EC-4758-AB40-7C1030296D7A.wav",
                 minimumReasonableCharacters: 40,
                 maximumReasonableCharacters: 5000
             ),
             ClipCase(
-                path: "/Users/guanwei/Library/Application Support/Voxt/transcription-history-audio/transcription/transcription-FD3C99FC-822F-45DB-8734-FFADEF6DC6EE.wav",
+                path: "/Users/guanwei/Library/Application Support/SayIt/transcription-history-audio/transcription/transcription-FD3C99FC-822F-45DB-8734-FFADEF6DC6EE.wav",
                 minimumReasonableCharacters: 40,
                 maximumReasonableCharacters: 4000
             )

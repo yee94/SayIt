@@ -398,7 +398,7 @@ final class ModelDebugSupportTests: XCTestCase {
         )
 
         let compiled = try! XCTUnwrap(resolved.compiledRequest)
-        XCTAssertContains(compiled.instructions, "Voxt")
+        XCTAssertContains(compiled.instructions, "SayIt")
         XCTAssertContains(compiled.instructions, "Runtime language preservation rules:")
         XCTAssertContains(compiled.prompt, "原始输入")
         XCTAssertFalse(compiled.instructions.contains("Raw transcription"))

@@ -6,7 +6,7 @@ import XCTest
 
 final class EntryValidationSupportTests: XCTestCase {
     func testPrepareAllowsDuplicateNormalizedHotwordTerm() throws {
-        let existingEntry = TestFactories.makeEntry(term: "Voxt")
+        let existingEntry = TestFactories.makeEntry(term: "SayIt")
 
         XCTAssertNoThrow(
             try DictionaryEntryInputPreparer.prepare(
@@ -19,7 +19,7 @@ final class EntryValidationSupportTests: XCTestCase {
     }
 
     func testPrepareRejectsReplacementMatchingExistingHotwordTerm() throws {
-        let existingEntry = TestFactories.makeEntry(term: "Voxt")
+        let existingEntry = TestFactories.makeEntry(term: "SayIt")
 
         XCTAssertThrowsError(
             try DictionaryEntryInputPreparer.prepare(

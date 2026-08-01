@@ -23,7 +23,7 @@ extension AppDelegate {
             case .translationProviderUnavailable:
                 return AppLocalization.localizedString("Translation failed because the selected translation provider is unavailable for this request.")
             case .translationPlanUnavailable:
-                return AppLocalization.localizedString("Translation failed because Voxt could not prepare the translation request.")
+                return AppLocalization.localizedString("Translation failed because SayIt could not prepare the translation request.")
             case .translationRejectedByGuard:
                 return AppLocalization.localizedString("Translation failed because the model output looked incomplete.")
             case .rewriteModelNotInstalled:
@@ -758,7 +758,7 @@ extension AppDelegate {
             : ""
 
         let base = """
-        You are Voxt's follow-up voice conversation assistant.
+        You are SayIt's follow-up voice conversation assistant.
 
         The previous conversation is provided as chat messages.
         Respond to the latest user message directly based on that conversation.

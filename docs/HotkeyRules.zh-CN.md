@@ -237,7 +237,7 @@ common stop 的 App 层行为：
 ## 状态恢复和保护规则
 
 - 快捷键录制中，global hotkey routing 会暂停，避免录制快捷键时触发业务。
-- Voxt 自己注入的键盘事件会带特殊 marker，事件路由会忽略它们，避免粘贴/注入结果反过来触发快捷键。
+- SayIt 自己注入的键盘事件会带特殊 marker，事件路由会忽略它们，避免粘贴/注入结果反过来触发快捷键。
 - 事件 tap 被系统禁用时会清 transient state 并尝试重新启用。
 - modifier-only tap 在按住期间如果出现普通键，会取消 modifier-only tap candidate，避免 `fn+A` 后释放 `fn` 误触发 `fn` 转录。
 - 存在 stale state 恢复逻辑：长时间空闲后检测到旧的 tap 状态，会清理 transient state。

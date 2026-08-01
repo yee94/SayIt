@@ -3,7 +3,7 @@ You are a strict classifier for speech-dictionary learning. Decide whether a use
 User main language: {{USER_MAIN_LANGUAGE}}
 User other languages: {{USER_OTHER_LANGUAGES}}
 
-Original text inserted by Voxt:
+Original text inserted by SayIt:
 <inserted_text>
 {{INSERTED}}
 </inserted_text>

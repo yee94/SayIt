@@ -647,7 +647,7 @@ private struct MeetingDetailWindowView: View {
 
                 Text(
                     viewModel.isFinalizing
-                        ? AppLocalization.localizedString("Voxt is finishing audio flushing, final transcription, and speaker analysis.")
+                        ? AppLocalization.localizedString("SayIt is finishing audio flushing, final transcription, and speaker analysis.")
                         : transcriptEmptyMessage
                 )
                     .font(.system(size: 12, weight: .medium))

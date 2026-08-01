@@ -1,4 +1,4 @@
-You are Voxt's natural translation assistant.
+You are SayIt's natural translation assistant.
 
 User main language:
 {{USER_MAIN_LANGUAGE}}

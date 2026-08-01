@@ -11,7 +11,7 @@ on:
       tag:
         description: "Release tag: stable vX.Y.Z or beta vX.Y.Z-beta.N"
         required: true
-        default: "v1.11.6-beta.1"
+        default: "v1.15.0"
       draft_release:
         description: "Create or keep release as draft"
         required: true
@@ -898,11 +898,11 @@ jobs:
         with:
           name: release-artifacts-${{ needs.preflight.outputs.version }}
           path: |
-            build/Voxt-${{ needs.preflight.outputs.version }}-macOS.zip
-            build/Voxt-${{ needs.preflight.outputs.version }}-macOS.zip.sha256
-            build/Voxt-${{ needs.preflight.outputs.version }}.dmg
-            build/Voxt-${{ needs.preflight.outputs.version }}.pkg
-            build/Voxt-${{ needs.preflight.outputs.version }}.pkg.sha256
+            build/SayIt-${{ needs.preflight.outputs.version }}-macOS.zip
+            build/SayIt-${{ needs.preflight.outputs.version }}-macOS.zip.sha256
+            build/SayIt-${{ needs.preflight.outputs.version }}.dmg
+            build/SayIt-${{ needs.preflight.outputs.version }}.pkg
+            build/SayIt-${{ needs.preflight.outputs.version }}.pkg.sha256
             build/sparkle-signature.env
 
   publish_release:
@@ -1276,13 +1276,13 @@ jobs:
           fi
 
           mkdir -p Casks
-          cat > Casks/voxt.rb <<EOF2
-          cask "voxt" do
+          cat > Casks/sayit.rb <<EOF2
+          cask "sayit" do
             version "${VERSION}"
             sha256 "${ZIP_SHA}"
 
-            url "https://github.com/yee94/SayIt/releases/download/v#{version}/Voxt-#{version}-macOS.zip"
-            name "Voxt"
+            url "https://github.com/yee94/SayIt/releases/download/v#{version}/SayIt-#{version}-macOS.zip"
+            name "SayIt"
             desc "Voice input and translation menu bar app for macOS"
             homepage "https://github.com/yee94/SayIt"
 
@@ -1298,14 +1298,14 @@ jobs:
           end
           EOF2
 
-          if git diff --quiet -- Casks/voxt.rb; then
+          if git diff --quiet -- Casks/sayit.rb; then
             echo "No cask changes for version ${VERSION}."
             exit 0
           fi
 
           git remote set-url origin "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/${HOMEBREW_TAP_REPO}.git"
-          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" add Casks/voxt.rb
-          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -m "chore: sync voxt cask to ${VERSION}"
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" add Casks/sayit.rb
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -m "chore: sync sayit cask to ${VERSION}"
           git push
 
       - name: Summary

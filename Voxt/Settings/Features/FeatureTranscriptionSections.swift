@@ -160,7 +160,7 @@ private struct VoxtNoteStorageRecoveryView: View {
     var body: some View {
         FeatureSettingSection(
             title: featureSettingsLocalized("Note Storage"),
-            detail: featureSettingsLocalized("Voxt keeps note data in its own local application storage.")
+            detail: featureSettingsLocalized("SayIt keeps note data in its own local application storage.")
         ) {
             VStack(alignment: .leading, spacing: 12) {
                 if store.isAvailable {

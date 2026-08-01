@@ -25,7 +25,7 @@ struct RemoteProviderDoubaoDictionarySection: View {
 
             switch resolvedMode {
             case .off:
-                Text(AppLocalization.localizedString("Do not send Voxt dictionary terms to Doubao."))
+                Text(AppLocalization.localizedString("Do not send SayIt dictionary terms to Doubao."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
 

@@ -1,10 +1,10 @@
 # Rewrite
 
-This document explains Voxt's rewrite feature: what it does, how it differs from standard transcription and translation, and how to configure it well.
+This document explains SayIt's rewrite feature: what it does, how it differs from standard transcription and translation, and how to configure it well.
 
 ## Overview
 
-Rewrite is the voice-driven prompt / rewrite flow in Voxt.
+Rewrite is the voice-driven prompt / rewrite flow in SayIt.
 
 Default shortcut: `fn+control`
 
@@ -54,7 +54,7 @@ Rewrite uses the dedicated rewrite prompt.
 - the spoken instruction becomes part of the rewrite request
 - selected text, if present, is passed in as source material
 
-Voxt also applies the normal enhancement chain to the dictated instruction before the rewrite step when appropriate.
+SayIt also applies the normal enhancement chain to the dictated instruction before the rewrite step when appropriate.
 
 ## App Enhancement And Rewrite
 
@@ -62,7 +62,7 @@ When `App Enhancement` is enabled, rewrite can become context-aware.
 
 <video src="https://github.com/user-attachments/assets/72e361eb-45c3-4f54-ac66-78d4787c7253" controls preload="none" width="100%"></video>
 
-- Voxt can switch prompts and rules based on the current app or browser URL
+- SayIt can switch prompts and rules based on the current app or browser URL
 - the same rewrite shortcut can behave differently in coding tools, chat apps, email, or docs
 - this is especially useful when you want different rewrite tone, formatting, or terminology by context
 

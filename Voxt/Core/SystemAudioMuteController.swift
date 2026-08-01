@@ -80,7 +80,7 @@ final class SystemAudioMuteController {
     private func activateBundleIDProcessTapMute(bundleID: String, outputUID: String) -> Bool {
         let tapDescription = CATapDescription(stereoGlobalTapButExcludeProcesses: [])
         tapDescription.uuid = UUID()
-        tapDescription.name = "Voxt System Audio Mute"
+        tapDescription.name = "SayIt System Audio Mute"
         tapDescription.isPrivate = true
         tapDescription.muteBehavior = .muted
 
@@ -97,7 +97,7 @@ final class SystemAudioMuteController {
             stereoGlobalTapButExcludeProcesses: [processObjectID]
         )
         tapDescription.uuid = UUID()
-        tapDescription.name = "Voxt System Audio Mute"
+        tapDescription.name = "SayIt System Audio Mute"
         tapDescription.isPrivate = true
         tapDescription.muteBehavior = CATapMuteBehavior.muted
 

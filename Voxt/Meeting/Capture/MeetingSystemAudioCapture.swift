@@ -55,7 +55,7 @@ final class MeetingSystemAudioCapture: @unchecked Sendable {
         let tapUUID = UUID()
 
         let tapDescription = CATapDescription()
-        tapDescription.name = "Voxt Meeting System Audio"
+        tapDescription.name = "SayIt Meeting System Audio"
         tapDescription.uuid = tapUUID
         tapDescription.processes = Self.currentProcessObjectID().map { [$0] } ?? []
         tapDescription.isPrivate = true

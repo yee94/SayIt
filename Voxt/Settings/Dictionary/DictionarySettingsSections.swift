@@ -31,6 +31,8 @@ struct DictionaryEntriesCard: View {
         GroupBox {
             VStack(alignment: .leading, spacing: 8) {
                 toolbar
+                    // Raise the toolbar above card content so hover tooltips are not covered.
+                    .zIndex(10)
 
                 if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     HStack(spacing: 8) {
@@ -309,7 +311,7 @@ struct DictionaryEntriesCard: View {
         if !isSearchActive {
             switch selectedTab {
             case .hotwords:
-                return AppLocalization.localizedString("Create a hot word to help Voxt recognize names, jargon, and product words.")
+                return AppLocalization.localizedString("Create a hot word to help SayIt recognize names, jargon, and product words.")
             case .replacements:
                 return AppLocalization.localizedString("Create a replacement term to normalize final transcription results.")
             }
@@ -733,9 +735,10 @@ private struct DictionaryHeaderIconButton<Icon: View>: View {
                     .offset(y: 34)
                     .allowsHitTesting(false)
                     .transition(.opacity)
-                    .zIndex(1)
             }
         }
+        // Keep the hover tooltip above neighboring toolbar controls and card content.
+        .zIndex(isTooltipVisible ? 1_000 : 0)
         .animation(.easeOut(duration: 0.12), value: isTooltipVisible)
     }
 }

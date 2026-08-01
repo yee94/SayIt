@@ -1,6 +1,6 @@
 # Japanese Prompts
 
-Japanese prompt templates used as localized defaults for Voxt features.
+Japanese prompt templates used as localized defaults for SayIt features.
 
 ## Responsibilities
 

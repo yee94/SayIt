@@ -118,7 +118,15 @@ enum AppPromptDefaults {
                 "21c438a9a05a34699dbb5199f715e62086f2746858b846fdbe2e6f51e735cfe0",
                 "55fa7253c76d272e011c40d7775cfa1bd62c99ff6edd56a2cc04e2930fc32008",
                 "6ae4ab890cc3fc5b9d0c147953c2067bada9934ef80df8de2aa498e0f41095a7",
-                "63ac6dc353ce8e7e5902f3fa5383c7d23df2b4460461dbc9b749218d42795abf"
+                "63ac6dc353ce8e7e5902f3fa5383c7d23df2b4460461dbc9b749218d42795abf",
+                // Pre-rebrand Voxt-branded defaults (before product renamed to SayIt).
+                "efdff73d5d2cb1c31b8bdf4dcddd2f43c0c0652c646ccf557f3427eb897a192b",
+                "74fcfe75cd2ea3721d8c7030485a7ec8d393f168acac3a9e4f4d0a68942434a3",
+                "597df6bba09df1a90f6e89513f2f85c82f453b17c9bc4cbbe894c1296521f00c",
+                "02741c386fa9ced8d2158e7cf4c6104b15013b7be272a061da55343ba2e69acd",
+                "a6791751db82f240ceb9fa7f05c65d06a0b74ca26965a4b4fa3040ea518d220c",
+                "27ad68f2641b5c74a86d790cd641819004d59002d82f33e5d17b4d8e272997b3"
+
             ]
         case .translation:
             return [
@@ -130,13 +138,26 @@ enum AppPromptDefaults {
                 "7949566e9e8848e1989800a593c719eedea2a7934d015dc0244aadc63cdca7f4",
                 "f59232f69bf85ac67b7deb0ff30d5e529363a4589c662fec4184efd921e9d0ca",
                 "0a00a63561f0670abbdd5dc57efd96829124fd68cb1f691539c93cfa68f3373f",
-                "585d0f4bf8a21d55aa669c5b16aa7c7ef77adb2417acbc88c85c36a85e8b3aec"
+                "585d0f4bf8a21d55aa669c5b16aa7c7ef77adb2417acbc88c85c36a85e8b3aec",
+                // Pre-rebrand Voxt-branded defaults (before product renamed to SayIt).
+                "3cfccb8fc1e8f591adf4d1da8e149da1ab871e462302f058e5a56033e638c10b",
+                "e43c49c82fdce5f0190dfcc5d0859ff7f23d18a73d46f8f0e2d3437455e295a0",
+                "509f3be5d697a01104b691fd99d23be6db463e99da3e0c0492fe822962a68b9b",
+                "d25406d98c9c6862f8193a9f892dd0425c16c43ef980653c607c6f955a626703",
+                "bd4babdeec2dcadff63778f1ebadf385e85a94dc7104fb74cb7bbae13d3dbcbb",
+                "7bbe13f7c2b445e0cca4420947e2b8e3b709bb9f596095ee72cee8c51c31d680"
+
             ]
         case .rewrite:
             return [
                 "09f35f472123a67b863f54e0d8f9429a097047060cbe82b97145efa85b4bb03d",
                 "5b3bb1cd6779e3ca43b727fb8e91066c749ac4c9b87dce66f1da9606b8ad3bb5",
-                "821bb73ad9372d231078bee8ac4d8ab8223c5c4010cce0d8fc25510ca12696cb"
+                "821bb73ad9372d231078bee8ac4d8ab8223c5c4010cce0d8fc25510ca12696cb",
+                // Pre-rebrand Voxt-branded defaults (before product renamed to SayIt).
+                "896482a35261df59cd0e37f50265e7ca9b28b942796f250381bf26d5bbbf0b74",
+                "d662ecb5d34cada98d06f112cd51b7bd299b5114f5531a5b8d21a0a18d08c4d1",
+                "5ed3a58145fa218cac67277b95042d84a4d153eb30de7e411668555d4378972f"
+
             ]
         case .qwenASRContextBias:
             return [

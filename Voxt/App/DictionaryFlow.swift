@@ -326,7 +326,7 @@ extension AppDelegate {
         case .appleIntelligence:
             guard let enhancer else {
                 throw NSError(
-                    domain: "Voxt.DictionaryHistoryScan",
+                    domain: "SayIt.DictionaryHistoryScan",
                     code: -1,
                     userInfo: [NSLocalizedDescriptionKey: AppLocalization.localizedString("Apple Intelligence is unavailable.")]
                 )
@@ -335,7 +335,7 @@ extension AppDelegate {
                 return try await enhancer.dictionaryHistoryScanTerms(userPrompt: prompt)
             }
             throw NSError(
-                domain: "Voxt.DictionaryHistoryScan",
+                domain: "SayIt.DictionaryHistoryScan",
                 code: -2,
                 userInfo: [NSLocalizedDescriptionKey: AppLocalization.localizedString("Apple Intelligence requires macOS 26 or later.")]
             )
@@ -368,7 +368,7 @@ extension AppDelegate {
             return fallback
         }
         throw NSError(
-            domain: "Voxt.DictionaryHistoryScan",
+            domain: "SayIt.DictionaryHistoryScan",
             code: -3,
             userInfo: [
                 NSLocalizedDescriptionKey: AppLocalization.localizedString(
@@ -430,7 +430,7 @@ extension AppDelegate {
             let repo = String(optionID.dropFirst("local:".count))
             guard customLLMManager.isModelDownloaded(repo: repo) else {
                 throw NSError(
-                    domain: "Voxt.DictionaryHistoryScan",
+                    domain: "SayIt.DictionaryHistoryScan",
                     code: -5,
                     userInfo: [NSLocalizedDescriptionKey: AppLocalization.localizedString("Selected local model is not available.")]
                 )
@@ -442,7 +442,7 @@ extension AppDelegate {
             let rawProvider = String(optionID.dropFirst("remote:".count))
             guard let provider = RemoteLLMProvider(rawValue: rawProvider) else {
                 throw NSError(
-                    domain: "Voxt.DictionaryHistoryScan",
+                    domain: "SayIt.DictionaryHistoryScan",
                     code: -6,
                     userInfo: [NSLocalizedDescriptionKey: AppLocalization.localizedString("Selected remote model is invalid.")]
                 )
@@ -456,7 +456,7 @@ extension AppDelegate {
                 stored: remoteLLMConfigurations
             ) else {
                 throw NSError(
-                    domain: "Voxt.DictionaryHistoryScan",
+                    domain: "SayIt.DictionaryHistoryScan",
                     code: -7,
                     userInfo: [NSLocalizedDescriptionKey: AppLocalization.localizedString("Selected remote model is not configured.")]
                 )
@@ -465,7 +465,7 @@ extension AppDelegate {
         }
 
         throw NSError(
-            domain: "Voxt.DictionaryHistoryScan",
+            domain: "SayIt.DictionaryHistoryScan",
             code: -8,
             userInfo: [NSLocalizedDescriptionKey: AppLocalization.localizedString("No model was selected for dictionary ingestion.")]
         )

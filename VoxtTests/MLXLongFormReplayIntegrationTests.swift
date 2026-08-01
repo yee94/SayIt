@@ -83,8 +83,8 @@ final class MLXLongFormReplayIntegrationTests: XCTestCase {
     private func resolvedCandidateClipPaths() -> [String] {
         let candidates = resolvedOfficialLongFormClipPaths() + [
             ProcessInfo.processInfo.environment["VOXT_LONGFORM_REPLAY_CLIP"],
-            "/Users/guanwei/Library/Application Support/Voxt/transcription-history-audio/transcription/transcription-6247D986-B2EC-4758-AB40-7C1030296D7A.wav",
-            "/Users/guanwei/Library/Application Support/Voxt/transcription-history-audio/transcription/transcription-FD3C99FC-822F-45DB-8734-FFADEF6DC6EE.wav",
+            "/Users/guanwei/Library/Application Support/SayIt/transcription-history-audio/transcription/transcription-6247D986-B2EC-4758-AB40-7C1030296D7A.wav",
+            "/Users/guanwei/Library/Application Support/SayIt/transcription-history-audio/transcription/transcription-FD3C99FC-822F-45DB-8734-FFADEF6DC6EE.wav",
             "/Users/guanwei/Downloads/transcription/20260505-104918-transcription-5F2FAD9F-D22E-4D0E-BA36-E1D95A53197D.wav",
             "/Users/guanwei/Downloads/transcription/transcription-0A0E87B1-7C9A-4BB6-8469-E18485A63103.wav",
             "/Users/guanwei/Downloads/transcription/20260507-123725-transcription-CF5D4F69-31F4-4F86-ADCA-18029BDB0EE8.wav"
@@ -93,7 +93,7 @@ final class MLXLongFormReplayIntegrationTests: XCTestCase {
             .filter { !$0.isEmpty && FileManager.default.fileExists(atPath: $0) }
 
         let discovered = discoveredWAVPaths(
-            in: "/Users/guanwei/Library/Application Support/Voxt/transcription-history-audio/transcription"
+            in: "/Users/guanwei/Library/Application Support/SayIt/transcription-history-audio/transcription"
         ) + discoveredWAVPaths(in: "/Users/guanwei/Downloads/transcription")
 
         var seen = Set<String>()

@@ -1,6 +1,6 @@
 # Meeting Notes
 
-This document explains Voxt's Meeting Notes mode: what it does, how to configure it, which engines it supports, and what to expect from the current beta implementation.
+This document explains SayIt's Meeting Notes mode: what it does, how to configure it, which engines it supports, and what to expect from the current beta implementation.
 
 ## Overview
 
@@ -99,7 +99,7 @@ Meeting realtime translation follows the app's existing translation model/provid
 - uses its own remembered target language for meeting mode
 - translates only `Them` segments in the current UI
 
-If the selected translation provider cannot be used directly for text translation in meeting mode, Voxt falls back through the normal resolver behavior.
+If the selected translation provider cannot be used directly for text translation in meeting mode, SayIt falls back through the normal resolver behavior.
 
 ## History, Detail Window, And Export
 
@@ -121,7 +121,7 @@ The detail window supports:
 - Current beta is source-based (`Me` / `Them`), not full speaker diarization
 - Meeting mode is isolated from normal transcription / translation / rewrite sessions
 - Meeting mode uses a dedicated history type and detail flow
-- Cold local-model startup can still take time on first use; Voxt shows model initialization state in the overlay
-- For remote providers, Voxt keeps the meeting UI uniform, but transport differs by provider capability:
+- Cold local-model startup can still take time on first use; SayIt shows model initialization state in the overlay
+- For remote providers, SayIt keeps the meeting UI uniform, but transport differs by provider capability:
   - `Doubao` / `Aliyun` meetings use provider-specific chunk/file transcription models
   - other providers stay on their existing chunk-based meeting path

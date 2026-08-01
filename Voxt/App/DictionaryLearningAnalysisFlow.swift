@@ -131,7 +131,7 @@ extension AppDelegate {
         }
         guard !correctedText.isEmpty else {
             throw NSError(
-                domain: "Voxt.ManualDictionaryCorrection",
+                domain: "SayIt.ManualDictionaryCorrection",
                 code: -1,
                 userInfo: [NSLocalizedDescriptionKey: AppLocalization.localizedString("Corrected text cannot be empty.")]
             )
@@ -364,7 +364,7 @@ extension AppDelegate {
         case .appleIntelligence:
             guard let enhancer else {
                 throw NSError(
-                    domain: "Voxt.AutomaticDictionaryLearning",
+                    domain: "SayIt.AutomaticDictionaryLearning",
                     code: -1,
                     userInfo: [NSLocalizedDescriptionKey: AppLocalization.localizedString("Apple Intelligence is unavailable.")]
                 )
@@ -373,7 +373,7 @@ extension AppDelegate {
                 return try await enhancer.dictionaryHistoryScanTerms(userPrompt: prompt)
             }
             throw NSError(
-                domain: "Voxt.AutomaticDictionaryLearning",
+                domain: "SayIt.AutomaticDictionaryLearning",
                 code: -2,
                 userInfo: [NSLocalizedDescriptionKey: AppLocalization.localizedString("Apple Intelligence requires macOS 26 or later.")]
             )
@@ -418,7 +418,7 @@ extension AppDelegate {
         }
 
         throw NSError(
-            domain: "Voxt.AutomaticDictionaryLearning",
+            domain: "SayIt.AutomaticDictionaryLearning",
             code: -3,
             userInfo: [
                 NSLocalizedDescriptionKey: AppLocalization.localizedString(
@@ -443,7 +443,7 @@ extension AppDelegate {
             let repo = String(optionID.dropFirst("local:".count))
             guard customLLMManager.isModelDownloaded(repo: repo) else {
                 throw NSError(
-                    domain: "Voxt.AutomaticDictionaryLearning",
+                    domain: "SayIt.AutomaticDictionaryLearning",
                     code: -4,
                     userInfo: [NSLocalizedDescriptionKey: AppLocalization.localizedString("Selected local model is not available.")]
                 )
@@ -455,7 +455,7 @@ extension AppDelegate {
             let rawProvider = String(optionID.dropFirst("remote:".count))
             guard let provider = RemoteLLMProvider(rawValue: rawProvider) else {
                 throw NSError(
-                    domain: "Voxt.AutomaticDictionaryLearning",
+                    domain: "SayIt.AutomaticDictionaryLearning",
                     code: -5,
                     userInfo: [NSLocalizedDescriptionKey: AppLocalization.localizedString("Selected remote model is invalid.")]
                 )
@@ -469,7 +469,7 @@ extension AppDelegate {
                 stored: remoteLLMConfigurations
             ) else {
                 throw NSError(
-                    domain: "Voxt.AutomaticDictionaryLearning",
+                    domain: "SayIt.AutomaticDictionaryLearning",
                     code: -6,
                     userInfo: [NSLocalizedDescriptionKey: AppLocalization.localizedString("Selected remote model is not configured.")]
                 )
@@ -478,7 +478,7 @@ extension AppDelegate {
         }
 
         throw NSError(
-            domain: "Voxt.AutomaticDictionaryLearning",
+            domain: "SayIt.AutomaticDictionaryLearning",
             code: -7,
             userInfo: [NSLocalizedDescriptionKey: AppLocalization.localizedString("No model was selected for automatic dictionary learning.")]
         )

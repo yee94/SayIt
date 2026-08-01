@@ -459,7 +459,7 @@ struct OnboardingSettingsView: View {
                 Group {
                     if currentStep == .finish {
                         Button(action: onFinish) {
-                            Label(localized("Start Voxt"), systemImage: "checkmark.circle")
+                            Label(localized("Start SayIt"), systemImage: "checkmark.circle")
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(SettingsPrimaryButtonStyle())
@@ -543,7 +543,7 @@ struct OnboardingSettingsView: View {
                 .buttonStyle(SettingsPrimaryButtonStyle())
             } else {
                 Button(action: onFinish) {
-                    Label(localized("Start Voxt"), systemImage: "checkmark.circle")
+                    Label(localized("Start SayIt"), systemImage: "checkmark.circle")
                 }
                 .buttonStyle(SettingsPrimaryButtonStyle())
             }

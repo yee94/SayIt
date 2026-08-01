@@ -151,7 +151,7 @@ extension AppDelegate {
         }
 
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: AppLocalization.localizedString("Quit Voxt"), action: #selector(quit), keyEquivalent: "q"))
+        menu.addItem(NSMenuItem(title: AppLocalization.localizedString("Quit SayIt"), action: #selector(quit), keyEquivalent: "q"))
         statusItem?.menu = menu
     }
 
@@ -676,7 +676,7 @@ extension AppDelegate {
     func showPermissionAlert() {
         let alert = NSAlert()
         alert.messageText = AppLocalization.localizedString("Permissions Required")
-        alert.informativeText = AppLocalization.localizedString("Voxt needs Microphone access. If you use Direct Dictation, enable Speech Recognition in System Settings → Privacy & Security.")
+        alert.informativeText = AppLocalization.localizedString("SayIt needs Microphone access. If you use Direct Dictation, enable Speech Recognition in System Settings → Privacy & Security.")
         alert.addButton(withTitle: AppLocalization.localizedString("Open System Settings"))
         alert.addButton(withTitle: AppLocalization.localizedString("Quit"))
         if alert.runModal() == .alertFirstButtonReturn {

@@ -46,7 +46,7 @@ struct MeetingRemoteLiveSessionFactory: MeetingLiveSessionFactory {
             )
         case .openAIWhisper, .glmASR, .stepFunASR, .xiaomiMiMoASR:
             throw NSError(
-                domain: "Voxt.Meeting",
+                domain: "SayIt.Meeting",
                 code: -1,
                 userInfo: [NSLocalizedDescriptionKey: "This remote provider does not support live meeting sessions."]
             )
@@ -586,13 +586,13 @@ private final class DoubaoMeetingRemoteLiveSession: BaseMeetingRemoteLiveSession
 
     override func openTransport() async throws {
         guard !accessToken.isEmpty else {
-            throw NSError(domain: "Voxt.Meeting", code: -10, userInfo: [NSLocalizedDescriptionKey: "Doubao Access Token is empty."])
+            throw NSError(domain: "SayIt.Meeting", code: -10, userInfo: [NSLocalizedDescriptionKey: "Doubao Access Token is empty."])
         }
         guard !appID.isEmpty else {
-            throw NSError(domain: "Voxt.Meeting", code: -11, userInfo: [NSLocalizedDescriptionKey: "Doubao App ID is empty."])
+            throw NSError(domain: "SayIt.Meeting", code: -11, userInfo: [NSLocalizedDescriptionKey: "Doubao App ID is empty."])
         }
         guard let wsURL = URL(string: endpoint) else {
-            throw NSError(domain: "Voxt.Meeting", code: -12, userInfo: [NSLocalizedDescriptionKey: "Invalid Doubao WebSocket endpoint URL."])
+            throw NSError(domain: "SayIt.Meeting", code: -12, userInfo: [NSLocalizedDescriptionKey: "Invalid Doubao WebSocket endpoint URL."])
         }
 
         var request = URLRequest(url: wsURL)
@@ -766,10 +766,10 @@ private final class AliyunFunMeetingRemoteLiveSession: BaseMeetingRemoteLiveSess
 
     override func openTransport() async throws {
         guard !token.isEmpty else {
-            throw NSError(domain: "Voxt.Meeting", code: -20, userInfo: [NSLocalizedDescriptionKey: "Aliyun Bailian API key is empty."])
+            throw NSError(domain: "SayIt.Meeting", code: -20, userInfo: [NSLocalizedDescriptionKey: "Aliyun Bailian API key is empty."])
         }
         guard let wsURL = URL(string: endpoint) else {
-            throw NSError(domain: "Voxt.Meeting", code: -21, userInfo: [NSLocalizedDescriptionKey: "Invalid Aliyun realtime WebSocket endpoint URL."])
+            throw NSError(domain: "SayIt.Meeting", code: -21, userInfo: [NSLocalizedDescriptionKey: "Invalid Aliyun realtime WebSocket endpoint URL."])
         }
 
         var request = URLRequest(url: wsURL)
@@ -825,7 +825,7 @@ private final class AliyunFunMeetingRemoteLiveSession: BaseMeetingRemoteLiveSess
         )
         let data = try JSONSerialization.data(withJSONObject: payload)
         guard let text = String(data: data, encoding: .utf8) else {
-            throw NSError(domain: "Voxt.Meeting", code: -22, userInfo: [NSLocalizedDescriptionKey: "Failed to encode Aliyun run-task payload."])
+            throw NSError(domain: "SayIt.Meeting", code: -22, userInfo: [NSLocalizedDescriptionKey: "Failed to encode Aliyun run-task payload."])
         }
         try await ws.send(.string(text))
     }
@@ -837,7 +837,7 @@ private final class AliyunFunMeetingRemoteLiveSession: BaseMeetingRemoteLiveSess
         )
         let data = try JSONSerialization.data(withJSONObject: payload)
         guard let text = String(data: data, encoding: .utf8) else {
-            throw NSError(domain: "Voxt.Meeting", code: -23, userInfo: [NSLocalizedDescriptionKey: "Failed to encode Aliyun control payload."])
+            throw NSError(domain: "SayIt.Meeting", code: -23, userInfo: [NSLocalizedDescriptionKey: "Failed to encode Aliyun control payload."])
         }
         try await ws.send(.string(text))
     }
@@ -880,7 +880,7 @@ private final class AliyunFunMeetingRemoteLiveSession: BaseMeetingRemoteLiveSess
                         if event == "task-failed" || event == "error" {
                             let detail = AliyunMeetingASRConfiguration.realtimeSocketErrorMessage(from: object)
                                 ?? "Aliyun fun ASR task failed."
-                            self.emitFailure(NSError(domain: "Voxt.Meeting", code: -24, userInfo: [NSLocalizedDescriptionKey: detail]))
+                            self.emitFailure(NSError(domain: "SayIt.Meeting", code: -24, userInfo: [NSLocalizedDescriptionKey: detail]))
                             break
                         }
                         if event == "result-generated" {
@@ -966,10 +966,10 @@ private final class AliyunQwenMeetingRemoteLiveSession: BaseMeetingRemoteLiveSes
 
     override func openTransport() async throws {
         guard !token.isEmpty else {
-            throw NSError(domain: "Voxt.Meeting", code: -30, userInfo: [NSLocalizedDescriptionKey: "Aliyun Bailian API key is empty."])
+            throw NSError(domain: "SayIt.Meeting", code: -30, userInfo: [NSLocalizedDescriptionKey: "Aliyun Bailian API key is empty."])
         }
         guard let wsURL = URL(string: endpoint) else {
-            throw NSError(domain: "Voxt.Meeting", code: -31, userInfo: [NSLocalizedDescriptionKey: "Invalid Aliyun Qwen realtime WebSocket endpoint URL."])
+            throw NSError(domain: "SayIt.Meeting", code: -31, userInfo: [NSLocalizedDescriptionKey: "Invalid Aliyun Qwen realtime WebSocket endpoint URL."])
         }
 
         var request = URLRequest(url: wsURL)
@@ -997,7 +997,7 @@ private final class AliyunQwenMeetingRemoteLiveSession: BaseMeetingRemoteLiveSes
         do {
             let data = try JSONSerialization.data(withJSONObject: payload)
             guard let text = String(data: data, encoding: .utf8) else {
-                throw NSError(domain: "Voxt.Meeting", code: -32, userInfo: [NSLocalizedDescriptionKey: "Failed to encode Aliyun Qwen audio event."])
+                throw NSError(domain: "SayIt.Meeting", code: -32, userInfo: [NSLocalizedDescriptionKey: "Failed to encode Aliyun Qwen audio event."])
             }
             try await ws.send(.string(text))
             if consumeShouldLogNextSpeechAudioPacket() {
@@ -1018,7 +1018,7 @@ private final class AliyunQwenMeetingRemoteLiveSession: BaseMeetingRemoteLiveSes
         do {
             let data = try JSONSerialization.data(withJSONObject: payload)
             guard let text = String(data: data, encoding: .utf8) else {
-                throw NSError(domain: "Voxt.Meeting", code: -33, userInfo: [NSLocalizedDescriptionKey: "Failed to encode Aliyun Qwen finish event."])
+                throw NSError(domain: "SayIt.Meeting", code: -33, userInfo: [NSLocalizedDescriptionKey: "Failed to encode Aliyun Qwen finish event."])
             }
             try await ws.send(.string(text))
         } catch {
@@ -1034,7 +1034,7 @@ private final class AliyunQwenMeetingRemoteLiveSession: BaseMeetingRemoteLiveSes
         )
         let data = try JSONSerialization.data(withJSONObject: payload)
         guard let text = String(data: data, encoding: .utf8) else {
-            throw NSError(domain: "Voxt.Meeting", code: -34, userInfo: [NSLocalizedDescriptionKey: "Failed to encode Aliyun Qwen session update."])
+            throw NSError(domain: "SayIt.Meeting", code: -34, userInfo: [NSLocalizedDescriptionKey: "Failed to encode Aliyun Qwen session update."])
         }
         try await ws.send(.string(text))
     }
@@ -1120,7 +1120,7 @@ private final class AliyunQwenMeetingRemoteLiveSession: BaseMeetingRemoteLiveSes
                         }
                         if type == "error" {
                             let detail = (object["message"] as? String) ?? "Aliyun Qwen realtime ASR task failed."
-                            self.emitFailure(NSError(domain: "Voxt.Meeting", code: -35, userInfo: [NSLocalizedDescriptionKey: detail]))
+                            self.emitFailure(NSError(domain: "SayIt.Meeting", code: -35, userInfo: [NSLocalizedDescriptionKey: detail]))
                             break
                         }
                     }
@@ -1382,7 +1382,7 @@ enum MeetingRemoteAudioSupport {
         case DoubaoProtocol.compressionGzip:
             guard rawPayload.count <= maxDoubaoCompressedPayloadBytes else {
                 throw NSError(
-                    domain: "Voxt.Meeting",
+                    domain: "SayIt.Meeting",
                     code: -45,
                     userInfo: [NSLocalizedDescriptionKey: "Doubao response payload is too large."]
                 )
@@ -1394,7 +1394,7 @@ enum MeetingRemoteAudioSupport {
 
         if messageType == DoubaoProtocol.messageTypeServerErrorResponse {
             let errorText = String(data: payload, encoding: .utf8) ?? "Unknown Doubao server error."
-            throw NSError(domain: "Voxt.Meeting", code: -40, userInfo: [NSLocalizedDescriptionKey: errorText])
+            throw NSError(domain: "SayIt.Meeting", code: -40, userInfo: [NSLocalizedDescriptionKey: errorText])
         }
 
         guard !payload.isEmpty else {
@@ -1444,7 +1444,7 @@ enum MeetingRemoteAudioSupport {
                 Int32(MemoryLayout<z_stream>.size)
             )
             guard initStatus == Z_OK else {
-                throw NSError(domain: "Voxt.Meeting", code: -41, userInfo: [NSLocalizedDescriptionKey: "Failed to initialize Doubao GZIP compression."])
+                throw NSError(domain: "SayIt.Meeting", code: -41, userInfo: [NSLocalizedDescriptionKey: "Failed to initialize Doubao GZIP compression."])
             }
             defer { deflateEnd(&stream) }
 
@@ -1463,7 +1463,7 @@ enum MeetingRemoteAudioSupport {
                 }
                 status = statusCode
                 if status != Z_OK && status != Z_STREAM_END {
-                    throw NSError(domain: "Voxt.Meeting", code: -42, userInfo: [NSLocalizedDescriptionKey: "Failed to compress Doubao payload."])
+                    throw NSError(domain: "SayIt.Meeting", code: -42, userInfo: [NSLocalizedDescriptionKey: "Failed to compress Doubao payload."])
                 }
             }
             return output
@@ -1484,7 +1484,7 @@ enum MeetingRemoteAudioSupport {
 
             let initStatus = inflateInit2_(&stream, 16 + MAX_WBITS, ZLIB_VERSION, Int32(MemoryLayout<z_stream>.size))
             guard initStatus == Z_OK else {
-                throw NSError(domain: "Voxt.Meeting", code: -43, userInfo: [NSLocalizedDescriptionKey: "Failed to initialize Doubao GZIP decompression."])
+                throw NSError(domain: "SayIt.Meeting", code: -43, userInfo: [NSLocalizedDescriptionKey: "Failed to initialize Doubao GZIP decompression."])
             }
             defer { inflateEnd(&stream) }
 
@@ -1502,7 +1502,7 @@ enum MeetingRemoteAudioSupport {
                     output.append(contentsOf: out[0..<used])
                     guard output.count <= outputLimit else {
                         throw NSError(
-                            domain: "Voxt.Meeting",
+                            domain: "SayIt.Meeting",
                             code: -46,
                             userInfo: [NSLocalizedDescriptionKey: "Doubao response payload expands beyond the allowed size."]
                         )
@@ -1510,7 +1510,7 @@ enum MeetingRemoteAudioSupport {
                 }
                 status = statusCode
                 guard status == Z_OK || status == Z_STREAM_END else {
-                    throw NSError(domain: "Voxt.Meeting", code: -44, userInfo: [NSLocalizedDescriptionKey: "Failed to decode Doubao response payload."])
+                    throw NSError(domain: "SayIt.Meeting", code: -44, userInfo: [NSLocalizedDescriptionKey: "Failed to decode Doubao response payload."])
                 }
             }
             return output

@@ -70,12 +70,12 @@ extension AppDelegate {
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             resolvedText = enhancedText.isEmpty ? rawText : enhancedText
             VoxtLog.history(
-                "Voxt note enhancement completed. noteID=\(noteID.uuidString), inputChars=\(rawText.count), outputChars=\(resolvedText.count)"
+                "SayIt note enhancement completed. noteID=\(noteID.uuidString), inputChars=\(rawText.count), outputChars=\(resolvedText.count)"
             )
         } catch {
             resolvedText = rawText
             VoxtLog.historyWarning(
-                "Voxt note enhancement failed; preserving raw text. noteID=\(noteID.uuidString), error=\(error.localizedDescription)"
+                "SayIt note enhancement failed; preserving raw text. noteID=\(noteID.uuidString), error=\(error.localizedDescription)"
             )
         }
 
@@ -115,11 +115,11 @@ extension AppDelegate {
             let resolvedState: NoteTitleGenerationState = normalizedTitle.isEmpty ? .fallback : .generated
             _ = noteStore.updateTitle(resolvedTitle, state: resolvedState, for: noteID)
             VoxtLog.history(
-                "Voxt note title generated. noteID=\(noteID.uuidString), state=\(resolvedState.rawValue), titleChars=\(resolvedTitle.count)"
+                "SayIt note title generated. noteID=\(noteID.uuidString), state=\(resolvedState.rawValue), titleChars=\(resolvedTitle.count)"
             )
         } catch {
             _ = noteStore.updateTitle(fallbackTitle, state: .fallback, for: noteID)
-            VoxtLog.historyWarning("Voxt note title generation failed. noteID=\(noteID.uuidString), error=\(error.localizedDescription)")
+            VoxtLog.historyWarning("SayIt note title generation failed. noteID=\(noteID.uuidString), error=\(error.localizedDescription)")
         }
     }
 
@@ -164,7 +164,7 @@ extension AppDelegate {
         case .appleIntelligence:
             guard let enhancer else {
                 throw NSError(
-                    domain: "Voxt.NoteTitle",
+                    domain: "SayIt.NoteTitle",
                     code: -1,
                     userInfo: [NSLocalizedDescriptionKey: AppLocalization.localizedString("Apple Intelligence is unavailable.")]
                 )
@@ -173,7 +173,7 @@ extension AppDelegate {
                 return try await enhancer.enhance(userPrompt: trimmedPrompt)
             }
             throw NSError(
-                domain: "Voxt.NoteTitle",
+                domain: "SayIt.NoteTitle",
                 code: -2,
                 userInfo: [NSLocalizedDescriptionKey: AppLocalization.localizedString("Apple Intelligence requires macOS 26 or later.")]
             )
@@ -190,7 +190,7 @@ extension AppDelegate {
 
     private func voxtNoteTitlePrompt(for text: String) -> String {
         """
-        You are Voxt's note title generator.
+        You are SayIt's note title generator.
 
         Generate a very short plain-text title for the note below.
 

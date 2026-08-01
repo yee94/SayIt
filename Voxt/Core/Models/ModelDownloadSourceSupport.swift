@@ -85,7 +85,7 @@ enum ModelDownloadSourceSelector {
     ) async throws -> ModelDownloadSourceSelection {
         guard !candidates.isEmpty else {
             throw NSError(
-                domain: "Voxt.ModelDownloadSourceSelector",
+                domain: "SayIt.ModelDownloadSourceSelector",
                 code: 1000,
                 userInfo: [NSLocalizedDescriptionKey: "No model download sources are configured."]
             )
@@ -111,7 +111,7 @@ enum ModelDownloadSourceSelector {
                 .map { "\($0.candidate.displayName): \($0.errorDescription ?? "unknown error")" }
                 .joined(separator: "; ")
             throw NSError(
-                domain: "Voxt.ModelDownloadSourceSelector",
+                domain: "SayIt.ModelDownloadSourceSelector",
                 code: 1001,
                 userInfo: [NSLocalizedDescriptionKey: "All model download sources failed. \(details)"]
             )
@@ -145,7 +145,7 @@ enum ModelDownloadSourceSelector {
               (200..<400).contains(httpResponse.statusCode) else {
             let status = (response as? HTTPURLResponse)?.statusCode ?? -1
             throw NSError(
-                domain: "Voxt.ModelDownloadSourceSelector",
+                domain: "SayIt.ModelDownloadSourceSelector",
                 code: status,
                 userInfo: [NSLocalizedDescriptionKey: "HTTP \(status)"]
             )

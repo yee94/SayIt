@@ -23,7 +23,7 @@ final class MeetingImportedAudioFileTests: XCTestCase {
 
     func testPrepareNormalizesAudioAndCreatesBoundedDescriptors() async throws {
         let sourceURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("Voxt-Meeting-Import-Test-\(UUID().uuidString)")
+            .appendingPathComponent("SayIt-Meeting-Import-Test-\(UUID().uuidString)")
             .appendingPathExtension("wav")
         let sourceSampleRate = 8_000
         let durationSeconds = 61

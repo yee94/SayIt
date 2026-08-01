@@ -26,7 +26,7 @@ final class VoxtDatabase: @unchecked Sendable {
             dbQueue = try DatabaseQueue(path: resolvedURL.path, configuration: configuration)
             try Self.migrator.migrate(dbQueue)
         } catch {
-            fatalError("Failed to initialize Voxt database: \(error)")
+            fatalError("Failed to initialize SayIt database: \(error)")
         }
     }
 

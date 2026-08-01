@@ -137,7 +137,9 @@ enum FeatureSettingsStore {
         return FeatureSettings(
             transcription: TranscriptionFeatureSettings(
                 asrSelectionID: transcriptionASR,
-                llmEnabled: (EnhancementMode(rawValue: defaults.string(forKey: AppPreferenceKey.enhancementMode) ?? "") ?? .off) != .off,
+                // Default text enhancement on for new installs; honor an explicit legacy mode when present.
+                llmEnabled: defaults.object(forKey: AppPreferenceKey.enhancementMode) == nil
+                    || (EnhancementMode(rawValue: defaults.string(forKey: AppPreferenceKey.enhancementMode) ?? "") ?? .off) != .off,
                 llmSelectionID: transcriptionText,
                 prompt: transcriptionPrompt,
                 promptPresetID: FeaturePromptPresetCatalog.inferredPresetID(
@@ -596,7 +598,7 @@ enum FeatureSettingsStore {
             enabled: settings.enabled,
             vaultPath: trimmedPath,
             vaultBookmarkData: settings.vaultBookmarkData,
-            relativeFolder: trimmedFolder.isEmpty ? "Voxt" : trimmedFolder,
+            relativeFolder: trimmedFolder.isEmpty ? "SayIt" : trimmedFolder,
             groupingMode: settings.groupingMode
         )
     }

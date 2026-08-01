@@ -158,7 +158,7 @@ extension RemoteLLMRuntimeClient {
                 )
             }
             return object
-        } catch let error as NSError where error.domain == "Voxt.RemoteLLM" {
+        } catch let error as NSError where error.domain == "SayIt.RemoteLLM" {
             throw error
         } catch {
             throw responsesDecodeError(
@@ -194,7 +194,7 @@ extension RemoteLLMRuntimeClient {
         }
 
         return NSError(
-            domain: "Voxt.RemoteLLM",
+            domain: "SayIt.RemoteLLM",
             code: -309,
             userInfo: [NSLocalizedDescriptionKey: message]
         )

@@ -44,7 +44,7 @@ enum AliyunRemoteASRClient {
             }
         }
         throw NSError(
-            domain: "Voxt.RemoteASR",
+            domain: "SayIt.RemoteASR",
             code: -37,
             userInfo: [NSLocalizedDescriptionKey: "Aliyun Bailian ASR returned no text content."]
         )
@@ -132,7 +132,7 @@ enum AliyunRemoteASRClient {
         defer { body.remove() }
 
         guard let uploadURL = URL(string: policy.uploadHost) else {
-            throw NSError(domain: "Voxt.RemoteASR", code: -38, userInfo: [NSLocalizedDescriptionKey: "Invalid Aliyun upload host URL."])
+            throw NSError(domain: "SayIt.RemoteASR", code: -38, userInfo: [NSLocalizedDescriptionKey: "Invalid Aliyun upload host URL."])
         }
         var request = URLRequest(url: uploadURL)
         request.httpMethod = "POST"
@@ -142,12 +142,12 @@ enum AliyunRemoteASRClient {
 
         let (data, response) = try await VoxtNetworkSession.active.upload(for: request, fromFile: body.url)
         guard let http = response as? HTTPURLResponse else {
-            throw NSError(domain: "Voxt.RemoteASR", code: -39, userInfo: [NSLocalizedDescriptionKey: "Invalid Aliyun upload response."])
+            throw NSError(domain: "SayIt.RemoteASR", code: -39, userInfo: [NSLocalizedDescriptionKey: "Invalid Aliyun upload response."])
         }
         guard (200...299).contains(http.statusCode) else {
             let payload = String(data: data.prefix(300), encoding: .utf8) ?? ""
             throw NSError(
-                domain: "Voxt.RemoteASR",
+                domain: "SayIt.RemoteASR",
                 code: http.statusCode,
                 userInfo: [NSLocalizedDescriptionKey: "Aliyun file upload failed (HTTP \(http.statusCode)): \(payload)"]
             )
@@ -163,7 +163,7 @@ enum AliyunRemoteASRClient {
         guard var components = URLComponents(
             string: AliyunRemoteASRConfiguration.resolvedUploadPolicyEndpoint(endpoint, model: model)
         ) else {
-            throw NSError(domain: "Voxt.RemoteASR", code: -40, userInfo: [NSLocalizedDescriptionKey: "Invalid Aliyun upload policy endpoint URL."])
+            throw NSError(domain: "SayIt.RemoteASR", code: -40, userInfo: [NSLocalizedDescriptionKey: "Invalid Aliyun upload policy endpoint URL."])
         }
         var queryItems = components.queryItems ?? []
         if !queryItems.contains(where: { $0.name == "action" }) {
@@ -174,7 +174,7 @@ enum AliyunRemoteASRClient {
         }
         components.queryItems = queryItems
         guard let url = components.url else {
-            throw NSError(domain: "Voxt.RemoteASR", code: -41, userInfo: [NSLocalizedDescriptionKey: "Invalid Aliyun upload policy endpoint URL."])
+            throw NSError(domain: "SayIt.RemoteASR", code: -41, userInfo: [NSLocalizedDescriptionKey: "Invalid Aliyun upload policy endpoint URL."])
         }
 
         var request = URLRequest(url: url)
@@ -185,19 +185,19 @@ enum AliyunRemoteASRClient {
 
         let (data, response) = try await VoxtNetworkSession.active.data(for: request)
         guard let http = response as? HTTPURLResponse else {
-            throw NSError(domain: "Voxt.RemoteASR", code: -42, userInfo: [NSLocalizedDescriptionKey: "Invalid Aliyun upload policy response."])
+            throw NSError(domain: "SayIt.RemoteASR", code: -42, userInfo: [NSLocalizedDescriptionKey: "Invalid Aliyun upload policy response."])
         }
         guard (200...299).contains(http.statusCode) else {
             let payload = String(data: data.prefix(300), encoding: .utf8) ?? ""
             throw NSError(
-                domain: "Voxt.RemoteASR",
+                domain: "SayIt.RemoteASR",
                 code: http.statusCode,
                 userInfo: [NSLocalizedDescriptionKey: "Aliyun upload policy request failed (HTTP \(http.statusCode)): \(payload)"]
             )
         }
         let object = try JSONSerialization.jsonObject(with: data)
         guard let policy = AliyunUploadPolicy(object: object) else {
-            throw NSError(domain: "Voxt.RemoteASR", code: -43, userInfo: [NSLocalizedDescriptionKey: "Aliyun upload policy payload is incomplete."])
+            throw NSError(domain: "SayIt.RemoteASR", code: -43, userInfo: [NSLocalizedDescriptionKey: "Aliyun upload policy payload is incomplete."])
         }
         return policy
     }
@@ -209,7 +209,7 @@ enum AliyunRemoteASRClient {
         endpoint: String
     ) async throws -> String {
         guard let url = URL(string: AliyunRemoteASRConfiguration.resolvedTranscriptionEndpoint(endpoint, model: model)) else {
-            throw NSError(domain: "Voxt.RemoteASR", code: -44, userInfo: [NSLocalizedDescriptionKey: "Invalid Aliyun transcription endpoint URL."])
+            throw NSError(domain: "SayIt.RemoteASR", code: -44, userInfo: [NSLocalizedDescriptionKey: "Invalid Aliyun transcription endpoint URL."])
         }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -225,12 +225,12 @@ enum AliyunRemoteASRClient {
 
         let (data, response) = try await VoxtNetworkSession.active.data(for: request)
         guard let http = response as? HTTPURLResponse else {
-            throw NSError(domain: "Voxt.RemoteASR", code: -45, userInfo: [NSLocalizedDescriptionKey: "Invalid Aliyun transcription response."])
+            throw NSError(domain: "SayIt.RemoteASR", code: -45, userInfo: [NSLocalizedDescriptionKey: "Invalid Aliyun transcription response."])
         }
         guard (200...299).contains(http.statusCode) else {
             let payload = String(data: data.prefix(300), encoding: .utf8) ?? ""
             throw NSError(
-                domain: "Voxt.RemoteASR",
+                domain: "SayIt.RemoteASR",
                 code: http.statusCode,
                 userInfo: [NSLocalizedDescriptionKey: "Aliyun Bailian ASR request failed (HTTP \(http.statusCode)): \(payload)"]
             )
@@ -239,7 +239,7 @@ enum AliyunRemoteASRClient {
         if let taskID = extractTaskID(from: object), !taskID.isEmpty {
             return taskID
         }
-        throw NSError(domain: "Voxt.RemoteASR", code: -46, userInfo: [NSLocalizedDescriptionKey: "Aliyun Bailian ASR did not return a task ID."])
+        throw NSError(domain: "SayIt.RemoteASR", code: -46, userInfo: [NSLocalizedDescriptionKey: "Aliyun Bailian ASR did not return a task ID."])
     }
 
     private static func pollTaskResult(
@@ -250,7 +250,7 @@ enum AliyunRemoteASRClient {
     ) async throws -> Any {
         let pollEndpoint = AliyunRemoteASRConfiguration.resolvedTaskEndpoint(endpoint, model: model, taskID: taskID)
         guard let url = URL(string: pollEndpoint) else {
-            throw NSError(domain: "Voxt.RemoteASR", code: -47, userInfo: [NSLocalizedDescriptionKey: "Invalid Aliyun task query endpoint URL."])
+            throw NSError(domain: "SayIt.RemoteASR", code: -47, userInfo: [NSLocalizedDescriptionKey: "Invalid Aliyun task query endpoint URL."])
         }
 
         for _ in 0..<40 {
@@ -263,12 +263,12 @@ enum AliyunRemoteASRClient {
 
             let (data, response) = try await VoxtNetworkSession.active.data(for: request)
             guard let http = response as? HTTPURLResponse else {
-                throw NSError(domain: "Voxt.RemoteASR", code: -48, userInfo: [NSLocalizedDescriptionKey: "Invalid Aliyun task query response."])
+                throw NSError(domain: "SayIt.RemoteASR", code: -48, userInfo: [NSLocalizedDescriptionKey: "Invalid Aliyun task query response."])
             }
             guard (200...299).contains(http.statusCode) else {
                 let payload = String(data: data.prefix(300), encoding: .utf8) ?? ""
                 throw NSError(
-                    domain: "Voxt.RemoteASR",
+                    domain: "SayIt.RemoteASR",
                     code: http.statusCode,
                     userInfo: [NSLocalizedDescriptionKey: "Aliyun task query failed (HTTP \(http.statusCode)): \(payload)"]
                 )
@@ -285,7 +285,7 @@ enum AliyunRemoteASRClient {
                     return object
                 }
                 throw NSError(
-                    domain: "Voxt.RemoteASR",
+                    domain: "SayIt.RemoteASR",
                     code: -49,
                     userInfo: [NSLocalizedDescriptionKey: detail.isEmpty ? "Aliyun task failed." : detail]
                 )
@@ -294,13 +294,13 @@ enum AliyunRemoteASRClient {
             }
         }
 
-        throw NSError(domain: "Voxt.RemoteASR", code: -50, userInfo: [NSLocalizedDescriptionKey: "Aliyun Bailian ASR task timed out."])
+        throw NSError(domain: "SayIt.RemoteASR", code: -50, userInfo: [NSLocalizedDescriptionKey: "Aliyun Bailian ASR task timed out."])
     }
 
     private static func fetchTranscriptionFile(from urlString: String) async throws -> Any {
         let normalizedURLString = normalizedTranscriptionURL(urlString)
         guard let url = URL(string: normalizedURLString) else {
-            throw NSError(domain: "Voxt.RemoteASR", code: -51, userInfo: [NSLocalizedDescriptionKey: "Invalid Aliyun transcription result URL."])
+            throw NSError(domain: "SayIt.RemoteASR", code: -51, userInfo: [NSLocalizedDescriptionKey: "Invalid Aliyun transcription result URL."])
         }
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
@@ -309,12 +309,12 @@ enum AliyunRemoteASRClient {
 
         let (data, response) = try await VoxtNetworkSession.active.data(for: request)
         guard let http = response as? HTTPURLResponse else {
-            throw NSError(domain: "Voxt.RemoteASR", code: -52, userInfo: [NSLocalizedDescriptionKey: "Invalid Aliyun transcription file response."])
+            throw NSError(domain: "SayIt.RemoteASR", code: -52, userInfo: [NSLocalizedDescriptionKey: "Invalid Aliyun transcription file response."])
         }
         guard (200...299).contains(http.statusCode) else {
             let payload = String(data: data.prefix(300), encoding: .utf8) ?? ""
             throw NSError(
-                domain: "Voxt.RemoteASR",
+                domain: "SayIt.RemoteASR",
                 code: http.statusCode,
                 userInfo: [NSLocalizedDescriptionKey: "Aliyun transcription result download failed (HTTP \(http.statusCode)): \(payload)"]
             )

@@ -186,7 +186,7 @@ enum DoubaoConnectivityTestSupport {
                 Int32(MemoryLayout<z_stream>.size)
             )
             guard initStatus == Z_OK else {
-                throw NSError(domain: "Voxt.Settings", code: -122, userInfo: [NSLocalizedDescriptionKey: "Failed to initialize Doubao test GZIP compression."])
+                throw NSError(domain: "SayIt.Settings", code: -122, userInfo: [NSLocalizedDescriptionKey: "Failed to initialize Doubao test GZIP compression."])
             }
             defer { deflateEnd(&stream) }
 
@@ -207,7 +207,7 @@ enum DoubaoConnectivityTestSupport {
             } while status == Z_OK
 
             guard status == Z_STREAM_END else {
-                throw NSError(domain: "Voxt.Settings", code: -123, userInfo: [NSLocalizedDescriptionKey: "Failed to compress Doubao test payload with GZIP."])
+                throw NSError(domain: "SayIt.Settings", code: -123, userInfo: [NSLocalizedDescriptionKey: "Failed to compress Doubao test payload with GZIP."])
             }
 
             return output
@@ -238,7 +238,7 @@ enum DoubaoConnectivityTestSupport {
                 Int32(MemoryLayout<z_stream>.size)
             )
             guard initStatus == Z_OK else {
-                throw NSError(domain: "Voxt.Settings", code: -124, userInfo: [NSLocalizedDescriptionKey: "Failed to initialize Doubao test GZIP decompression."])
+                throw NSError(domain: "SayIt.Settings", code: -124, userInfo: [NSLocalizedDescriptionKey: "Failed to initialize Doubao test GZIP decompression."])
             }
             defer { inflateEnd(&stream) }
 
@@ -259,7 +259,7 @@ enum DoubaoConnectivityTestSupport {
             } while status == Z_OK
 
             guard status == Z_STREAM_END else {
-                throw NSError(domain: "Voxt.Settings", code: -125, userInfo: [NSLocalizedDescriptionKey: "Failed to decompress Doubao test GZIP payload."])
+                throw NSError(domain: "SayIt.Settings", code: -125, userInfo: [NSLocalizedDescriptionKey: "Failed to decompress Doubao test GZIP payload."])
             }
 
             return output

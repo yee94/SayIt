@@ -8,7 +8,7 @@ import Combine
 @MainActor
 final class SherpaOnnxModelManager: ObservableObject {
     typealias ModelState = MLXModelManager.ModelState
-    private static let downloadUserAgent = "Voxt/1.0 (SherpaOnnx)"
+    private static let downloadUserAgent = "SayIt/1.0 (SherpaOnnx)"
 
     struct CatalogSnapshot: Equatable {
         let id: SherpaOnnxModelID

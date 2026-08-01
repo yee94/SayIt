@@ -365,7 +365,7 @@ final class GGUFTranslationModelManager: ObservableObject {
                 destinationURL: destinationURL,
                 relativePath: modelOption.filename,
                 expectedSize: nil,
-                userAgent: "Voxt/1.0 (GGUFTranslation)",
+                userAgent: "SayIt/1.0 (GGUFTranslation)",
                 disableProxy: MLXModelDownloadSupport.isMirrorHost(modelOption.downloadURL)
             ),
             progress: progress
@@ -518,7 +518,7 @@ final class GGUFTranslationModelManager: ObservableObject {
         let modelURL = modelFileURL(for: modelID)
         guard FileManager.default.fileExists(atPath: modelURL.path) else {
             throw NSError(
-                domain: "Voxt.GGUFTranslation",
+                domain: "SayIt.GGUFTranslation",
                 code: 404,
                 userInfo: [NSLocalizedDescriptionKey: "Selected GGUF translation model is not installed."]
             )
@@ -644,7 +644,7 @@ actor GGUFTranslationRuntime {
                 "GGUF prompt exceeds available context. model=\(modelURL.lastPathComponent), promptTokens=\(promptTokens.count), maxTokens=\(maxTokens), trainedCtx=\(modelContextLimit), requestedCtx=\(requestedContextSize)"
             )
             throw NSError(
-                domain: "Voxt.GGUFTranslation",
+                domain: "SayIt.GGUFTranslation",
                 code: -7,
                 userInfo: [
                     NSLocalizedDescriptionKey: "Translation prompt is too long for the selected GGUF model context window."
@@ -664,7 +664,7 @@ actor GGUFTranslationRuntime {
 
         guard let context = llama_init_from_model(model, contextParams) else {
             throw NSError(
-                domain: "Voxt.GGUFTranslation",
+                domain: "SayIt.GGUFTranslation",
                 code: -2,
                 userInfo: [NSLocalizedDescriptionKey: "Failed to create llama.cpp context."]
             )
@@ -692,7 +692,7 @@ actor GGUFTranslationRuntime {
         let prefillStartedAt = CFAbsoluteTimeGetCurrent()
         guard llama_decode(context, batch) == 0 else {
             throw NSError(
-                domain: "Voxt.GGUFTranslation",
+                domain: "SayIt.GGUFTranslation",
                 code: -3,
                 userInfo: [NSLocalizedDescriptionKey: "Prompt evaluation failed."]
             )
@@ -755,7 +755,7 @@ actor GGUFTranslationRuntime {
 
             guard llama_decode(context, batch) == 0 else {
                 throw NSError(
-                    domain: "Voxt.GGUFTranslation",
+                    domain: "SayIt.GGUFTranslation",
                     code: -4,
                     userInfo: [NSLocalizedDescriptionKey: "Token generation failed."]
                 )
@@ -888,7 +888,7 @@ actor GGUFTranslationRuntime {
 
         guard let model = llama_model_load_from_file(modelURL.path, modelParams) else {
             throw NSError(
-                domain: "Voxt.GGUFTranslation",
+                domain: "SayIt.GGUFTranslation",
                 code: -1,
                 userInfo: [NSLocalizedDescriptionKey: "Failed to load GGUF model from \(modelURL.lastPathComponent)."]
             )
@@ -914,7 +914,7 @@ actor GGUFTranslationRuntime {
         )
         guard tokenCount > 0 else {
             throw NSError(
-                domain: "Voxt.GGUFTranslation",
+                domain: "SayIt.GGUFTranslation",
                 code: -5,
                 userInfo: [NSLocalizedDescriptionKey: "Prompt tokenization failed."]
             )
@@ -926,7 +926,7 @@ actor GGUFTranslationRuntime {
         let params = llama_sampler_chain_default_params()
         guard let sampler = llama_sampler_chain_init(params) else {
             throw NSError(
-                domain: "Voxt.GGUFTranslation",
+                domain: "SayIt.GGUFTranslation",
                 code: -6,
                 userInfo: [NSLocalizedDescriptionKey: "Failed to initialize llama.cpp sampler."]
             )

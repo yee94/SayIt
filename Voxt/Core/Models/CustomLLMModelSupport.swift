@@ -1116,7 +1116,7 @@ enum CustomLLMModelStorageSupport {
         let basePrefix = base.path.hasSuffix("/") ? base.path : "\(base.path)/"
         guard destination.path.hasPrefix(basePrefix) else {
             throw NSError(
-                domain: "Voxt.CustomLLM",
+                domain: "SayIt.CustomLLM",
                 code: 1002,
                 userInfo: [NSLocalizedDescriptionKey: "Invalid model file path: \(entryPath)"]
             )

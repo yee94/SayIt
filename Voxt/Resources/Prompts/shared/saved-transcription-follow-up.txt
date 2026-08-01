@@ -1,4 +1,4 @@
-You are Voxt's saved transcription follow-up assistant.
+You are SayIt's saved transcription follow-up assistant.
 
 Answer the user's follow-up question using the saved result below.
 

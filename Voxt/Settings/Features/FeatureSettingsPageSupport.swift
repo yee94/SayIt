@@ -169,7 +169,7 @@ extension FeatureSettingsView {
         FeatureEmbeddedFieldGroup {
             FeatureToggleRow(
                 title: featureSettingsLocalized("Enable Obsidian Sync"),
-                detail: featureSettingsLocalized("Export Voxt notes into an Obsidian vault by writing Markdown files directly into the selected folder."),
+                detail: featureSettingsLocalized("Export SayIt notes into an Obsidian vault by writing Markdown files directly into the selected folder."),
                 isOn: binding(
                     get: { featureSettings.transcription.notes.obsidianSync.enabled },
                     set: { featureSettings.transcription.notes.obsidianSync.enabled = $0 }
@@ -191,12 +191,12 @@ extension FeatureSettingsView {
 
                 FeatureInlineTextFieldRow(
                     title: featureSettingsLocalized("Target Folder"),
-                    detail: featureSettingsLocalized("Choose where inside the vault Voxt should write exported notes."),
+                    detail: featureSettingsLocalized("Choose where inside the vault SayIt should write exported notes."),
                     text: binding(
                         get: { featureSettings.transcription.notes.obsidianSync.relativeFolder },
                         set: { featureSettings.transcription.notes.obsidianSync.relativeFolder = $0 }
                     ),
-                    placeholder: "Voxt",
+                    placeholder: "SayIt",
                     width: 244,
                     isEmbedded: true
                 )
@@ -227,7 +227,7 @@ extension FeatureSettingsView {
         FeatureEmbeddedFieldGroup {
             FeatureToggleRow(
                 title: featureSettingsLocalized("Enable Reminders Sync"),
-                detail: featureSettingsLocalized("Sync Voxt notes into Apple Reminders by creating and updating reminders in the selected list."),
+                detail: featureSettingsLocalized("Sync SayIt notes into Apple Reminders by creating and updating reminders in the selected list."),
                 isOn: binding(
                     get: { featureSettings.transcription.notes.remindersSync.enabled },
                     set: { featureSettings.transcription.notes.remindersSync.enabled = $0 }
@@ -238,7 +238,7 @@ extension FeatureSettingsView {
             if featureSettings.transcription.notes.remindersSync.enabled {
                 FeatureInlinePickerRow(
                     title: featureSettingsLocalized("Target List"),
-                    detail: featureSettingsLocalized("Choose the Reminders list that should receive synced Voxt notes."),
+                    detail: featureSettingsLocalized("Choose the Reminders list that should receive synced SayIt notes."),
                     isEmbedded: true
                 ) {
                     SettingsSelectionButton(width: 280, action: presentRemindersListSelector) {

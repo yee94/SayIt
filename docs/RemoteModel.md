@@ -1,6 +1,6 @@
 # Remote Models
 
-Voxt lets you choose separate remote providers for `Remote ASR` and `Remote LLM`. This document only introduces the providers and model ranges currently built into the app, so you can understand what each option is for first. Setup steps such as API key creation, endpoint configuration, and model selection guidance can be expanded in later sections.
+SayIt lets you choose separate remote providers for `Remote ASR` and `Remote LLM`. This document only introduces the providers and model ranges currently built into the app, so you can understand what each option is for first. Setup steps such as API key creation, endpoint configuration, and model selection guidance can be expanded in later sections.
 
 ## ASR Models
 
@@ -8,8 +8,8 @@ Voxt lets you choose separate remote providers for `Remote ASR` and `Remote LLM`
 
 - Suggested default: `whisper-1`
 - Built-in models: `whisper-1`, `gpt-4o-mini-transcribe`, `gpt-4o-transcribe`
-- Overview: Best for general-purpose multilingual audio transcription. Voxt currently integrates it as file-based transcription, which makes it a good fit for users who want compatibility and a stable experience.
-- Voxt note: this provider also supports custom model IDs and custom OpenAI-compatible transcription endpoints.
+- Overview: Best for general-purpose multilingual audio transcription. SayIt currently integrates it as file-based transcription, which makes it a good fit for users who want compatibility and a stable experience.
+- SayIt note: this provider also supports custom model IDs and custom OpenAI-compatible transcription endpoints.
 
 - [Website](https://openai.com/)
 - [API Docs](https://developers.openai.com/api/reference/resources/audio)
@@ -29,10 +29,10 @@ Compatible custom endpoint examples:
 
 Important notes:
 
-- In Voxt, custom ASR model IDs are supported only through the `OpenAI Whisper` provider.
+- In SayIt, custom ASR model IDs are supported only through the `OpenAI Whisper` provider.
 - Enter the full transcription endpoint, not just the API root.
-- Voxt uses file upload transcription for this provider path. If a compatible service also supports URL or Base64 inputs, Voxt still uses file upload.
-- If a compatible service returns extra structured metadata such as diarization segments, Voxt currently reads the transcript text but does not surface that metadata as a dedicated UI feature.
+- SayIt uses file upload transcription for this provider path. If a compatible service also supports URL or Base64 inputs, SayIt still uses file upload.
+- If a compatible service returns extra structured metadata such as diarization segments, SayIt currently reads the transcript text but does not surface that metadata as a dedicated UI feature.
 
 <img width="923" height="676" alt="image" src="https://github.com/user-attachments/assets/62be17c8-78f5-418e-a4ba-873d18d58f18" />
 
@@ -51,7 +51,7 @@ Important notes:
 <img width="1442" height="1059" alt="image" src="https://github.com/user-attachments/assets/188f5abd-7bec-4592-8aa9-68b5e9ee260d" />
 
 1. Create an application and choose the model.
-2. In the left sidebar, open `Doubao Streaming Speech Recognition Model 2.0`, then copy the `APP ID` and `Access Token` into Voxt.
+2. In the left sidebar, open `Doubao Streaming Speech Recognition Model 2.0`, then copy the `APP ID` and `Access Token` into SayIt.
 
 <img width="939" height="683" alt="image" src="https://github.com/user-attachments/assets/18c4032e-b3e8-4ab5-92fe-9f6f0117ecd1" />
 
@@ -77,7 +77,7 @@ Key: `xxx.xxx`
   - Qwen3 ASR Flash Realtime: `qwen3-asr-flash-realtime`, `qwen3-asr-flash-realtime-2026-02-10`, `qwen3-asr-flash-realtime-2025-10-27`
   - Fun ASR Realtime: `fun-asr-realtime`, `fun-asr-realtime-2026-02-28`, `fun-asr-realtime-2025-11-07`, `fun-asr-realtime-2025-09-15`, `fun-asr-flash-8k-realtime`, `fun-asr-flash-8k-realtime-2026-01-28`
   - Paraformer Realtime: `paraformer-realtime-v2`, `paraformer-realtime-v1`, `paraformer-realtime-8k-v2`, `paraformer-realtime-8k-v1`
-- Overview: Aliyun Bailian has the widest preset ASR selection in Voxt. It includes Qwen3 ASR, Fun ASR, and Paraformer, which makes it a strong choice for users who need realtime transcription and want to compare multiple ASR families on the same platform.
+- Overview: Aliyun Bailian has the widest preset ASR selection in SayIt. It includes Qwen3 ASR, Fun ASR, and Paraformer, which makes it a strong choice for users who need realtime transcription and want to compare multiple ASR families on the same platform.
 
 - [Website](https://bailian.console.aliyun.com/cn-beijing)
 - [Key Management](https://bailian.console.aliyun.com/cn-beijing/?tab=model#/api-key)
@@ -96,7 +96,7 @@ Key: `xxxx`
 
 ## LLM Models
 
-In Voxt, the remote LLM configuration sheet supports both preset models and custom model IDs. The sections below list the main model ranges that are already built into the app for each provider.
+In SayIt, the remote LLM configuration sheet supports both preset models and custom model IDs. The sections below list the main model ranges that are already built into the app for each provider.
 
 ### Anthropic
 
@@ -121,7 +121,7 @@ In Voxt, the remote LLM configuration sheet supports both preset models and cust
 - Suggested default: `gpt-5.2`
 - Built-in model range: GPT-5.2 / 5.1 / 5, the `o4` / `o3` / `o1` reasoning series, GPT-4.1, GPT-4o, GPT-4, and GPT-3.5
 - Representative models: `gpt-5.2`, `gpt-5.2-chat-latest`, `gpt-5.2-pro`, `gpt-5.1-codex`, `o3`, `o4-mini`, `gpt-4.1`, `gpt-4o`, `gpt-4o-mini`
-- Overview: This is the broadest OpenAI-compatible selection in Voxt. It works well for general text enhancement, as well as reasoning, coding, and lower-latency response scenarios.
+- Overview: This is the broadest OpenAI-compatible selection in SayIt. It works well for general text enhancement, as well as reasoning, coding, and lower-latency response scenarios.
 
 *Soon*
 
@@ -144,9 +144,9 @@ In Voxt, the remote LLM configuration sheet supports both preset models and cust
 - Built-in model range: local MLX-hosted Qwen, Llama, DeepSeek, Gemma, Mixtral, GPT-OSS, and other model aliases exposed by your oMLX server
 - Representative models: `qwen3`, `Qwen3-Coder-Next-8bit`, `gpt-oss-120b-MXFP4-Q8`, `Qwen3.5-122B-A10B-4bit`, `Step-3.5-Flash-8bit`
 - API key: optional. Leave it blank for the default localhost setup, or provide a bearer token if you started oMLX with `--api-key`.
-- Endpoint: Voxt defaults to the oMLX OpenAI-compatible root `http://localhost:8000/v1` and resolves requests to `/v1/chat/completions`.
+- Endpoint: SayIt defaults to the oMLX OpenAI-compatible root `http://localhost:8000/v1` and resolves requests to `/v1/chat/completions`.
 - Model IDs: oMLX accepts either the configured alias returned by `/v1/models` or the discovered local model directory name.
-- Overview: Best for users running MLX-native local inference on Apple Silicon and want a dedicated local model server with OpenAI-compatible access from Voxt.
+- Overview: Best for users running MLX-native local inference on Apple Silicon and want a dedicated local model server with OpenAI-compatible access from SayIt.
 
 *Soon*
 
@@ -215,7 +215,7 @@ Key: `xxx`
 
 - Suggested default: `llama3.1`
 - Built-in models: `llama3.1`, `qwen2.5-14b-instruct`
-- Overview: Best for users already exposing a local OpenAI-compatible endpoint from LM Studio and want to connect those local models to Voxt quickly.
+- Overview: Best for users already exposing a local OpenAI-compatible endpoint from LM Studio and want to connect those local models to SayIt quickly.
 
 *Soon*
 

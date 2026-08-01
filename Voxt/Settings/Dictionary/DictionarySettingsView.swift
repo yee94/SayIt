@@ -508,7 +508,7 @@ struct DictionarySettingsView: View {
     private func exportDictionary() {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.json]
-        panel.nameFieldStringValue = localized("Voxt-Dictionary.json")
+        panel.nameFieldStringValue = localized("SayIt-Dictionary.json")
         panel.canCreateDirectories = true
 
         guard panel.runModal() == .OK, let url = panel.url else { return }

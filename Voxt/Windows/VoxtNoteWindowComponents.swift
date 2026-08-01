@@ -119,7 +119,7 @@ struct VoxtNoteWindowView: View {
 
     private func header(activeCount: Int) -> some View {
         HStack(spacing: 8) {
-            Text("Voxt Notes")
+            Text("SayIt Notes")
                 .font(.system(size: 13, weight: .semibold, design: .rounded))
             Text("· \(activeSubtitle(count: activeCount))")
                 .font(.system(size: 10, design: .rounded))

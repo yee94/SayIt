@@ -47,7 +47,7 @@ extension AppDelegate {
                 try? FileManager.default.removeItem(at: importedAudioURL)
             }
             throw NSError(
-                domain: "Voxt.MeetingFileAnalysis",
+                domain: "SayIt.MeetingFileAnalysis",
                 code: -1,
                 userInfo: [
                     NSLocalizedDescriptionKey: AppLocalization.localizedString(
@@ -282,7 +282,7 @@ extension AppDelegate {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd-HHmm"
-        return "Voxt-Meeting-\(formatter.string(from: Date())).txt"
+        return "SayIt-Meeting-\(formatter.string(from: Date())).txt"
     }
 
     func resolvedMeetingRealtimeTranslationTargetLanguage() -> TranslationTargetLanguage? {
