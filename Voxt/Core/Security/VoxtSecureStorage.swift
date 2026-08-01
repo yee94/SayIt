@@ -57,33 +57,17 @@ enum VoxtSecureStorage {
             return migrateLegacyValueForTesting(for: account)
         }
 
-        var query = protectedQuery(for: account)
-        query[kSecReturnData as String] = kCFBooleanTrue
-        query[kSecMatchLimit as String] = kSecMatchLimitOne
-
-        var item: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &item)
-        switch status {
-        case errSecSuccess:
-            guard let data = item as? Data,
-                  let value = String(data: data, encoding: .utf8)
-            else {
-                return nil
-            }
+        if let value = readString(from: .authoritative, account: account) {
             cache(value, for: account)
-            // A readable Data Protection item is authoritative. Legacy cleanup
-            // is best effort and must never make the current value unavailable.
-            _ = deleteLegacyValue(for: account, interactionAllowed: false)
+            // Authoritative item wins. Cleanup of alternate-store copies is best
+            // effort and must never make the current value unavailable.
+            _ = deleteValue(in: .alternate, for: account, interactionAllowed: false)
             return value
-        case errSecItemNotFound:
-            return migrateLegacyValue(for: account)
-        default:
-            VoxtLog.securityWarning("Data Protection Keychain read failed. account=\(account), status=\(status)")
-            return nil
         }
+        return migrateLegacyValue(for: account)
     }
 
-    /// Reads only from the authoritative Data Protection Keychain item.
+    /// Reads only from the authoritative Keychain item.
     /// Unlike `string(for:)`, this API never consults the process cache and
     /// never performs legacy migration as a side effect.
     nonisolated static func protectedString(for account: String) throws -> String? {
@@ -91,29 +75,11 @@ enum VoxtSecureStorage {
             return protectedValueForTesting(for: account)
         }
 
-        var query = protectedQuery(for: account)
-        query[kSecReturnData as String] = kCFBooleanTrue
-        query[kSecMatchLimit as String] = kSecMatchLimitOne
-
-        var item: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &item)
-        switch status {
-        case errSecSuccess:
-            guard let data = item as? Data,
-                  let value = String(data: data, encoding: .utf8)
-            else {
-                throw StorageError.invalidUTF8
-            }
-            return value
-        case errSecItemNotFound:
-            return nil
-        default:
-            throw StorageError.unexpectedStatus(status)
-        }
+        return try readStringStrict(from: .authoritative, account: account)
     }
 
-    /// Upserts an authoritative Data Protection Keychain item. The update
-    /// changes only the secret data; accessibility is fixed when adding.
+    /// Upserts an authoritative Keychain item. The update changes only the
+    /// secret data; accessibility is fixed when adding.
     nonisolated static func setProtectedString(_ value: String, for account: String) throws {
         guard !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             try removeProtectedString(for: account)
@@ -127,34 +93,7 @@ enum VoxtSecureStorage {
             return
         }
 
-        let query = protectedQuery(for: account)
-        let attributes: [String: Any] = [
-            kSecValueData as String: Data(value.utf8)
-        ]
-        let updateStatus = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
-        switch updateStatus {
-        case errSecSuccess:
-            cache(value, for: account)
-            return
-        case errSecItemNotFound:
-            var item = query
-            item[kSecValueData as String] = Data(value.utf8)
-            item[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-            let addStatus = SecItemAdd(item as CFDictionary, nil)
-            if addStatus == errSecDuplicateItem {
-                let retryStatus = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
-                guard retryStatus == errSecSuccess else {
-                    throw StorageError.unexpectedStatus(retryStatus)
-                }
-                cache(value, for: account)
-                return
-            }
-            guard addStatus == errSecSuccess else {
-                throw StorageError.unexpectedStatus(addStatus)
-            }
-        default:
-            throw StorageError.unexpectedStatus(updateStatus)
-        }
+        try writeString(value, to: .authoritative, account: account)
         cache(value, for: account)
     }
 
@@ -170,9 +109,8 @@ enum VoxtSecureStorage {
             return
         }
 
-        let status = SecItemDelete(protectedQuery(for: account) as CFDictionary)
-        guard status == errSecSuccess || status == errSecItemNotFound else {
-            throw StorageError.unexpectedStatus(status)
+        guard deleteValue(in: .authoritative, for: account, interactionAllowed: true) else {
+            throw StorageError.unexpectedStatus(errSecNotAvailable)
         }
         removeCachedValue(for: account)
     }
@@ -186,33 +124,10 @@ enum VoxtSecureStorage {
             return protectedValueForTesting(for: account) != nil || legacyValueForTesting(for: account) != nil
         }
 
-        var protectedLookup = protectedQuery(for: account)
-        protectedLookup[kSecMatchLimit as String] = kSecMatchLimitOne
-        let protectedStatus = SecItemCopyMatching(protectedLookup as CFDictionary, nil)
-        switch protectedStatus {
-        case errSecSuccess:
+        if hasValue(in: .authoritative, account: account) {
             return true
-        case errSecItemNotFound:
-            break
-        default:
-            VoxtLog.securityWarning(
-                "Data Protection Keychain presence check failed. account=\(account), status=\(protectedStatus)"
-            )
-            return false
         }
-
-        var legacyLookup = legacyQuery(for: account, interactionAllowed: false)
-        legacyLookup[kSecMatchLimit as String] = kSecMatchLimitOne
-        let legacyStatus = SecItemCopyMatching(legacyLookup as CFDictionary, nil)
-        switch legacyStatus {
-        case errSecSuccess:
-            return true
-        case errSecItemNotFound, errSecInteractionNotAllowed, errSecAuthFailed:
-            return false
-        default:
-            VoxtLog.securityWarning("Legacy Keychain presence check failed. account=\(account), status=\(legacyStatus)")
-            return false
-        }
+        return hasValue(in: .alternate, account: account)
     }
 
     /// Performs the one-time legacy lookup used by configuration migration.
@@ -241,62 +156,44 @@ enum VoxtSecureStorage {
             return .value(legacyValue)
         }
 
-        var protectedLookup = protectedQuery(for: account)
-        protectedLookup[kSecReturnData as String] = kCFBooleanTrue
-        protectedLookup[kSecMatchLimit as String] = kSecMatchLimitOne
-        var protectedItem: CFTypeRef?
-        let protectedStatus = SecItemCopyMatching(protectedLookup as CFDictionary, &protectedItem)
-        switch protectedStatus {
-        case errSecSuccess:
-            guard let data = protectedItem as? Data,
-                  let value = String(data: data, encoding: .utf8)
-            else {
-                return .unavailable
+        do {
+            if let value = try readStringStrict(from: .authoritative, account: account) {
+                cache(value, for: account)
+                _ = deleteValue(in: .alternate, for: account, interactionAllowed: false)
+                return .value(value)
             }
-            cache(value, for: account)
-            _ = deleteLegacyValue(for: account, interactionAllowed: false)
-            return .value(value)
-        case errSecItemNotFound:
-            break
-        default:
+        } catch {
             VoxtLog.securityWarning(
-                "Data Protection Keychain migration lookup failed. account=\(account), status=\(protectedStatus)"
+                "Authoritative Keychain migration lookup failed. account=\(account), error=\(error.localizedDescription)"
             )
             return .unavailable
         }
 
-        var legacyLookup = legacyQuery(for: account, interactionAllowed: false)
-        legacyLookup[kSecReturnData as String] = kCFBooleanTrue
-        legacyLookup[kSecMatchLimit as String] = kSecMatchLimitOne
-        var legacyItem: CFTypeRef?
-        let legacyStatus = SecItemCopyMatching(legacyLookup as CFDictionary, &legacyItem)
-        switch legacyStatus {
-        case errSecSuccess:
-            guard let legacyData = legacyItem as? Data,
-                  let value = String(data: legacyData, encoding: .utf8)
-            else {
-                return .unavailable
+        do {
+            guard let value = try readStringStrict(from: .alternate, account: account) else {
+                return .missing
             }
             guard !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 return .missing
             }
-            guard set(value, for: account), protectedData(for: account) == legacyData else {
+            guard set(value, for: account), authoritativeData(for: account) == Data(value.utf8) else {
                 VoxtLog.securityWarning("Legacy Keychain migration could not be committed. account=\(account)")
                 return .unavailable
             }
-            if !deleteLegacyValue(for: account, interactionAllowed: false) {
+            if !deleteValue(in: .alternate, for: account, interactionAllowed: false) {
                 VoxtLog.securityWarning("Legacy Keychain migration cleanup failed. account=\(account)")
             }
             return .value(value)
-        case errSecItemNotFound:
-            return .missing
-        case errSecInteractionNotAllowed, errSecAuthFailed:
+        } catch let StorageError.unexpectedStatus(status)
+            where status == errSecInteractionNotAllowed || status == errSecAuthFailed {
             VoxtLog.securityWarning(
-                "Legacy Keychain migration is temporarily unavailable. account=\(account), status=\(legacyStatus)"
+                "Legacy Keychain migration is temporarily unavailable. account=\(account), status=\(status)"
             )
             return .unavailable
-        default:
-            VoxtLog.securityWarning("Legacy Keychain migration lookup failed. account=\(account), status=\(legacyStatus)")
+        } catch {
+            VoxtLog.securityWarning(
+                "Legacy Keychain migration lookup failed. account=\(account), error=\(error.localizedDescription)"
+            )
             return .unavailable
         }
     }
@@ -311,39 +208,16 @@ enum VoxtSecureStorage {
             return setProtectedValueForTesting(value, for: account)
         }
 
-        let query = protectedQuery(for: account)
-        let status = SecItemCopyMatching(query as CFDictionary, nil)
-        switch status {
-        case errSecSuccess:
-            let attributes: [String: Any] = [
-                kSecValueData as String: Data(value.utf8),
-                kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-            ]
-            let updateStatus = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
-            guard updateStatus == errSecSuccess else {
-                VoxtLog.securityWarning(
-                    "Data Protection Keychain update failed. account=\(account), status=\(updateStatus)"
-                )
-                return false
-            }
-        case errSecItemNotFound:
-            var item = query
-            item[kSecValueData as String] = Data(value.utf8)
-            item[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-            let addStatus = SecItemAdd(item as CFDictionary, nil)
-            guard addStatus == errSecSuccess else {
-                VoxtLog.securityWarning("Data Protection Keychain add failed. account=\(account), status=\(addStatus)")
-                return false
-            }
-        default:
+        do {
+            try writeString(value, to: .authoritative, account: account)
+            cache(value, for: account)
+            return true
+        } catch {
             VoxtLog.securityWarning(
-                "Data Protection Keychain lookup before write failed. account=\(account), status=\(status)"
+                "Keychain write failed. account=\(account), error=\(error.localizedDescription)"
             )
             return false
         }
-
-        cache(value, for: account)
-        return true
     }
 
     @discardableResult
@@ -354,13 +228,13 @@ enum VoxtSecureStorage {
             return removeValuesForTesting(for: account)
         }
 
-        // Delete the legacy copy first. If its ACL prevents noninteractive
-        // deletion, keep the protected copy intact so callers can retry without
-        // reviving an older credential.
-        guard deleteLegacyValue(for: account, interactionAllowed: false) else {
+        // Delete the alternate-store copy first. If its ACL prevents
+        // noninteractive deletion, keep the authoritative copy intact so
+        // callers can retry without reviving an older credential.
+        guard deleteValue(in: .alternate, for: account, interactionAllowed: false) else {
             return false
         }
-        return deleteProtectedValue(for: account)
+        return deleteValue(in: .authoritative, for: account, interactionAllowed: true)
     }
 
     @discardableResult
@@ -432,18 +306,8 @@ enum VoxtSecureStorage {
     }
 
     nonisolated private static func migrateLegacyValue(for account: String) -> String? {
-        var query = legacyQuery(for: account, interactionAllowed: false)
-        query[kSecReturnData as String] = kCFBooleanTrue
-        query[kSecMatchLimit as String] = kSecMatchLimitOne
-
-        var item: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &item)
-        switch status {
-        case errSecSuccess:
-            guard let legacyData = item as? Data,
-                  let value = String(data: legacyData, encoding: .utf8)
-            else {
-                VoxtLog.securityWarning("Legacy Keychain value is not valid UTF-8. account=\(account)")
+        do {
+            guard let value = try readStringStrict(from: .alternate, account: account) else {
                 return nil
             }
             guard set(value, for: account) else {
@@ -451,60 +315,39 @@ enum VoxtSecureStorage {
                 cache(value, for: account)
                 return value
             }
-            guard protectedData(for: account) == legacyData else {
+            guard authoritativeData(for: account) == Data(value.utf8) else {
                 removeCachedValue(for: account)
                 VoxtLog.securityWarning("Legacy Keychain migration verification failed. account=\(account)")
                 cache(value, for: account)
                 return value
             }
-
-            if !deleteLegacyValue(for: account, interactionAllowed: false) {
+            if !deleteValue(in: .alternate, for: account, interactionAllowed: false) {
                 VoxtLog.securityWarning("Legacy Keychain migration cleanup failed. account=\(account)")
             }
             return value
-        case errSecItemNotFound:
-            return nil
-        case errSecInteractionNotAllowed, errSecAuthFailed:
+        } catch let StorageError.unexpectedStatus(status)
+            where status == errSecInteractionNotAllowed || status == errSecAuthFailed {
             VoxtLog.securityWarning(
                 "Legacy Keychain migration requires user interaction; migration deferred. account=\(account), status=\(status)"
             )
             return nil
-        default:
-            VoxtLog.securityWarning("Legacy Keychain read failed. account=\(account), status=\(status)")
+        } catch {
+            VoxtLog.securityWarning(
+                "Legacy Keychain read failed. account=\(account), error=\(error.localizedDescription)"
+            )
             return nil
         }
     }
 
-    nonisolated private static func protectedData(for account: String) -> Data? {
-        var query = protectedQuery(for: account)
+    nonisolated private static func authoritativeData(for account: String) -> Data? {
+        var query = query(for: .authoritative, account: account, interactionAllowed: true)
         query[kSecReturnData as String] = kCFBooleanTrue
         query[kSecMatchLimit as String] = kSecMatchLimitOne
-
         var item: CFTypeRef?
         guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess else {
             return nil
         }
         return item as? Data
-    }
-
-    nonisolated private static func deleteProtectedValue(for account: String) -> Bool {
-        let status = SecItemDelete(protectedQuery(for: account) as CFDictionary)
-        guard status == errSecSuccess || status == errSecItemNotFound else {
-            VoxtLog.securityWarning("Data Protection Keychain delete failed. account=\(account), status=\(status)")
-            return false
-        }
-        return true
-    }
-
-    nonisolated private static func deleteLegacyValue(for account: String, interactionAllowed: Bool) -> Bool {
-        let status = SecItemDelete(
-            legacyQuery(for: account, interactionAllowed: interactionAllowed) as CFDictionary
-        )
-        guard status == errSecSuccess || status == errSecItemNotFound else {
-            VoxtLog.securityWarning("Legacy Keychain delete failed. account=\(account), status=\(status)")
-            return false
-        }
-        return true
     }
 
     nonisolated private static var isUsingInMemoryStoreForTesting: Bool {
@@ -587,27 +430,110 @@ enum VoxtSecureStorage {
         stateLock.unlock()
     }
 
-    nonisolated private static func protectedQuery(for account: String) -> [String: Any] {
-        [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: serviceName,
-            kSecAttrAccount as String: account,
-            kSecUseDataProtectionKeychain as String: kCFBooleanTrue as Any
-        ]
+    /// Keychain backend selection for unsandboxed Developer ID builds.
+    /// Prefer Data Protection when available; otherwise use the login keychain.
+    private enum KeychainStore: String, CaseIterable, Sendable {
+        case dataProtection
+        case login
+
+        var usesDataProtectionKeychain: Bool {
+            self == .dataProtection
+        }
     }
 
-    nonisolated static func legacyQuery(
-        for account: String,
+    /// Logical roles:
+    /// - authoritative: preferred writable store for this process
+    /// - alternate: secondary store used only for migration/cleanup
+    private enum KeychainRole: String, Sendable {
+        case authoritative
+        case alternate
+    }
+
+    // Cached after first successful probe so release builds do not keep retrying
+    // Data Protection APIs that are unavailable without the related entitlement.
+    nonisolated(unsafe) private static var preferredStoreOverride: KeychainStore?
+
+    nonisolated private static var preferredStore: KeychainStore {
+        stateLock.lock()
+        if let preferredStoreOverride {
+            stateLock.unlock()
+            return preferredStoreOverride
+        }
+        stateLock.unlock()
+
+        let resolved = resolvePreferredStore()
+        stateLock.lock()
+        preferredStoreOverride = resolved
+        stateLock.unlock()
+        return resolved
+    }
+
+    nonisolated private static func resolvePreferredStore() -> KeychainStore {
+        // Probe Data Protection with a disposable item. errSecMissingEntitlement
+        // (-34018) means this process cannot use DP keychain (typical for the
+        // unsandboxed SayIt Developer ID packaging).
+        let probeAccount = "voxt.secure-storage.capability-probe"
+        var addQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: serviceName,
+            kSecAttrAccount as String: probeAccount,
+            kSecValueData as String: Data("probe".utf8),
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+            kSecUseDataProtectionKeychain as String: kCFBooleanTrue as Any
+        ]
+        let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
+        if addStatus == errSecSuccess || addStatus == errSecDuplicateItem {
+            var deleteQuery = addQuery
+            deleteQuery.removeValue(forKey: kSecValueData as String)
+            deleteQuery.removeValue(forKey: kSecAttrAccessible as String)
+            _ = SecItemDelete(deleteQuery as CFDictionary)
+            return .dataProtection
+        }
+        if addStatus == errSecMissingEntitlement {
+            VoxtLog.securityWarning(
+                "Data Protection Keychain unavailable (missing entitlement); using login keychain."
+            )
+            return .login
+        }
+        // Any other failure: still try DP first at call sites, but prefer login
+        // so credential saves remain usable on unsandboxed builds.
+        VoxtLog.securityWarning(
+            "Data Protection Keychain probe failed (status=\(addStatus)); preferring login keychain."
+        )
+        return .login
+    }
+
+    nonisolated private static func store(for role: KeychainRole) -> KeychainStore {
+        switch role {
+        case .authoritative:
+            return preferredStore
+        case .alternate:
+            // Always keep the non-preferred store as alternate so older items
+            // can still be found after backend preference flips.
+            return preferredStore == .dataProtection ? .login : .dataProtection
+        }
+    }
+
+    nonisolated private static func query(
+        for role: KeychainRole,
+        account: String,
+        interactionAllowed: Bool
+    ) -> [String: Any] {
+        query(for: store(for: role), account: account, interactionAllowed: interactionAllowed)
+    }
+
+    nonisolated private static func query(
+        for store: KeychainStore,
+        account: String,
         interactionAllowed: Bool
     ) -> [String: Any] {
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: serviceName,
             kSecAttrAccount as String: account,
-            // An unqualified macOS Keychain query also matches Data Protection
-            // items. Explicitly select the legacy store so cleanup cannot delete
-            // the protected item that was just written and leave only the cache.
-            kSecUseDataProtectionKeychain as String: kCFBooleanFalse as Any,
+            kSecUseDataProtectionKeychain as String: (
+                store.usesDataProtectionKeychain ? kCFBooleanTrue : kCFBooleanFalse
+            ) as Any
         ]
         if !interactionAllowed {
             let context = LAContext()
@@ -615,5 +541,159 @@ enum VoxtSecureStorage {
             query[kSecUseAuthenticationContext as String] = context
         }
         return query
+    }
+
+    nonisolated private static func readString(from role: KeychainRole, account: String) -> String? {
+        (try? readStringStrict(from: role, account: account)) ?? nil
+    }
+
+    nonisolated private static func readStringStrict(
+        from role: KeychainRole,
+        account: String
+    ) throws -> String? {
+        var query = query(for: role, account: account, interactionAllowed: true)
+        query[kSecReturnData as String] = kCFBooleanTrue
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        switch status {
+        case errSecSuccess:
+            guard let data = item as? Data,
+                  let value = String(data: data, encoding: .utf8)
+            else {
+                throw StorageError.invalidUTF8
+            }
+            return value
+        case errSecItemNotFound:
+            return nil
+        case errSecMissingEntitlement:
+            // Mark DP unavailable for subsequent calls.
+            if store(for: role) == .dataProtection {
+                stateLock.lock()
+                preferredStoreOverride = .login
+                stateLock.unlock()
+            }
+            throw StorageError.unexpectedStatus(status)
+        default:
+            throw StorageError.unexpectedStatus(status)
+        }
+    }
+
+    nonisolated private static func writeString(
+        _ value: String,
+        to role: KeychainRole,
+        account: String
+    ) throws {
+        let query = query(for: role, account: account, interactionAllowed: true)
+        let attributes: [String: Any] = [
+            kSecValueData as String: Data(value.utf8)
+        ]
+        let updateStatus = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+        switch updateStatus {
+        case errSecSuccess:
+            return
+        case errSecItemNotFound:
+            break
+        case errSecMissingEntitlement:
+            if store(for: role) == .dataProtection {
+                stateLock.lock()
+                preferredStoreOverride = .login
+                stateLock.unlock()
+                // Retry once against login keychain.
+                try writeString(value, to: role, account: account)
+                return
+            }
+            throw StorageError.unexpectedStatus(updateStatus)
+        default:
+            throw StorageError.unexpectedStatus(updateStatus)
+        }
+
+        var item = query
+        item[kSecValueData as String] = Data(value.utf8)
+        item[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+        let addStatus = SecItemAdd(item as CFDictionary, nil)
+        switch addStatus {
+        case errSecSuccess:
+            return
+        case errSecDuplicateItem:
+            let retryStatus = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+            guard retryStatus == errSecSuccess else {
+                throw StorageError.unexpectedStatus(retryStatus)
+            }
+        case errSecMissingEntitlement:
+            if store(for: role) == .dataProtection {
+                stateLock.lock()
+                preferredStoreOverride = .login
+                stateLock.unlock()
+                try writeString(value, to: role, account: account)
+                return
+            }
+            throw StorageError.unexpectedStatus(addStatus)
+        default:
+            throw StorageError.unexpectedStatus(addStatus)
+        }
+    }
+
+    nonisolated private static func hasValue(in role: KeychainRole, account: String) -> Bool {
+        var lookup = query(for: role, account: account, interactionAllowed: false)
+        lookup[kSecMatchLimit as String] = kSecMatchLimitOne
+        let status = SecItemCopyMatching(lookup as CFDictionary, nil)
+        switch status {
+        case errSecSuccess:
+            return true
+        case errSecItemNotFound, errSecInteractionNotAllowed, errSecAuthFailed:
+            return false
+        case errSecMissingEntitlement:
+            if store(for: role) == .dataProtection {
+                stateLock.lock()
+                preferredStoreOverride = .login
+                stateLock.unlock()
+            }
+            return false
+        default:
+            VoxtLog.securityWarning(
+                "Keychain presence check failed. role=\(role) account=\(account) status=\(status)"
+            )
+            return false
+        }
+    }
+
+    @discardableResult
+    nonisolated private static func deleteValue(
+        in role: KeychainRole,
+        for account: String,
+        interactionAllowed: Bool
+    ) -> Bool {
+        let status = SecItemDelete(
+            query(for: role, account: account, interactionAllowed: interactionAllowed) as CFDictionary
+        )
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            // Missing entitlement on the alternate store is not fatal.
+            if status == errSecMissingEntitlement {
+                return true
+            }
+            VoxtLog.securityWarning(
+                "Keychain delete failed. role=\(role) account=\(account) status=\(status)"
+            )
+            return false
+        }
+        return true
+    }
+
+    // MARK: - Compatibility wrappers used by tests / call sites
+
+    nonisolated private static func protectedQuery(for account: String) -> [String: Any] {
+        // Historical name: "protected" means the Data Protection query shape
+        // when available; otherwise the authoritative store query.
+        query(for: .authoritative, account: account, interactionAllowed: true)
+    }
+
+    /// Always targets the login keychain (non-Data-Protection). Used by tests and
+    /// cleanup paths that must not touch Data Protection items.
+    nonisolated static func legacyQuery(
+        for account: String,
+        interactionAllowed: Bool
+    ) -> [String: Any] {
+        query(for: .login, account: account, interactionAllowed: interactionAllowed)
     }
 }
