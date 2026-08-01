@@ -34,8 +34,8 @@ final class AppUpdateManager: NSObject, ObservableObject, SPUStandardUserDriverD
         return controller
     }
 
-    static let stableFeedURLString = "https://voxt.actnow.dev/updates/stable/appcast.xml"
-    static let betaFeedURLString = "https://voxt.actnow.dev/updates/beta/appcast.xml"
+    static let stableFeedURLString = "https://github.com/yee94/SayIt"
+    static let betaFeedURLString = "https://github.com/yee94/SayIt"
     static let betaFeedEnableEnvKey = "VOXT_ENABLE_BETA_UPDATES"
     private let defaults: UserDefaults
     private let interactiveUIPresentationTimeout: Duration = .seconds(4)

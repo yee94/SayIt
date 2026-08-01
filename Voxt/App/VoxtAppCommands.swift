@@ -195,8 +195,8 @@ struct MainWindowNavigationCommands: Commands {
 struct HelpNavigationCommands: Commands {
     @AppStorage(AppPreferenceKey.interfaceLanguage) private var interfaceLanguageRaw = AppInterfaceLanguage.system.rawValue
     let appDelegate: AppDelegate
-    private let projectURL = URL(string: "https://github.com/hehehai/voxt")!
-    private let feedbackURL = URL(string: "https://github.com/hehehai/voxt/issues/new/choose")!
+    private let projectURL = URL(string: "https://github.com/yee94/SayIt")!
+    private let feedbackURL = URL(string: "https://github.com/yee94/SayIt/issues/new/choose")!
     private let authorURL = URL(string: "https://www.hehehai.cn/")!
 
     var body: some Commands {

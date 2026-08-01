@@ -1338,10 +1338,10 @@ jobs:
             version "${VERSION}"
             sha256 "${ZIP_SHA}"
 
-            url "https://github.com/hehehai/voxt/releases/download/v#{version}/Voxt-#{version}-macOS.zip"
+            url "https://github.com/yee94/SayIt/releases/download/v#{version}/Voxt-#{version}-macOS.zip"
             name "Voxt"
             desc "Voice input and translation menu bar app for macOS"
-            homepage "https://github.com/hehehai/voxt"
+            homepage "https://github.com/yee94/SayIt"
 
             livecheck do
               url :url

@@ -59,7 +59,7 @@ struct AboutSettingsView: View {
         return (1...98).contains(releaseBuildSuffix)
     }
 
-    private let feedbackURL = URL(string: "https://github.com/hehehai/voxt/issues/new/choose")!
+    private let feedbackURL = URL(string: "https://github.com/yee94/SayIt/issues/new/choose")!
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -110,8 +110,8 @@ struct AboutSettingsView: View {
             HStack(alignment: .top, spacing: 14) {
                 AboutInfoCard(title: localizedKey("Project")) {
                     AboutExternalLink(
-                        title: "github.com/hehehai/voxt",
-                        destination: URL(string: "https://github.com/hehehai/voxt")!
+                        title: "github.com/yee94/SayIt",
+                        destination: URL(string: "https://github.com/yee94/SayIt")!
                     )
                     AboutExternalLink(title: localized("Feedback"), destination: feedbackURL)
                 }
@@ -119,6 +119,7 @@ struct AboutSettingsView: View {
 
                 AboutInfoCard(title: localizedKey("Author")) {
                     AboutExternalLink(title: "hehehai", destination: URL(string: "https://www.hehehai.cn/")!)
+                    AboutExternalLink(title: "yee94", destination: URL(string: "https://github.com/yee94")!)
                 }
                 .settingsNavigationAnchor(.aboutAuthor)
             }

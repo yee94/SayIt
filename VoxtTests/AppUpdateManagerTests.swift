@@ -13,7 +13,7 @@ final class AppUpdateManagerTests: XCTestCase {
             environment: [:]
         )
 
-        XCTAssertTrue(url.hasPrefix("https://voxt.actnow.dev/updates/stable/appcast.xml"))
+        XCTAssertTrue(url.hasPrefix("https://github.com/yee94/SayIt"))
         XCTAssertEqual(URLComponents(string: url)?.queryItems?.first(where: { $0.name == "lang" })?.value, "en")
     }
 
@@ -25,7 +25,7 @@ final class AppUpdateManagerTests: XCTestCase {
             environment: [:]
         )
 
-        XCTAssertTrue(url.hasPrefix("https://voxt.actnow.dev/updates/beta/appcast.xml"))
+        XCTAssertTrue(url.hasPrefix("https://github.com/yee94/SayIt"))
         XCTAssertEqual(URLComponents(string: url)?.queryItems?.first(where: { $0.name == "lang" })?.value, "zh-Hans")
     }
 
@@ -37,7 +37,7 @@ final class AppUpdateManagerTests: XCTestCase {
             environment: ["VOXT_UPDATE_CHANNEL": "stable"]
         )
 
-        XCTAssertTrue(url.hasPrefix("https://voxt.actnow.dev/updates/stable/appcast.xml"))
+        XCTAssertTrue(url.hasPrefix("https://github.com/yee94/SayIt"))
         XCTAssertEqual(URLComponents(string: url)?.queryItems?.first(where: { $0.name == "lang" })?.value, "ja")
     }
 
@@ -52,7 +52,7 @@ final class AppUpdateManagerTests: XCTestCase {
             ]
         )
 
-        XCTAssertTrue(url.hasPrefix("https://voxt.actnow.dev/updates/beta/appcast.xml"))
+        XCTAssertTrue(url.hasPrefix("https://github.com/yee94/SayIt"))
         XCTAssertEqual(URLComponents(string: url)?.queryItems?.first(where: { $0.name == "lang" })?.value, "en")
     }
 
@@ -75,7 +75,7 @@ final class AppUpdateManagerTests: XCTestCase {
     @MainActor
     func testLocalizedFeedURLStringUsesInterfaceLanguageQueryParameter() {
         let url = AppUpdateManager.localizedFeedURLString(
-            baseURLString: "https://voxt.actnow.dev/updates/stable/appcast.xml",
+            baseURLString: "https://github.com/yee94/SayIt",
             interfaceLanguage: .chineseSimplified
         )
 
@@ -86,7 +86,7 @@ final class AppUpdateManagerTests: XCTestCase {
     @MainActor
     func testLocalizedFeedURLStringPreservesExistingQueryItems() {
         let url = AppUpdateManager.localizedFeedURLString(
-            baseURLString: "https://voxt.actnow.dev/updates/stable/appcast.xml?channel=stable",
+            baseURLString: "https://github.com/yee94/SayIt?channel=stable",
             interfaceLanguage: .japanese
         )
 

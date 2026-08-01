@@ -57,9 +57,9 @@ struct SettingsView: View {
     @State private var isHomeNotificationDialogPresented = false
     @StateObject private var notificationStore = VoxtNotificationStore()
 
-    private static let officialWebsiteURL = URL(string: "https://voxt.actnow.dev")!
-    private static let changelogURL = URL(string: "https://voxt.actnow.dev/changelog")!
-    private static let feedbackURL = URL(string: "https://github.com/hehehai/voxt/issues/new/choose")!
+    private static let officialWebsiteURL = URL(string: "https://github.com/yee94/SayIt")!
+    private static let changelogURL = URL(string: "https://github.com/yee94/SayIt")!
+    private static let feedbackURL = URL(string: "https://github.com/yee94/SayIt/issues/new/choose")!
     private static let feedbackWeChatQRCodeURL = URL(string: "https://storage.actnow.dev/common/voxt/gw-wx.png")!
     private static let scrollBottomAnchorID = "settings-scroll-bottom-anchor"
 

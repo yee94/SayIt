@@ -78,7 +78,7 @@ extension AppDelegate {
     }
 
     private var feedbackURL: URL {
-        URL(string: "https://github.com/hehehai/voxt/issues/new/choose")!
+        URL(string: "https://github.com/yee94/SayIt/issues/new/choose")!
     }
 
     func buildMenu() {

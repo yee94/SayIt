@@ -32,7 +32,7 @@ final class VoxtNotificationStore: ObservableObject {
     private static let viewedNotificationIDsKey = "VoxtNotificationStore.viewedNotificationIDs"
 
     init(
-        endpointURL: URL = URL(string: "https://voxt.actnow.dev/api/app/notifications")!,
+        endpointURL: URL = URL(string: "https://github.com/yee94/SayIt")!,
         sessionProvider: @escaping @MainActor () -> URLSession = { VoxtNetworkSession.active },
         userDefaults: UserDefaults = .standard,
         cacheURL: URL? = nil,

@@ -45,7 +45,7 @@
     <key>SUEnableInstallerLauncherService</key>
     <true/>
 	<key>SUFeedURL</key>
-	<string>https://voxt.actnow.dev/updates/stable/appcast.xml</string>
+	<string>https://github.com/yee94/SayIt</string>
     <key>SUPublicEDKey</key>
     <string>iMt1voRdgfUUpKxdY7DliGLaOl17gJFB8Jhlo5ox2eE=</string>
 </dict>
