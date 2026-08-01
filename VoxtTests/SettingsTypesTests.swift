@@ -376,9 +376,13 @@ final class SettingsTypesTests: XCTestCase {
     }
 
     func testVisibleTabsHideAppEnhancementWhenFeatureDisabled() {
+        // Primary sidebar no longer surfaces App Branch or Feature Configuration;
+        // those live under settingsTabs / FeatureSettingsTab instead.
         XCTAssertFalse(SettingsTab.visibleTabs(appEnhancementEnabled: false).contains(.appEnhancement))
         XCTAssertFalse(SettingsTab.visibleTabs(appEnhancementEnabled: true).contains(.appEnhancement))
-        XCTAssertTrue(SettingsTab.visibleTabs(appEnhancementEnabled: true).contains(.feature))
+        XCTAssertFalse(SettingsTab.visibleTabs(appEnhancementEnabled: true).contains(.feature))
+        XCTAssertTrue(SettingsTab.settingsTabs.contains(.feature))
+        XCTAssertEqual(SettingsTab.visibleTabs(appEnhancementEnabled: true), [.report, .dictionary, .history])
     }
 
     func testFeatureVisibleTabsHideAppEnhancementWhenDisabled() {

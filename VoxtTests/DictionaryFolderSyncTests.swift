@@ -42,7 +42,7 @@ final class DictionaryFolderSyncTests: XCTestCase {
         )
         let b = DictionarySyncSnapshotEntry(
             id: "b",
-            term: "voxt",
+            term: "sayit",
             weight: 7,
             source: "manual",
             createdAt: "2026-01-02T00:00:00Z"

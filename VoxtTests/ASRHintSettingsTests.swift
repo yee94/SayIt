@@ -116,7 +116,7 @@ final class ASRHintSettingsTests: XCTestCase {
     func testResolveAliyunBuildsHotwordsFromContextAndDictionaryTerms() {
         let payload = ASRHintResolver.resolve(
             target: .aliyunBailianASR,
-            settings: ASRHintSettings(contextualPhrasesText: "SayIt\nFireRed\nVoxt"),
+            settings: ASRHintSettings(contextualPhrasesText: "SayIt\nFireRed\nSayIt"),
             userLanguageCodes: ["zh-Hans"],
             dictionaryTerms: "Codex\nFireRed"
         )
@@ -128,7 +128,7 @@ final class ASRHintSettingsTests: XCTestCase {
     func testResolveStepFunBuildsPromptFromTerms() {
         let payload = ASRHintResolver.resolve(
             target: .stepFunASR,
-            settings: ASRHintSettings(contextualPhrasesText: "SayIt\nFireRed\nVoxt"),
+            settings: ASRHintSettings(contextualPhrasesText: "SayIt\nFireRed\nSayIt"),
             userLanguageCodes: ["zh-Hans"],
             dictionaryTerms: "Codex\nFireRed"
         )
@@ -297,7 +297,7 @@ final class ASRHintSettingsTests: XCTestCase {
     func testResolveSherpaOnnxUsesLanguageAndMergedTerms() {
         let payload = ASRHintResolver.resolve(
             target: .sherpaOnnx,
-            settings: ASRHintSettings(contextualPhrasesText: "SayIt\nFireRed\nVoxt"),
+            settings: ASRHintSettings(contextualPhrasesText: "SayIt\nFireRed\nSayIt"),
             userLanguageCodes: ["zh-Hans"],
             dictionaryTerms: "Codex\nFireRed"
         )

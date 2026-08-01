@@ -6,7 +6,7 @@ import XCTest
 
 final class HistoryCorrectionPresentationTests: XCTestCase {
     func testCorrectedTextReturnsFinalVisibleText() {
-        let text = "我们创建了新的APP，名字叫Voxt，支持语音转文本。"
+        let text = "我们创建了新的APP，名字叫SayIt，支持语音转文本。"
         let corrected = HistoryCorrectionPresentation.correctedText(
             for: text,
             snapshots: [
@@ -14,7 +14,7 @@ final class HistoryCorrectionPresentationTests: XCTestCase {
                     originalText: "Waxed",
                     correctedText: "SayIt",
                     finalLocation: (text as NSString).range(of: "SayIt").location,
-                    finalLength: 4
+                    finalLength: 5
                 )
             ]
         )
@@ -23,7 +23,7 @@ final class HistoryCorrectionPresentationTests: XCTestCase {
     }
 
     func testSegmentsInlineSingleCorrection() {
-        let text = "我们创建了新的APP，名字叫Voxt，支持语音转文本。"
+        let text = "我们创建了新的APP，名字叫SayIt，支持语音转文本。"
         let segments = HistoryCorrectionPresentation.segments(
             for: text,
             snapshots: [
@@ -31,7 +31,7 @@ final class HistoryCorrectionPresentationTests: XCTestCase {
                     originalText: "Waxed",
                     correctedText: "SayIt",
                     finalLocation: (text as NSString).range(of: "SayIt").location,
-                    finalLength: 4
+                    finalLength: 5
                 )
             ]
         )
@@ -63,7 +63,7 @@ final class HistoryCorrectionPresentationTests: XCTestCase {
                     originalText: "Waxed",
                     correctedText: "SayIt",
                     finalLocation: nsText.range(of: "SayIt").location,
-                    finalLength: 4
+                    finalLength: 5
                 )
             ]
         )
@@ -89,7 +89,7 @@ final class HistoryCorrectionPresentationTests: XCTestCase {
                     originalText: "Waxed",
                     correctedText: "SayIt",
                     finalLocation: 99,
-                    finalLength: 4
+                    finalLength: 5
                 )
             ]
         )

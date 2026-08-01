@@ -10,7 +10,7 @@ final class EntryValidationSupportTests: XCTestCase {
 
         XCTAssertNoThrow(
             try DictionaryEntryInputPreparer.prepare(
-                term: "voxt",
+                term: "sayit",
                 replacementTerms: [],
                 groupID: nil,
                 entries: [existingEntry]
@@ -24,12 +24,12 @@ final class EntryValidationSupportTests: XCTestCase {
         XCTAssertThrowsError(
             try DictionaryEntryInputPreparer.prepare(
                 term: "Voice Input",
-                replacementTerms: ["voxt"],
+                replacementTerms: ["sayit"],
                 groupID: nil,
                 entries: [existingEntry]
             )
         ) { error in
-            guard case DictionaryStoreError.duplicateReplacementTerm("voxt") = error else {
+            guard case DictionaryStoreError.duplicateReplacementTerm("sayit") = error else {
                 return XCTFail("Expected duplicateReplacementTerm, got \(error)")
             }
         }
