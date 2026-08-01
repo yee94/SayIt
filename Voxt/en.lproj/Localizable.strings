@@ -201,7 +201,7 @@
 "Tap: Tap transcription hotkey to start and tap transcription hotkey again to stop. Translation hotkey starts translation sessions." = "Tap: Tap transcription hotkey to start and tap transcription hotkey again to stop. Translation hotkey starts translation sessions.";
 "Selected text shortcut behavior: If text is selected in a focused input, pressing the translation shortcut translates and replaces the selection directly. Tap and long press behave the same." = "Selected text shortcut behavior: If text is selected in a focused input, pressing the translation shortcut translates and replaces the selection directly. Tap and long press behave the same.";
 "Listening..." = "Listening...";
-"Connecting to microphone…" = "Connecting to microphone…";
+"Connecting to microphone…" = "Connecting…";
 "Reset shortcut" = "Reset shortcut";
 "Text Enhancement" = "Text Enhancement";
 "Translation Custom LLM Model" = "Translation Custom LLM Model";
@@ -761,6 +761,8 @@
 "Enable Dictionary" = "Enable Dictionary";
 "Enable Dictionary Recognition" = "Enable Dictionary Recognition";
 "Enable Automatic Learning" = "Enable Automatic Learning";
+"🎉 Learned “%@”" = "🎉 Learned “%@”";
+"Dictionary learning term separator" = ", ";
 "Allow High-Confidence Auto Correction" = "Allow High-Confidence Auto Correction";
 "Dictionary Advanced Settings" = "Dictionary Advanced Settings";
 "Dictionary recognition injects matched terms into prompts and can correct high-confidence near matches before output." = "Dictionary recognition injects matched terms into prompts and can correct high-confidence near matches before output.";

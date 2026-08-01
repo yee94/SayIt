@@ -50,6 +50,7 @@ struct WaveformView: View {
     var shouldAnimate: Bool
     var transcribedText: String
     var statusMessage: String = ""
+    var statusPresentation: OverlayStatusPresentation = .standard
     var isEnhancing: Bool = false
     var isRequesting: Bool = false
     var isFinalizingTranscription: Bool = false
@@ -101,20 +102,29 @@ struct WaveformView: View {
     private var displayText: String {
         let message = statusMessage.trimmingCharacters(in: .whitespacesAndNewlines)
         if !message.isEmpty { return message }
-        if isConnectingMicrophone {
-            return AppLocalization.localizedString("Connecting to microphone…")
-        }
+        // Connecting mic stays in the waveform slot so the compact bubble
+        // never expands for a second text row.
         guard isAnswerMode || realtimeTextDisplayEnabled else { return "" }
         return sanitizedDisplayText(transcribedText)
     }
 
+    private var connectingMicrophoneText: String {
+        AppLocalization.localizedString("Connecting to microphone…")
+    }
+
     private var hasText: Bool { !displayText.isEmpty }
     private var isAnswerMode: Bool { displayMode == .answer }
+    private var isDictionaryLearningFeedback: Bool { statusPresentation == .dictionaryLearning }
     private var isCompact: Bool { !hasText && !isAnswerMode }
     private var cornerRadius: CGFloat { CGFloat(min(max(overlayCardCornerRadius, 0), 40)) }
     private var cardOpacity: Double { Double(min(max(overlayCardOpacity, 0), 100)) / 100.0 }
     private var showsLoadingSpinner: Bool {
-        !isCompleting && (isEnhancing || isRequesting || isFinalizingTranscription || isConnectingMicrophone)
+        // Keep connecting mic size-stable: replace waveform bars with text
+        // instead of entering the processing-bars + subtitle layout.
+        !isCompleting && (isEnhancing || isRequesting || isFinalizingTranscription)
+    }
+    private var showsConnectingMicrophoneStatus: Bool {
+        isConnectingMicrophone && !isRecording && !showsLoadingSpinner && !isDictionaryLearningFeedback
     }
     private var showsInitializationIcon: Bool { isModelInitializing && !showsLoadingSpinner }
     private var showsSessionTranslationLanguagePill: Bool {
@@ -162,15 +172,27 @@ struct WaveformView: View {
         return RewriteAnswerPayload(title: answerTitle, content: answerContent)
     }
 
+    private var presentationScale: CGFloat {
+        guard !appeared else { return 1 }
+        return isDictionaryLearningFeedback ? 0.96 : 0.5
+    }
+
+    private var presentationAnimation: Animation {
+        if isDictionaryLearningFeedback {
+            return .easeOut(duration: 0.16)
+        }
+        return .spring(response: 0.35, dampingFraction: 0.5, blendDuration: 0.1)
+    }
+
     var body: some View {
         let _ = interfaceLanguageRaw
         VStack(alignment: .leading, spacing: 10) {
             cardView
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-        .scaleEffect(appeared ? 1.0 : 0.5, anchor: .bottom)
+        .scaleEffect(presentationScale, anchor: .bottom)
         .opacity(appeared ? 1.0 : 0.0)
-        .animation(.spring(response: 0.35, dampingFraction: 0.5, blendDuration: 0.1), value: appeared)
+        .animation(presentationAnimation, value: appeared)
         .onHover { hovering in
             guard allowsSessionTranslationLanguageSwitching else { return }
             onSessionTranslationLanguageHoverChanged(hovering)
@@ -210,13 +232,16 @@ struct WaveformView: View {
             if isAnswerMode {
                 answerCard
                     .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
+            } else if isDictionaryLearningFeedback {
+                dictionaryLearningCard
+                    .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
             } else {
                 compactCard
                     .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
             }
         }
-        .padding(.horizontal, isAnswerMode ? 18 : (isCompact ? 14 : 20))
-        .padding(.vertical, isAnswerMode ? 16 : (isCompact ? 10 : 12))
+        .padding(.horizontal, isAnswerMode ? 18 : (isDictionaryLearningFeedback || isCompact ? 14 : 20))
+        .padding(.vertical, isAnswerMode ? 16 : (isDictionaryLearningFeedback || isCompact ? 10 : 12))
         .background(cardBackground)
         .compositingGroup()
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
@@ -257,9 +282,26 @@ struct WaveformView: View {
         }
     }
 
+    private var dictionaryLearningCard: some View {
+        Text(displayText)
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(.white.opacity(0.88))
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .frame(maxWidth: .infinity, minHeight: 18, alignment: .center)
+    }
+
     @ViewBuilder
     private var waveformSlot: some View {
-        if showsLoadingSpinner {
+        if showsConnectingMicrophoneStatus {
+            Text(connectingMicrophoneText)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.white.opacity(0.88))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(width: waveformSlotWidth, height: barAreaHeight, alignment: .center)
+                .transition(.opacity)
+        } else if showsLoadingSpinner {
             processingBars
                 .frame(width: waveformVisualWidth, height: barAreaHeight, alignment: .center)
                 .frame(width: waveformSlotWidth, height: barAreaHeight, alignment: .center)

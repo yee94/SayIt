@@ -17,6 +17,9 @@ jobs:
   build-sign-notarize:
     name: Build, Sign, Notarize
     runs-on: macos-26
+    outputs:
+      version: ${{ steps.release_metadata.outputs.version }}
+      tag: ${{ steps.release_metadata.outputs.tag }}
     env:
       DEVELOPER_ID_APP_IDENTITY: "Developer ID Application: yee wang (6W97S9B7CZ)"
       APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -28,6 +31,18 @@ jobs:
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v5
+
+      - name: Resolve release metadata
+        id: release_metadata
+        run: |
+          set -euo pipefail
+          VERSION="$(awk -F' = ' '/^[[:space:]]*MARKETING_VERSION = / { value=$2; sub(/;.*/, "", value); print value; exit }' Voxt.xcodeproj/project.pbxproj)"
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Invalid MARKETING_VERSION: ${VERSION:-<missing>}"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Validate SayIt signing secrets
         run: |
@@ -123,7 +138,6 @@ jobs:
             -onlyUsePackageVersionsFromResolvedFile \
             -skipPackagePluginValidation \
             build \
-            CURRENT_PROJECT_VERSION="${GITHUB_RUN_NUMBER}" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY=""
@@ -179,7 +193,8 @@ jobs:
         run: |
           set -euo pipefail
           APP_PATH="build/DerivedData/Build/Products/Release/Voxt.app"
-          ZIP_PATH="build/Voxt-v2-${GITHUB_SHA::12}.zip"
+          VERSION="${{ steps.release_metadata.outputs.version }}"
+          ZIP_PATH="build/Voxt-${VERSION}-macOS.zip"
           ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ZIP_PATH"
           xcrun notarytool submit "$ZIP_PATH" \
             --key "$NOTARY_KEY_PATH" \
@@ -196,7 +211,10 @@ jobs:
         run: |
           set -euo pipefail
           APP_PATH="build/DerivedData/Build/Products/Release/Voxt.app"
-          PAYLOAD_PATH="build/SayIt-v2-${GITHUB_SHA::12}.app.tar.gz"
+          VERSION="${{ steps.release_metadata.outputs.version }}"
+          TAG="${{ steps.release_metadata.outputs.tag }}"
+          PAYLOAD_NAME="SayIt-${VERSION}-universal.app.tar.gz"
+          PAYLOAD_PATH="build/${PAYLOAD_NAME}"
           KEY_PATH="$RUNNER_TEMP/sayit-tauri.key"
           STAGING_PATH="$RUNNER_TEMP/sayit-migration"
           rm -rf "$STAGING_PATH"
@@ -211,14 +229,66 @@ jobs:
             "$PAYLOAD_PATH"
           test -s "$PAYLOAD_PATH.sig"
           shasum -a 256 "$PAYLOAD_PATH" > "$PAYLOAD_PATH.sha256"
+          SIGNATURE="$(base64 < "$PAYLOAD_PATH.sig" | tr -d '\n')"
+          PAYLOAD_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${PAYLOAD_NAME}"
+          jq -n \
+            --arg version "$VERSION" \
+            --arg signature "$SIGNATURE" \
+            --arg url "$PAYLOAD_URL" \
+            '{
+              version: $version,
+              notes: "SayIt has migrated to Voxt.",
+              pub_date: (now | todate),
+              platforms: {
+                "darwin-aarch64": { signature: $signature, url: $url },
+                "darwin-aarch64-app": { signature: $signature, url: $url },
+                "darwin-x86_64": { signature: $signature, url: $url },
+                "darwin-x86_64-app": { signature: $signature, url: $url }
+              }
+            }' > build/latest.json
 
       - uses: actions/upload-artifact@v4
         with:
           name: sayit-v2-signed-migration-${{ github.sha }}
           if-no-files-found: error
           path: |
-            build/Voxt-v2-*.zip
-            build/SayIt-v2-*.app.tar.gz
-            build/SayIt-v2-*.app.tar.gz.sig
-            build/SayIt-v2-*.app.tar.gz.sha256
+            build/Voxt-*-macOS.zip
+            build/SayIt-*-universal.app.tar.gz
+            build/SayIt-*-universal.app.tar.gz.sig
+            build/SayIt-*-universal.app.tar.gz.sha256
+            build/latest.json
             build/codesign.txt
+
+  publish-release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs: build-sign-notarize
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.build-sign-notarize.outputs.tag }}
+      VERSION: ${{ needs.build-sign-notarize.outputs.version }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: sayit-v2-signed-migration-${{ github.sha }}
+          path: build
+
+      - name: Create release and publish updater metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ZIP_PATH="build/Voxt-${VERSION}-macOS.zip"
+          PAYLOAD_PATH="build/SayIt-${VERSION}-universal.app.tar.gz"
+          if gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$ZIP_PATH" "$PAYLOAD_PATH" "$PAYLOAD_PATH.sig" "$PAYLOAD_PATH.sha256" build/latest.json \
+              --clobber \
+              -R "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" "$ZIP_PATH" "$PAYLOAD_PATH" "$PAYLOAD_PATH.sig" "$PAYLOAD_PATH.sha256" build/latest.json \
+              --target "$GITHUB_SHA" \
+              --title "Voxt $TAG" \
+              --notes "SayIt has migrated to Voxt." \
+              -R "$GITHUB_REPOSITORY"
+          fi

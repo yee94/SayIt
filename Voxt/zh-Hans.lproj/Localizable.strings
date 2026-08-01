@@ -201,7 +201,7 @@
 "Tap: Tap transcription hotkey to start and tap transcription hotkey again to stop. Translation hotkey starts translation sessions." = "点按：点按一次转录快捷键开始，再点按一次结束。翻译快捷键用于开始翻译会话。";
 "Selected text shortcut behavior: If text is selected in a focused input, pressing the translation shortcut translates and replaces the selection directly. Tap and long press behave the same." = "选中文本快捷行为：当聚焦输入框中有选中文本时，按下翻译快捷键会直接翻译并替换选中内容。点按和长按行为一致。";
 "Listening..." = "正在监听...";
-"Connecting to microphone…" = "正在连接麦克风…";
+"Connecting to microphone…" = "连麦中";
 "Reset shortcut" = "重置快捷键";
 "Text Enhancement" = "文本增强";
 "Translation Custom LLM Model" = "翻译自定义 LLM 模型";
@@ -760,6 +760,8 @@
 "Automatic" = "自动添加";
 "Enable Dictionary Recognition" = "启用词典识别";
 "Enable Automatic Learning" = "启用自动学习";
+"🎉 Learned “%@”" = "🎉 学习到「%@」";
+"Dictionary learning term separator" = "、";
 "Allow High-Confidence Auto Correction" = "允许高置信自动纠偏";
 "Dictionary recognition injects matched terms into prompts and can correct high-confidence near matches before output." = "词典识别会把命中的词汇注入提示词，并可在输出前对高置信近似词进行自动纠偏。";
 "No dictionary terms yet." = "还没有词典词汇。";

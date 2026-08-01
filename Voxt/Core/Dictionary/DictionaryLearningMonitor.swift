@@ -108,12 +108,9 @@ enum AutomaticDictionaryLearningMonitor {
     }
 
     static let startupDelayNanoseconds: UInt64 = 900_000_000
-    static let pollIntervalNanoseconds: UInt64 = 1_000_000_000
-    static let initialSnapshotRetryCount = 3
-    static let initialSnapshotRetryNanoseconds: UInt64 = 500_000_000
+    static let pollIntervalNanoseconds: UInt64 = 500_000_000
     static let observationWindowSeconds: TimeInterval = 30
-    static let idleSettleSeconds: TimeInterval = 4
-    static let maxConsecutiveMissingSnapshotsBeforeStop = 3
+    static let idleSettleSeconds: TimeInterval = 1.2
     static let maxConsecutiveMissingSnapshotsAfterObservedChange = 3
     static let maximumEditRatio = 0.8
     private static let latinOrNumberRegex = try! NSRegularExpression(
@@ -591,13 +588,12 @@ enum AutomaticDictionaryLearningMonitor {
     ) -> AutomaticDictionaryLearningObservationDecision {
         state.consecutiveMissingSnapshots += 1
 
-        if !state.didObserveChange,
-           state.consecutiveMissingSnapshots >= maxConsecutiveMissingSnapshotsBeforeStop {
-            return .stopWithoutAnalysis
+        // Before any user edit, keep polling until the outer observation deadline.
+        if !state.didObserveChange {
+            return .continueObserving
         }
 
-        if state.didObserveChange,
-           state.consecutiveMissingSnapshots >= maxConsecutiveMissingSnapshotsAfterObservedChange,
+        if state.consecutiveMissingSnapshots >= maxConsecutiveMissingSnapshotsAfterObservedChange,
            let lastChangeElapsedSeconds = state.lastChangeElapsedSeconds,
            lastChangeElapsedSeconds >= idleSettleSeconds {
             if shouldContinueObservingForPotentialReplacement(
@@ -641,13 +637,14 @@ enum AutomaticDictionaryLearningMonitor {
         return .continueObserving
     }
 
+    /// Whether a focused observation should terminate now (SayIt: settle after 1.2s idle → analyze immediately).
     static func shouldFinalizeWhileFocused(
         decision: AutomaticDictionaryLearningObservationDecision
     ) -> Bool {
         switch decision {
-        case .continueObserving, .settleForAnalysis:
+        case .continueObserving:
             return false
-        case .stopWithoutAnalysis:
+        case .settleForAnalysis, .stopWithoutAnalysis:
             return true
         }
     }

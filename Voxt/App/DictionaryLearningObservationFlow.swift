@@ -84,25 +84,24 @@ extension AppDelegate {
             VoxtLog.dictionary(
                 "Automatic dictionary learning observation started. expectedBundleID=\(expectedBundleID ?? "nil"), expectedPID=\(expectedProcessIdentifier.map(String.init) ?? "nil"), historyEntryID=\(historyEntryID?.uuidString ?? "nil")"
             )
-            guard let baselineSnapshot = try await automaticDictionaryLearningBaselineSnapshot(
-                expectedBundleID: expectedBundleID,
-                expectedProcessIdentifier: expectedProcessIdentifier
-            ) else {
-                VoxtLog.dictionary("Automatic dictionary learning stopped: baseline snapshot unavailable.")
-                return
-            }
+
+            try await Task.sleep(
+                nanoseconds: AutomaticDictionaryLearningMonitor.startupDelayNanoseconds
+            )
+            try Task.checkCancellation()
+
+            // Use injected text as baseline so observation can start even when early AX reads fail.
             let baselineScopedText = AutomaticDictionaryLearningMonitor.observationScopedText(
                 insertedText: insertedText,
-                baselineText: baselineSnapshot.text,
-                currentText: baselineSnapshot.text
+                baselineText: insertedText,
+                currentText: insertedText
             )
             VoxtLog.dictionary(
-                "Automatic dictionary learning baseline captured. chars=\(baselineSnapshot.text.count), scopedChars=\(baselineScopedText.count), role=\(baselineSnapshot.role ?? "unknown"), bundleID=\(baselineSnapshot.bundleIdentifier ?? "nil"), editable=\(baselineSnapshot.isEditable), focused=\(baselineSnapshot.isFocusedTarget), textSource=\(baselineSnapshot.textSource ?? "nil")"
+                "Automatic dictionary learning baseline using injected text. chars=\(insertedText.count), scopedChars=\(baselineScopedText.count). Empty snapshots will keep polling for the full observation window."
             )
 
             let observation = try await automaticDictionaryLearningObservationResult(
                 insertedText: insertedText,
-                baselineSnapshot: baselineSnapshot,
                 baselineScopedText: baselineScopedText,
                 expectedBundleID: expectedBundleID,
                 expectedProcessIdentifier: expectedProcessIdentifier
@@ -142,7 +141,6 @@ extension AppDelegate {
 
     private func automaticDictionaryLearningObservationResult(
         insertedText: String,
-        baselineSnapshot: FocusedInputTextSnapshot,
         baselineScopedText: String,
         expectedBundleID: String?,
         expectedProcessIdentifier: pid_t?
@@ -152,6 +150,7 @@ extension AppDelegate {
         )
         var lastChangeAt: Date?
         var didLogDeferredAnalysis = false
+        var didLogEmptySnapshotWait = false
         let deadline = Date().addingTimeInterval(
             AutomaticDictionaryLearningMonitor.observationWindowSeconds
         )
@@ -170,9 +169,10 @@ extension AppDelegate {
                 expectedBundleID: expectedBundleID,
                 expectedProcessIdentifier: expectedProcessIdentifier
             ) {
+                didLogEmptySnapshotWait = false
                 let scopedText = AutomaticDictionaryLearningMonitor.observationScopedText(
                     insertedText: insertedText,
-                    baselineText: baselineSnapshot.text,
+                    baselineText: insertedText,
                     currentText: snapshot.text
                 )
                 let previousText = state.latestText
@@ -217,10 +217,16 @@ extension AppDelegate {
             } else {
                 switch AutomaticDictionaryLearningMonitor.observeMissingSnapshot(state: &state) {
                 case .continueObserving:
+                    if !state.didObserveChange, !didLogEmptySnapshotWait {
+                        VoxtLog.dictionary(
+                            "Automatic dictionary learning empty snapshot; continuing to poll until observation deadline. consecutiveMissing=\(state.consecutiveMissingSnapshots)"
+                        )
+                        didLogEmptySnapshotWait = true
+                    }
                     continue
                 case .stopWithoutAnalysis:
                     VoxtLog.dictionary(
-                        "Automatic dictionary learning stopped early: focused input missing for \(state.consecutiveMissingSnapshots) consecutive polls before any user edit."
+                        "Automatic dictionary learning stopped early: focused input missing for \(state.consecutiveMissingSnapshots) consecutive polls."
                     )
                     shouldTerminateObservation = true
                 case .settleForAnalysis:
@@ -254,33 +260,6 @@ extension AppDelegate {
             finalText: state.latestText,
             didObserveChange: state.didObserveChange
         )
-    }
-
-    private func automaticDictionaryLearningBaselineSnapshot(
-        expectedBundleID: String?,
-        expectedProcessIdentifier: pid_t?
-    ) async throws -> FocusedInputTextSnapshot? {
-        try await Task.sleep(
-            nanoseconds: AutomaticDictionaryLearningMonitor.startupDelayNanoseconds
-        )
-
-        for attempt in 0..<AutomaticDictionaryLearningMonitor.initialSnapshotRetryCount {
-            try Task.checkCancellation()
-            if let snapshot = await currentFocusedInputTextSnapshotForAutomaticDictionaryLearning(
-                expectedBundleID: expectedBundleID,
-                expectedProcessIdentifier: expectedProcessIdentifier
-            ) {
-                return snapshot
-            }
-            guard attempt + 1 < AutomaticDictionaryLearningMonitor.initialSnapshotRetryCount else {
-                break
-            }
-            try await Task.sleep(
-                nanoseconds: AutomaticDictionaryLearningMonitor.initialSnapshotRetryNanoseconds
-            )
-        }
-
-        return nil
     }
 }
 

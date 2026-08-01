@@ -7,10 +7,31 @@ import ApplicationServices
 import Carbon
 
 private enum FocusedInputLearningAXSupport {
-    private static let messagingTimeout: Float = 0.05
+    /// Lightweight C API ordinary reads (Electron often returns cannotComplete at 0.05s).
+    private static let messagingTimeout: Float = 0.2
+    /// One-shot AXManualAccessibility poke needs a longer messaging window.
+    private static let manualAccessibilityMessagingTimeout: Float = 0.5
     private static let snapshotLock = NSLock()
-    private static let preparedProcessLock = NSLock()
-    private static var preparedProcessIdentifiers = Set<pid_t>()
+    private static let enableAXEnhancedTimeout: TimeInterval = 1.2
+    private static let osascriptReadTimeout: TimeInterval = 1.5
+    private static let manualAccessibilitySettleDelay: TimeInterval = 0.15
+    private static let maxExcerptCharacters = 200
+    private static let enhancedUIEnabledPIDs = NSLockingSet()
+    private static let manualAccessibilityPokedPIDs = NSLockingSet()
+    private static let firstResultLoggedPIDs = NSLockingSet()
+    /// System Events permanently denied for this PID (-10004 / -1743); skip osascript on later polls.
+    private static let osascriptUnavailablePIDs = NSLockingSet()
+    private static let nestedFocusContainerRoles: Set<String> = [
+        "AXWebArea",
+        "AXGroup",
+        "AXScrollArea"
+    ]
+    private static let maxCAPIDiagnosticCharacters = 200
+    /// Safe AppleScript marker prefix — never log field content; only parse these markers.
+    private static let osascriptErrorMarkerPrefix = "AX_READ_ERR:"
+    private static let osascriptEmptyMarker = "AX_READ_EMPTY"
+    private static let osascriptEnableOKMarker = "AX_ENABLE_OK"
+    private static let osascriptEnableErrorMarkerPrefix = "AX_ENABLE_ERR:"
 
     static func snapshot(
         bundleIdentifier: String?,
@@ -26,107 +47,744 @@ private enum FocusedInputLearningAXSupport {
             }
             defer { snapshotLock.unlock() }
 
-            guard AccessibilityPermissionManager.isTrusted() else { return nil }
-            prepareAccessibilityTreeIfNeeded(for: processIdentifier)
-            let focusedElement = focusedElement(for: processIdentifier)
-            let directText = focusedElement.flatMap {
-                stringAttribute(kAXValueAttribute as CFString, for: $0)
-            }?.trimmingCharacters(in: .whitespacesAndNewlines)
-            let scriptText = (directText?.isEmpty == false)
-                ? nil
-                : focusedTextFromSystemEvents(processIdentifier: processIdentifier)
-            guard let text = directText?.isEmpty == false ? directText : scriptText,
-                  !text.isEmpty else {
+            guard AccessibilityPermissionManager.isTrusted() else {
+                VoxtLog.input(
+                    "Automatic dictionary AX snapshot skipped: accessibility not trusted (permission missing, not unreadable field).",
+                    verbose: true
+                )
                 return nil
             }
 
-            let role = focusedElement.flatMap {
-                stringAttribute(kAXRoleAttribute as CFString, for: $0)
-            }
-            let selectedRange: NSRange? = focusedElement.flatMap {
-                rangeAttribute(kAXSelectedTextRangeAttribute as CFString, for: $0)
-            }.flatMap { range -> NSRange? in
-                guard range.location >= 0, range.length >= 0 else { return nil }
-                return NSRange(location: range.location, length: range.length)
-            }
-            let isEditable = focusedElement.map {
-                boolAttribute("AXEditable" as CFString, for: $0) == true
-                    || isAttributeSettable(kAXValueAttribute as CFString, on: $0)
-                    || isAttributeSettable(kAXSelectedTextRangeAttribute as CFString, on: $0)
-            } ?? false
+            let enhancedStatus = ensureAXEnhancedUserInterfaceIfNeeded(for: processIdentifier)
 
-            return AppDelegate.FocusedInputTextSnapshot(
-                text: text,
+            // First pass: osascript then lightweight C API (no tree scan).
+            var attempt = attemptFocusedSnapshot(
                 bundleIdentifier: bundleIdentifier,
-                processIdentifier: processIdentifier,
-                role: role,
-                isEditable: isEditable,
-                isFocusedTarget: focusedElement.map {
-                    boolAttribute(kAXFocusedAttribute as CFString, for: $0) == true
-                } ?? false,
-                selectedRange: selectedRange,
-                failureReason: nil,
-                textSource: directText?.isEmpty == false
-                    ? "ax-enhanced-target-pid"
-                    : "system-events-target-pid"
+                processIdentifier: processIdentifier
             )
+            var manualPokeRawValue: Int32?
+            var didPokeThisCycle = false
+
+            // Per-PID once: only after both osascript + C API fail, poke AXManualAccessibility
+            // via C API (Electron wake), sleep 150ms, then retry same helpers.
+            if attempt.snapshot == nil,
+               !manualAccessibilityPokedPIDs.contains(processIdentifier) {
+                manualPokeRawValue = pokeAXManualAccessibility(for: processIdentifier)
+                didPokeThisCycle = true
+                Thread.sleep(forTimeInterval: manualAccessibilitySettleDelay)
+                attempt = attemptFocusedSnapshot(
+                    bundleIdentifier: bundleIdentifier,
+                    processIdentifier: processIdentifier
+                )
+            }
+
+            let successSource = attempt.snapshot?.textSource
+            logFirstResultDiagnosticsIfNeeded(
+                processIdentifier: processIdentifier,
+                enhancedStatus: enhancedStatus,
+                osascriptMarker: attempt.osascriptMarker,
+                cAPIMarker: attempt.cAPIMarker,
+                manualPokeRawValue: didPokeThisCycle ? manualPokeRawValue : nil,
+                successSource: successSource
+            )
+
+            if let snapshot = attempt.snapshot {
+                VoxtLog.input(
+                    "Automatic dictionary AX snapshot success source=\(snapshot.textSource ?? "unknown") pid=\(processIdentifier) chars=\(snapshot.text.count)",
+                    verbose: true
+                )
+            }
+            return attempt.snapshot
         }.value
     }
 
-    private static func prepareAccessibilityTreeIfNeeded(for processIdentifier: pid_t) {
-        preparedProcessLock.lock()
-        let shouldPrepare = preparedProcessIdentifiers.insert(processIdentifier).inserted
-        preparedProcessLock.unlock()
-        guard shouldPrepare else { return }
+    private struct SnapshotAttempt {
+        let snapshot: AppDelegate.FocusedInputTextSnapshot?
+        let osascriptMarker: String
+        let cAPIMarker: String
+    }
 
-        let application = AXUIElementCreateApplication(processIdentifier)
-        AXUIElementSetMessagingTimeout(application, messagingTimeout)
-        guard let enabledValue = kCFBooleanTrue else { return }
-        for attribute in ["AXManualAccessibility", "AXEnhancedUserInterface"] {
-            _ = AXUIElementSetAttributeValue(
-                application,
-                attribute as CFString,
-                enabledValue
-            )
+    /// Shared first-pass / post-poke retry path: osascript then C API. No tree scan.
+    private static func attemptFocusedSnapshot(
+        bundleIdentifier: String?,
+        processIdentifier: pid_t
+    ) -> SnapshotAttempt {
+        let osascriptRead = readFocusedTextViaOsascript(processIdentifier: processIdentifier)
+        if case .success(let text) = osascriptRead {
+            let excerpt = excerptForLearning(text)
+            if !excerpt.isEmpty {
+                return SnapshotAttempt(
+                    snapshot: AppDelegate.FocusedInputTextSnapshot(
+                        text: excerpt,
+                        bundleIdentifier: bundleIdentifier,
+                        processIdentifier: processIdentifier,
+                        role: nil,
+                        isEditable: true,
+                        isFocusedTarget: true,
+                        selectedRange: nil,
+                        failureReason: nil,
+                        textSource: "osascript-ax-focused"
+                    ),
+                    osascriptMarker: osascriptRead.diagnosticMarker,
+                    cAPIMarker: "skipped"
+                )
+            }
         }
-        VoxtLog.input(
-            "Automatic dictionary AX enhancements enabled. pid=\(processIdentifier)",
-            verbose: true
+
+        let cAPIResult = readFocusedSnapshotViaCAPI(
+            bundleIdentifier: bundleIdentifier,
+            processIdentifier: processIdentifier
+        )
+        return SnapshotAttempt(
+            snapshot: cAPIResult.snapshot,
+            osascriptMarker: osascriptRead.diagnosticMarker,
+            cAPIMarker: cAPIResult.marker
         )
     }
 
-    private static func focusedElement(for processIdentifier: pid_t) -> AXUIElement? {
-        let application = AXUIElementCreateApplication(processIdentifier)
-        if let element = elementAttribute(kAXFocusedUIElementAttribute as CFString, for: application) {
-            return element
+    private static func ensureAXEnhancedUserInterfaceIfNeeded(for processIdentifier: pid_t) -> String {
+        guard !enhancedUIEnabledPIDs.contains(processIdentifier) else {
+            return "already"
         }
-        guard let window = elementAttribute(kAXFocusedWindowAttribute as CFString, for: application) else {
-            return nil
+        if osascriptUnavailablePIDs.contains(processIdentifier) {
+            enhancedUIEnabledPIDs.insert(processIdentifier)
+            return "unavailable"
         }
-        return elementAttribute(kAXFocusedUIElementAttribute as CFString, for: window)
+
+        // Launch System Events first (it may not be running), short settle, then set by PID.
+        // Markers make enable success/failure explicit — silent try must not report success.
+        let script = """
+        try
+          tell application "System Events" to launch
+          delay 0.1
+          tell application "System Events"
+            tell (first application process whose unix id is \(processIdentifier))
+              set value of attribute "AXEnhancedUserInterface" to true
+            end tell
+          end tell
+          return "\(osascriptEnableOKMarker)"
+        on error errMsg number errNum
+          return "\(osascriptEnableErrorMarkerPrefix)" & errNum & ":" & errMsg
+        end try
+        """
+        let result = runOsascript(script: script, timeout: enableAXEnhancedTimeout, purpose: "enable")
+        // Always mark so we do not keep re-running a slow enable path each poll.
+        enhancedUIEnabledPIDs.insert(processIdentifier)
+        switch result {
+        case .success(let output):
+            let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed == osascriptEnableOKMarker || trimmed.hasPrefix(osascriptEnableOKMarker) {
+                VoxtLog.input(
+                    "Automatic dictionary AX enable success pid=\(processIdentifier)",
+                    verbose: true
+                )
+                return "success"
+            }
+            if trimmed.hasPrefix(osascriptEnableErrorMarkerPrefix) {
+                let payload = String(trimmed.dropFirst(osascriptEnableErrorMarkerPrefix.count))
+                let parts = payload.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
+                let number = parts.first.map(String.init) ?? "?"
+                let shortMessage = sanitizeDiagnosticFragment(
+                    parts.count > 1 ? String(parts[1]) : ""
+                )
+                // Same permanent denials as read path: cache so later polls skip System Events.
+                if number == "-10004" || number == "-1743" {
+                    osascriptUnavailablePIDs.insert(processIdentifier)
+                }
+                let status = shortMessage.isEmpty
+                    ? "ax_err:\(number)"
+                    : "ax_err:\(number):\(shortMessage)"
+                VoxtLog.input(
+                    "Automatic dictionary AX enable ax_err pid=\(processIdentifier) number=\(number) marker=\(shortMessage)",
+                    verbose: true
+                )
+                return status
+            }
+            // Unexpected stdout: treat as failure, never silent success.
+            let fragment = sanitizeDiagnosticFragment(trimmed)
+            VoxtLog.input(
+                "Automatic dictionary AX enable unexpected marker pid=\(processIdentifier) marker=\(fragment)",
+                verbose: true
+            )
+            return fragment.isEmpty ? "unexpected" : "unexpected:\(fragment)"
+        case .timeout:
+            VoxtLog.input(
+                "Automatic dictionary AX enable timeout pid=\(processIdentifier) timeoutMs=\(Int(enableAXEnhancedTimeout * 1000))",
+                verbose: true
+            )
+            return "timeout"
+        case .exitFailure(let code, let stderr):
+            let fragment = sanitizeDiagnosticFragment(stderr)
+            VoxtLog.input(
+                "Automatic dictionary AX enable exit failure pid=\(processIdentifier) code=\(code) stderr=\(stderr.prefix(120))",
+                verbose: true
+            )
+            return fragment.isEmpty ? "exit_failure:\(code)" : "exit_failure:\(code):\(fragment)"
+        case .launchFailure(let message):
+            let fragment = sanitizeDiagnosticFragment(message)
+            VoxtLog.input(
+                "Automatic dictionary AX enable launch failure pid=\(processIdentifier) error=\(fragment)",
+                verbose: true
+            )
+            return fragment.isEmpty ? "launch_failure" : "launch_failure:\(fragment)"
+        }
     }
 
-    private static func focusedTextFromSystemEvents(processIdentifier: pid_t) -> String? {
-        let source = """
-        tell application "System Events"
-            with timeout of 1 seconds
-                try
-                    set targetProcess to first application process whose unix id is \(processIdentifier)
-                    set focusedElement to value of attribute "AXFocusedUIElement" of targetProcess
-                    if focusedElement is missing value then return ""
-                    set textValue to value of attribute "AXValue" of focusedElement
-                    if textValue is missing value then return ""
-                    return textValue as text
-                on error
-                    return ""
-                end try
-            end timeout
-        end tell
+    /// Per-PID once. Sets AXManualAccessibility=true via C API only (no tree scan).
+    /// Unsupported on native apps → quick AXError (e.g. attribute unsupported).
+    @discardableResult
+    private static func pokeAXManualAccessibility(for processIdentifier: pid_t) -> Int32 {
+        manualAccessibilityPokedPIDs.insert(processIdentifier)
+        let application = AXUIElementCreateApplication(processIdentifier)
+        AXUIElementSetMessagingTimeout(application, manualAccessibilityMessagingTimeout)
+        guard let enabledValue = kCFBooleanTrue else {
+            return AXError.failure.rawValue
+        }
+        let error = AXUIElementSetAttributeValue(
+            application,
+            "AXManualAccessibility" as CFString,
+            enabledValue
+        )
+        VoxtLog.input(
+            "Automatic dictionary AX manual poke pid=\(processIdentifier) axError=\(error.rawValue)",
+            verbose: true
+        )
+        return error.rawValue
+    }
+
+    private enum OsascriptTextRead {
+        case success(String)
+        case empty
+        case axError(number: String, shortMessage: String)
+        case unavailable
+        case timeout
+        case exitFailure(code: Int32, stderr: String)
+        case launchFailure(String)
+
+        /// Safe diagnostic marker for current.log — never includes field content.
+        var diagnosticMarker: String {
+            switch self {
+            case .success:
+                return "ok"
+            case .empty:
+                return "empty"
+            case .axError(let number, let shortMessage):
+                return "ax_err:\(number):\(shortMessage)"
+            case .unavailable:
+                return "unavailable"
+            case .timeout:
+                return "timeout"
+            case .exitFailure(let code, let stderr):
+                let marker = sanitizeDiagnosticFragment(stderr)
+                return marker.isEmpty ? "exit:\(code)" : "exit:\(code):\(marker)"
+            case .launchFailure(let message):
+                return "launch_failure:\(sanitizeDiagnosticFragment(message))"
+            }
+        }
+    }
+
+    private static func readFocusedTextViaOsascript(processIdentifier: pid_t) -> OsascriptTextRead {
+        // Permanent Automation / sandbox denials: skip System Events entirely.
+        if osascriptUnavailablePIDs.contains(processIdentifier) {
+            return .unavailable
+        }
+
+        // Prefer AXValue, then AXSelectedText. Errors return safe markers (not field text).
+        let script = """
+        try
+          tell application "System Events"
+            tell (first application process whose unix id is \(processIdentifier))
+              set focusedElement to value of attribute "AXFocusedUIElement"
+              try
+                set focusedValue to value of attribute "AXValue" of focusedElement
+                if focusedValue is not missing value and focusedValue as text is not "" then
+                  return focusedValue as text
+                end if
+              end try
+              try
+                set selectedText to value of attribute "AXSelectedText" of focusedElement
+                if selectedText is not missing value and selectedText as text is not "" then
+                  return selectedText as text
+                end if
+              end try
+            end tell
+          end tell
+          return "\(osascriptEmptyMarker)"
+        on error errMsg number errNum
+          return "\(osascriptErrorMarkerPrefix)" & errNum & ":" & errMsg
+        end try
         """
-        var error: NSDictionary?
-        let value = NSAppleScript(source: source)?.executeAndReturnError(&error).stringValue
-        let text = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return text.isEmpty ? nil : text
+        let result = runOsascript(script: script, timeout: osascriptReadTimeout, purpose: "read")
+        switch result {
+        case .success(let output):
+            let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.hasPrefix(osascriptErrorMarkerPrefix) {
+                let payload = String(trimmed.dropFirst(osascriptErrorMarkerPrefix.count))
+                let parts = payload.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
+                let number = parts.first.map(String.init) ?? "?"
+                let shortMessage = sanitizeDiagnosticFragment(
+                    parts.count > 1 ? String(parts[1]) : ""
+                )
+                // -10004: sandbox/privilege violation; -1743: Automation denied.
+                // Cache per-PID so later polls skip osascript. -600 is launch timing — retry OK.
+                if number == "-10004" || number == "-1743" {
+                    osascriptUnavailablePIDs.insert(processIdentifier)
+                    VoxtLog.input(
+                        "Automatic dictionary AX read osascript unavailable cached pid=\(processIdentifier) number=\(number)",
+                        verbose: true
+                    )
+                }
+                VoxtLog.input(
+                    "Automatic dictionary AX read ax_err via osascript pid=\(processIdentifier) number=\(number) marker=\(shortMessage)",
+                    verbose: true
+                )
+                return .axError(number: number, shortMessage: shortMessage)
+            }
+            if trimmed.isEmpty || trimmed == osascriptEmptyMarker {
+                VoxtLog.input(
+                    "Automatic dictionary AX read empty via osascript pid=\(processIdentifier)",
+                    verbose: true
+                )
+                return .empty
+            }
+            return .success(trimmed)
+        case .timeout:
+            VoxtLog.input(
+                "Automatic dictionary AX read timeout pid=\(processIdentifier) timeoutMs=\(Int(osascriptReadTimeout * 1000))",
+                verbose: true
+            )
+            return .timeout
+        case .exitFailure(let code, let stderr):
+            VoxtLog.input(
+                "Automatic dictionary AX read exit failure pid=\(processIdentifier) code=\(code) stderr=\(stderr.prefix(120))",
+                verbose: true
+            )
+            return .exitFailure(code: code, stderr: stderr)
+        case .launchFailure(let message):
+            VoxtLog.input(
+                "Automatic dictionary AX read launch failure pid=\(processIdentifier) error=\(message)",
+                verbose: true
+            )
+            return .launchFailure(message)
+        }
+    }
+
+    private struct CAPIReadResult {
+        let snapshot: AppDelegate.FocusedInputTextSnapshot?
+        /// Content-free route diagnostic, e.g. `app:e=-25204|win:role=AXWebArea,v=-25212|sw:ok`.
+        let marker: String
+    }
+
+    /// SayIt-aligned C API fallback: try lightweight focused-element routes (no tree scan).
+    /// Order: app focused → window focused → systemWide focused → systemWide focusedApp focused.
+    /// Nested AXWebArea/AXGroup/AXScrollArea: one-level focused child before value reads.
+    private static func readFocusedSnapshotViaCAPI(
+        bundleIdentifier: String?,
+        processIdentifier: pid_t
+    ) -> CAPIReadResult {
+        var diagnosticParts: [String] = []
+        // Best-effort dedupe when the same CF pointer is returned via multiple routes.
+        var seenElementPointers = Set<UnsafeMutableRawPointer>()
+
+        let application = AXUIElementCreateApplication(processIdentifier)
+        AXUIElementSetMessagingTimeout(application, messagingTimeout)
+
+        // a) app → AXFocusedUIElement
+        if let snapshot = tryCAPIFocusedCandidate(
+            root: application,
+            routeLabel: "app",
+            textSource: "c-api-app-focused",
+            bundleIdentifier: bundleIdentifier,
+            processIdentifier: processIdentifier,
+            seenElementPointers: &seenElementPointers,
+            diagnosticParts: &diagnosticParts
+        ) {
+            return CAPIReadResult(snapshot: snapshot, marker: joinCAPIDiagnostic(diagnosticParts))
+        }
+
+        // b) app → AXFocusedWindow → window AXFocusedUIElement (then window itself as value source)
+        let (focusedWindow, windowFetchError) = copyElementAttribute(
+            kAXFocusedWindowAttribute as CFString,
+            for: application
+        )
+        if let focusedWindow {
+            AXUIElementSetMessagingTimeout(focusedWindow, messagingTimeout)
+            if let snapshot = tryCAPIFocusedCandidate(
+                root: focusedWindow,
+                routeLabel: "win",
+                textSource: "c-api-window-focused",
+                bundleIdentifier: bundleIdentifier,
+                processIdentifier: processIdentifier,
+                seenElementPointers: &seenElementPointers,
+                diagnosticParts: &diagnosticParts
+            ) {
+                return CAPIReadResult(snapshot: snapshot, marker: joinCAPIDiagnostic(diagnosticParts))
+            }
+            // Window itself as candidate (some Electron surfaces expose value on the window).
+            if let snapshot = tryCAPIValueCandidate(
+                element: focusedWindow,
+                routeLabel: "winSelf",
+                textSource: "c-api-window-value",
+                bundleIdentifier: bundleIdentifier,
+                processIdentifier: processIdentifier,
+                seenElementPointers: &seenElementPointers,
+                diagnosticParts: &diagnosticParts
+            ) {
+                return CAPIReadResult(snapshot: snapshot, marker: joinCAPIDiagnostic(diagnosticParts))
+            }
+        } else {
+            diagnosticParts.append("win:e=\(windowFetchError.rawValue)")
+        }
+
+        // c) systemWide → AXFocusedUIElement
+        let systemWide = AXUIElementCreateSystemWide()
+        AXUIElementSetMessagingTimeout(systemWide, messagingTimeout)
+        if let snapshot = tryCAPIFocusedCandidate(
+            root: systemWide,
+            routeLabel: "sw",
+            textSource: "c-api-systemwide-focused",
+            bundleIdentifier: bundleIdentifier,
+            processIdentifier: processIdentifier,
+            seenElementPointers: &seenElementPointers,
+            diagnosticParts: &diagnosticParts
+        ) {
+            return CAPIReadResult(snapshot: snapshot, marker: joinCAPIDiagnostic(diagnosticParts))
+        }
+
+        // d) systemWide → AXFocusedApplication → that app's AXFocusedUIElement
+        let (focusedApp, focusedAppError) = copyElementAttribute(
+            kAXFocusedApplicationAttribute as CFString,
+            for: systemWide
+        )
+        if let focusedApp {
+            AXUIElementSetMessagingTimeout(focusedApp, messagingTimeout)
+            if let snapshot = tryCAPIFocusedCandidate(
+                root: focusedApp,
+                routeLabel: "swApp",
+                textSource: "c-api-systemwide-app-focused",
+                bundleIdentifier: bundleIdentifier,
+                processIdentifier: processIdentifier,
+                seenElementPointers: &seenElementPointers,
+                diagnosticParts: &diagnosticParts
+            ) {
+                return CAPIReadResult(snapshot: snapshot, marker: joinCAPIDiagnostic(diagnosticParts))
+            }
+        } else {
+            diagnosticParts.append("swApp:e=\(focusedAppError.rawValue)")
+        }
+
+        return CAPIReadResult(snapshot: nil, marker: joinCAPIDiagnostic(diagnosticParts))
+    }
+
+    /// Resolve `root.AXFocusedUIElement`, then SayIt-aligned value/selectedText (with optional nested focus).
+    private static func tryCAPIFocusedCandidate(
+        root: AXUIElement,
+        routeLabel: String,
+        textSource: String,
+        bundleIdentifier: String?,
+        processIdentifier: pid_t,
+        seenElementPointers: inout Set<UnsafeMutableRawPointer>,
+        diagnosticParts: inout [String]
+    ) -> AppDelegate.FocusedInputTextSnapshot? {
+        let (focused, focusError) = copyElementAttribute(
+            kAXFocusedUIElementAttribute as CFString,
+            for: root
+        )
+        guard let focused else {
+            diagnosticParts.append("\(routeLabel):e=\(focusError.rawValue)")
+            return nil
+        }
+        return tryCAPIValueCandidate(
+            element: focused,
+            routeLabel: routeLabel,
+            textSource: textSource,
+            bundleIdentifier: bundleIdentifier,
+            processIdentifier: processIdentifier,
+            seenElementPointers: &seenElementPointers,
+            diagnosticParts: &diagnosticParts
+        )
+    }
+
+    /// SayIt-aligned value extraction on a candidate element (deduped by CF pointer).
+    private static func tryCAPIValueCandidate(
+        element: AXUIElement,
+        routeLabel: String,
+        textSource: String,
+        bundleIdentifier: String?,
+        processIdentifier: pid_t,
+        seenElementPointers: inout Set<UnsafeMutableRawPointer>,
+        diagnosticParts: inout [String]
+    ) -> AppDelegate.FocusedInputTextSnapshot? {
+        let elementPointer = Unmanaged.passUnretained(element).toOpaque()
+        guard seenElementPointers.insert(elementPointer).inserted else {
+            diagnosticParts.append("\(routeLabel):dup")
+            return nil
+        }
+
+        AXUIElementSetMessagingTimeout(element, messagingTimeout)
+        let focusedRole = stringAttribute(kAXRoleAttribute as CFString, for: element)
+        var child: AXUIElement?
+        if let focusedRole, nestedFocusContainerRoles.contains(focusedRole) {
+            child = elementAttribute(kAXFocusedUIElementAttribute as CFString, for: element)
+        }
+
+        let (childValue, childValueError) = child.map {
+            copyNonEmptyStringAttribute(kAXValueAttribute as CFString, for: $0)
+        } ?? (nil, AXError.attributeUnsupported)
+        let (focusedValue, focusedValueError) = copyNonEmptyStringAttribute(
+            kAXValueAttribute as CFString,
+            for: element
+        )
+
+        let text: String?
+        let textElement: AXUIElement
+        var selectedTextError: AXError = .attributeUnsupported
+        if let childValue {
+            text = childValue
+            textElement = child ?? element
+        } else if let focusedValue {
+            text = focusedValue
+            textElement = element
+        } else {
+            let childSelectedResult = child.map {
+                copyNonEmptyStringAttribute(kAXSelectedTextAttribute as CFString, for: $0)
+            }
+            let (focusedSelected, focusedSelectedError) = copyNonEmptyStringAttribute(
+                kAXSelectedTextAttribute as CFString,
+                for: element
+            )
+            selectedTextError = childSelectedResult?.1 ?? focusedSelectedError
+            if let childSelected = childSelectedResult?.0 {
+                text = childSelected
+                textElement = child ?? element
+            } else if let focusedSelected {
+                text = focusedSelected
+                textElement = element
+            } else {
+                let roleToken = focusedRole.map { "role=\($0)" } ?? "role=?"
+                let valueErrorToken = child != nil
+                    ? "v=\(childValueError.rawValue)/\(focusedValueError.rawValue)"
+                    : "v=\(focusedValueError.rawValue)"
+                diagnosticParts.append(
+                    "\(routeLabel):\(roleToken),\(valueErrorToken),s=\(selectedTextError.rawValue)"
+                )
+                return nil
+            }
+        }
+
+        guard let text else { return nil }
+        let excerpt = excerptForLearning(text)
+        guard !excerpt.isEmpty else {
+            let roleToken = focusedRole.map { "role=\($0)" } ?? "role=?"
+            diagnosticParts.append("\(routeLabel):\(roleToken),empty-excerpt")
+            return nil
+        }
+
+        let role = stringAttribute(kAXRoleAttribute as CFString, for: textElement) ?? focusedRole
+        let selectedRange: NSRange? = rangeAttribute(
+            kAXSelectedTextRangeAttribute as CFString,
+            for: textElement
+        ).flatMap { range -> NSRange? in
+            guard range.location >= 0, range.length >= 0 else { return nil }
+            return NSRange(location: range.location, length: range.length)
+        }
+        let isEditable = boolAttribute("AXEditable" as CFString, for: textElement) == true
+            || isAttributeSettable(kAXValueAttribute as CFString, on: textElement)
+            || isAttributeSettable(kAXSelectedTextRangeAttribute as CFString, on: textElement)
+
+        let roleToken = role.map { "role=\($0)" } ?? "role=?"
+        diagnosticParts.append("\(routeLabel):\(roleToken),ok")
+
+        return AppDelegate.FocusedInputTextSnapshot(
+            text: excerpt,
+            bundleIdentifier: bundleIdentifier,
+            processIdentifier: processIdentifier,
+            role: role,
+            isEditable: isEditable,
+            isFocusedTarget: boolAttribute(kAXFocusedAttribute as CFString, for: textElement) == true,
+            selectedRange: selectedRange,
+            failureReason: nil,
+            textSource: textSource
+        )
+    }
+
+    private static func joinCAPIDiagnostic(_ parts: [String]) -> String {
+        guard !parts.isEmpty else { return "none" }
+        let joined = parts.joined(separator: "|")
+        if joined.count <= maxCAPIDiagnosticCharacters {
+            return joined
+        }
+        return String(joined.prefix(maxCAPIDiagnosticCharacters))
+    }
+
+    private static func copyElementAttribute(
+        _ attribute: CFString,
+        for element: AXUIElement
+    ) -> (AXUIElement?, AXError) {
+        AXUIElementSetMessagingTimeout(element, messagingTimeout)
+        var value: CFTypeRef?
+        let error = AXUIElementCopyAttributeValue(element, attribute, &value)
+        guard error == .success,
+              let value,
+              CFGetTypeID(value) == AXUIElementGetTypeID() else {
+            return (nil, error)
+        }
+        return (unsafeBitCast(value, to: AXUIElement.self), error)
+    }
+
+    private static func copyNonEmptyStringAttribute(
+        _ attribute: CFString,
+        for element: AXUIElement
+    ) -> (String?, AXError) {
+        AXUIElementSetMessagingTimeout(element, messagingTimeout)
+        var value: CFTypeRef?
+        let error = AXUIElementCopyAttributeValue(element, attribute, &value)
+        guard error == .success else {
+            return (nil, error)
+        }
+        let raw: String?
+        if let text = value as? String {
+            raw = text
+        } else {
+            raw = (value as? NSAttributedString)?.string
+        }
+        let trimmed = raw?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let trimmed, !trimmed.isEmpty else {
+            return (nil, error)
+        }
+        return (trimmed, error)
+    }
+
+    private static func logFirstResultDiagnosticsIfNeeded(
+        processIdentifier: pid_t,
+        enhancedStatus: String,
+        osascriptMarker: String,
+        cAPIMarker: String,
+        manualPokeRawValue: Int32?,
+        successSource: String?
+    ) {
+        let isFirst = !firstResultLoggedPIDs.contains(processIdentifier)
+        if isFirst {
+            firstResultLoggedPIDs.insert(processIdentifier)
+        }
+        let pokeToken: String
+        if let manualPokeRawValue {
+            pokeToken = String(manualPokeRawValue)
+        } else if manualAccessibilityPokedPIDs.contains(processIdentifier) {
+            pokeToken = "already"
+        } else {
+            pokeToken = "skipped"
+        }
+        let sourceToken = successSource ?? "nil"
+        let cAPIToken = sanitizeDiagnosticFragment(cAPIMarker, maxLength: maxCAPIDiagnosticCharacters)
+        // Info on first PID result so current.log shows Automation deny vs empty fields;
+        // subsequent polls stay verbose-only.
+        VoxtLog.input(
+            "Automatic dictionary AX first-result pid=\(processIdentifier) enhanced=\(enhancedStatus) osascript=\(osascriptMarker) cAPI=\(cAPIToken) manualPoke=\(pokeToken) source=\(sourceToken)",
+            verbose: !isFirst
+        )
+    }
+
+    private static func sanitizeDiagnosticFragment(_ raw: String, maxLength: Int = 80) -> String {
+        let collapsed = raw
+            .replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "\r", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !collapsed.isEmpty else { return "" }
+        return String(collapsed.prefix(maxLength))
+    }
+
+    private enum OsascriptResult {
+        case success(String)
+        case timeout
+        case exitFailure(code: Int32, stderr: String)
+        case launchFailure(String)
+    }
+
+    private static func runOsascript(
+        script: String,
+        timeout: TimeInterval,
+        purpose: String
+    ) -> OsascriptResult {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        process.arguments = ["-e", script]
+
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+
+        do {
+            try process.run()
+        } catch {
+            return .launchFailure(error.localizedDescription)
+        }
+
+        let deadline = Date().addingTimeInterval(timeout)
+        while process.isRunning, Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.02)
+        }
+
+        if process.isRunning {
+            // Hard timeout: SIGTERM, short wait; if still alive SIGKILL, short wait;
+            // only read pipes after confirmed exit. Never block forever on readDataToEndOfFile.
+            process.terminate()
+            waitForProcessExit(process, timeout: 0.2)
+            if process.isRunning {
+                kill(process.processIdentifier, SIGKILL)
+                waitForProcessExit(process, timeout: 0.2)
+            }
+            if process.isRunning {
+                // Still stuck: drop pipe readers and return immediately.
+                try? stdoutPipe.fileHandleForReading.close()
+                try? stderrPipe.fileHandleForReading.close()
+                VoxtLog.input(
+                    "Automatic dictionary AX \(purpose) process still running after SIGKILL; closed pipes and returning timeout",
+                    verbose: true
+                )
+                return .timeout
+            }
+            _ = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+            _ = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+            VoxtLog.input(
+                "Automatic dictionary AX \(purpose) process terminated after timeout",
+                verbose: true
+            )
+            return .timeout
+        }
+
+        let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+        let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+        let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
+        let stderr = String(data: stderrData, encoding: .utf8) ?? ""
+        let status = process.terminationStatus
+        if status == 0 {
+            return .success(stdout)
+        }
+        return .exitFailure(code: status, stderr: stderr)
+    }
+
+    private static func waitForProcessExit(_ process: Process, timeout: TimeInterval) {
+        let deadline = Date().addingTimeInterval(timeout)
+        while process.isRunning, Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+    }
+
+    /// Keep short text intact; for longer fields keep a trailing excerpt (~200 chars).
+    private static func excerptForLearning(_ text: String) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count > maxExcerptCharacters else { return trimmed }
+        let suffix = String(trimmed.suffix(maxExcerptCharacters))
+        return suffix.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func nonEmptyStringAttribute(_ attribute: CFString, for element: AXUIElement) -> String? {
+        let text = stringAttribute(attribute, for: element)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let text, !text.isEmpty else { return nil }
+        return text
     }
 
     private static func elementAttribute(_ attribute: CFString, for element: AXUIElement) -> AXUIElement? {
@@ -175,9 +833,28 @@ private enum FocusedInputLearningAXSupport {
     }
 
     private static func isAttributeSettable(_ attribute: CFString, on element: AXUIElement) -> Bool {
+        AXUIElementSetMessagingTimeout(element, messagingTimeout)
         var settable = DarwinBoolean(false)
         return AXUIElementIsAttributeSettable(element, attribute, &settable) == .success
             && settable.boolValue
+    }
+}
+
+/// Thread-safe set of PIDs that already received AXEnhancedUserInterface enable attempt.
+private final class NSLockingSet: @unchecked Sendable {
+    private let lock = NSLock()
+    private var values: Set<pid_t> = []
+
+    func contains(_ value: pid_t) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return values.contains(value)
+    }
+
+    func insert(_ value: pid_t) {
+        lock.lock()
+        defer { lock.unlock() }
+        values.insert(value)
     }
 }
 
@@ -358,7 +1035,7 @@ extension AppDelegate {
         let startedAt = Date()
         defer {
             let elapsed = Date().timeIntervalSince(startedAt)
-            if elapsed >= 0.08 {
+            if elapsed >= 0.5 {
                 let bundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "unknown"
                 VoxtLog.input(
                     "Automatic dictionary focused input snapshot was slow. elapsedMs=\(Int(elapsed * 1000)), bundleID=\(bundleID), expectedBundleID=\(expectedBundleID ?? "nil")"
@@ -372,6 +1049,10 @@ extension AppDelegate {
         if let expectedBundleID,
            let bundleIdentifier = frontmostApplication.bundleIdentifier,
            bundleIdentifier != expectedBundleID {
+            return nil
+        }
+        if let expectedProcessIdentifier,
+           frontmostApplication.processIdentifier != expectedProcessIdentifier {
             return nil
         }
 

@@ -193,7 +193,7 @@
 "Tap: Tap transcription hotkey to start and tap transcription hotkey again to stop. Translation hotkey starts translation sessions." = "タップ: 文字起こしショートカットを 1 回押すと開始、もう 1 回押すと終了します。翻訳ショートカットは翻訳セッションを開始します。";
 "Selected text shortcut behavior: If text is selected in a focused input, pressing the translation shortcut translates and replaces the selection directly. Tap and long press behave the same." = "選択テキスト時のショートカット動作: フォーカス中の入力欄でテキストを選択している場合、翻訳ショートカットで直接翻訳し、選択範囲を置き換えます。タップと長押しは同じ動作です。";
 "Listening..." = "入力待機中...";
-"Connecting to microphone…" = "マイクに接続中…";
+"Connecting to microphone…" = "接続中";
 "Reset shortcut" = "ショートカットをリセット";
 "Text Enhancement" = "テキスト強化";
 "Translation Custom LLM Model" = "翻訳用カスタム LLM モデル";
@@ -782,6 +782,8 @@
 "Automatic" = "自動追加";
 "Enable Dictionary Recognition" = "辞書認識を有効にする";
 "Enable Automatic Learning" = "自動学習を有効にする";
+"🎉 Learned “%@”" = "🎉「%@」を学習";
+"Dictionary learning term separator" = "・";
 "Allow High-Confidence Auto Correction" = "高信頼の自動補正を許可する";
 "Dictionary recognition injects matched terms into prompts and can correct high-confidence near matches before output." = "辞書認識は一致した用語をプロンプトに注入し、出力前に高信頼の近似一致を自動補正できます。";
 "No dictionary terms yet." = "辞書の用語はまだありません。";

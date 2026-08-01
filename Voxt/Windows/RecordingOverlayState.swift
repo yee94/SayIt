@@ -11,6 +11,11 @@ enum OverlayDisplayMode: Equatable {
     case answer
 }
 
+enum OverlayStatusPresentation: Equatable {
+    case standard
+    case dictionaryLearning
+}
+
 enum OverlaySessionIconMode: Equatable {
     case transcription
     case note
@@ -38,6 +43,7 @@ class OverlayState: ObservableObject {
     @Published var audioLevel: Float = 0.0
     @Published var transcribedText = ""
     @Published var statusMessage = ""
+    @Published var statusPresentation: OverlayStatusPresentation = .standard
     @Published var isEnhancing = false
     @Published var isRequesting = false
     @Published var isFinalizingTranscription = false
@@ -176,6 +182,7 @@ class OverlayState: ObservableObject {
         audioLevel = 0
         transcribedText = ""
         statusMessage = ""
+        statusPresentation = .standard
         isEnhancing = false
         isRequesting = false
         isFinalizingTranscription = false
@@ -222,6 +229,7 @@ class OverlayState: ObservableObject {
 
     func presentRecording(iconMode: OverlaySessionIconMode? = nil) {
         displayMode = .recording
+        statusPresentation = .standard
         if let iconMode {
             sessionIconMode = iconMode
         }
@@ -230,6 +238,27 @@ class OverlayState: ObservableObject {
         answerContent = ""
         isFinalizingTranscription = false
         isStreamingAnswer = false
+    }
+
+    func presentStatus(
+        _ message: String,
+        presentation: OverlayStatusPresentation = .standard,
+        iconMode: OverlaySessionIconMode? = nil
+    ) {
+        presentRecording(iconMode: iconMode)
+        statusMessage = message
+        statusPresentation = presentation
+    }
+
+    @discardableResult
+    func clearStatus(
+        matching message: String,
+        presentation: OverlayStatusPresentation
+    ) -> Bool {
+        guard statusMessage == message, statusPresentation == presentation else { return false }
+        statusMessage = ""
+        statusPresentation = .standard
+        return true
     }
 
     /// Marks the overlay as waiting for the microphone hardware to come online.

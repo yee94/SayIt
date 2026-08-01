@@ -36,6 +36,7 @@ ThirdParty/sherpa-onnx/
 .codex/
 scripts/
 .repos/
+.slim/deepwork/
 
 # Local signing overrides
 Config/Signing.local.xcconfig

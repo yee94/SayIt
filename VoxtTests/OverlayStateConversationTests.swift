@@ -6,6 +6,89 @@ import XCTest
 
 @MainActor
 final class OverlayStateConversationTests: XCTestCase {
+    func testStatusPresentationDefaultsAndLifecycle() {
+        let state = OverlayState()
+
+        XCTAssertEqual(state.statusPresentation, .standard)
+
+        state.presentStatus("🎉 学习到「Typeless」", presentation: .dictionaryLearning)
+        XCTAssertEqual(state.statusPresentation, .dictionaryLearning)
+        XCTAssertEqual(state.statusMessage, "🎉 学习到「Typeless」")
+
+        XCTAssertTrue(
+            state.clearStatus(
+                matching: "🎉 学习到「Typeless」",
+                presentation: .dictionaryLearning
+            )
+        )
+        XCTAssertEqual(state.statusPresentation, .standard)
+        XCTAssertTrue(state.statusMessage.isEmpty)
+
+        state.presentStatus("完成")
+        state.reset()
+        XCTAssertEqual(state.statusPresentation, .standard)
+    }
+
+    func testDictionaryLearningFeedbackUsesLocalizedSingleLineTerms() {
+        XCTAssertEqual(
+            AutomaticDictionaryLearningFeedback.message(
+                for: ["Typeless", "Voxt"],
+                localeIdentifier: "zh-Hans"
+            ),
+            "🎉 学习到「Typeless、Voxt」"
+        )
+        XCTAssertEqual(
+            AutomaticDictionaryLearningFeedback.message(
+                for: ["Typeless", "Voxt"],
+                localeIdentifier: "en"
+            ),
+            "🎉 Learned “Typeless, Voxt”"
+        )
+    }
+
+    func testDictionaryLearningFeedbackUsesCompactClassicPanelOnly() {
+        XCTAssertEqual(
+            RecordingOverlayWindow.classicPanelSize(
+                displayMode: .recording,
+                statusPresentation: .dictionaryLearning,
+                allowsRealtimeText: true
+            ),
+            CGSize(width: 320, height: 84)
+        )
+        XCTAssertEqual(
+            RecordingOverlayWindow.classicPanelSize(
+                displayMode: .recording,
+                statusPresentation: .standard,
+                allowsRealtimeText: true
+            ),
+            CGSize(width: 360, height: 140)
+        )
+    }
+
+    func testNotchPanelFrameAvoidsSafeAreaAndPreservesGeometry() {
+        let screenFrame = CGRect(x: 120, y: 40, width: 1_800, height: 1_100)
+        let panelSize = CGSize(width: 472, height: 96)
+
+        let frameWithoutNotch = RecordingOverlayWindow.notchPanelFrame(
+            screenFrame: screenFrame,
+            panelSize: panelSize,
+            safeAreaTopInset: 0
+        )
+        XCTAssertEqual(frameWithoutNotch.maxY, screenFrame.maxY)
+        XCTAssertEqual(frameWithoutNotch.midX, screenFrame.midX)
+        XCTAssertEqual(frameWithoutNotch.size, panelSize)
+
+        let safeAreaTopInset: CGFloat = 32
+        let frameWithNotch = RecordingOverlayWindow.notchPanelFrame(
+            screenFrame: screenFrame,
+            panelSize: panelSize,
+            safeAreaTopInset: safeAreaTopInset
+        )
+        XCTAssertEqual(frameWithNotch.maxY, screenFrame.maxY - safeAreaTopInset - 5)
+        XCTAssertEqual(frameWithNotch.midX, screenFrame.midX)
+        XCTAssertEqual(frameWithNotch.size, panelSize)
+    }
+
     func testBeginRewriteConversationSeedsExistingAnswerAndSwitchesSpaceAction() {
         let state = OverlayState()
         state.sessionIconMode = .rewrite

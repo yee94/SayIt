@@ -12,11 +12,18 @@ extension AppDelegate {
         )
     }
 
-    func showOverlayStatus(_ message: String, clearAfter seconds: TimeInterval = 2.4) {
+    func showOverlayStatus(
+        _ message: String,
+        presentation: OverlayStatusPresentation = .standard,
+        clearAfter seconds: TimeInterval = 2.4
+    ) {
         overlayStatusClearTask?.cancel()
         let presentsStandaloneOverlay = !overlayWindow.isVisible
-        overlayState.statusMessage = message
-        overlayState.presentRecording(iconMode: currentRecordingOverlayIconMode)
+        overlayState.presentStatus(
+            message,
+            presentation: presentation,
+            iconMode: currentRecordingOverlayIconMode
+        )
         if presentsStandaloneOverlay {
             overlayWindow.show(state: overlayState, position: overlayPosition)
         }
@@ -28,9 +35,7 @@ extension AppDelegate {
             guard let self else { return }
             try? await Task.sleep(for: .seconds(seconds))
             guard !Task.isCancelled else { return }
-            guard self.overlayState.statusMessage == message else { return }
-
-            self.overlayState.statusMessage = ""
+            guard self.overlayState.clearStatus(matching: message, presentation: presentation) else { return }
             let dismissStandaloneOverlay = Self.shouldDismissStandaloneOverlayStatus(
                 presentsStandaloneOverlay: presentsStandaloneOverlay,
                 isSessionActive: self.isSessionActive

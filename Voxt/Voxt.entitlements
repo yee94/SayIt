@@ -52,6 +52,7 @@
 	<!-- Apple Events to supported browsers for active-tab URL -->
 	<key>com.apple.security.temporary-exception.apple-events</key>
 	<array>
+		<string>com.apple.systemevents</string>
 		<string>com.apple.Safari</string>
 		<string>com.apple.SafariTechnologyPreview</string>
 		<string>com.google.Chrome</string>

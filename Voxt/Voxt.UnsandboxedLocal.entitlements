@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Stable identity for Data Protection Keychain items. -->
+	<key>com.apple.application-identifier</key>
+	<string>$(AppIdentifierPrefix)$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>com.apple.developer.team-identifier</key>
+	<string>$(DEVELOPMENT_TEAM)</string>
+
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	</array>
+
+	<!-- Local unsandboxed build: no App Sandbox entitlements. -->
+	<key>com.apple.security.automation.apple-events</key>
+	<true/>
+
+	<!-- Microphone access -->
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
+</dict>
+</plist>

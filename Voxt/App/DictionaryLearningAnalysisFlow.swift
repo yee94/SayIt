@@ -3,6 +3,25 @@
 
 import Foundation
 
+enum AutomaticDictionaryLearningFeedback {
+    static func message(for terms: [String], localeIdentifier: String? = nil) -> String {
+        let identifier = localeIdentifier ?? AppLocalization.language.localeIdentifier
+        let separator = AppLocalization.localizedString(
+            "Dictionary learning term separator",
+            localeIdentifier: identifier
+        )
+        let format = AppLocalization.localizedString(
+            "🎉 Learned “%@”",
+            localeIdentifier: identifier
+        )
+        return String(
+            format: format,
+            locale: Locale(identifier: identifier),
+            arguments: [terms.joined(separator: separator)]
+        )
+    }
+}
+
 extension AppDelegate {
     private struct AutomaticDictionaryLearningPersistResult {
         let addedTerms: [String]
@@ -87,7 +106,11 @@ extension AppDelegate {
         } else if !persistResult.addedTerms.isEmpty {
             VoxtLog.dictionary("Automatic dictionary learning added terms but history entry is unavailable.")
         }
-        showOverlayStatus(automaticDictionaryLearningSuccessMessage(for: persistResult), clearAfter: 3.2)
+        showOverlayStatus(
+            automaticDictionaryLearningSuccessMessage(for: persistResult),
+            presentation: .dictionaryLearning,
+            clearAfter: 3.2
+        )
         VoxtLog.dictionary(
             "Automatic dictionary learning persisted terms. added=\(persistResult.addedTerms.joined(separator: ", ")), reinforced=\(persistResult.reinforcedTerms.joined(separator: ", "))"
         )
@@ -178,7 +201,11 @@ extension AppDelegate {
         )
 
         if !persistResult.isEmpty {
-            showOverlayStatus(automaticDictionaryLearningSuccessMessage(for: persistResult), clearAfter: 3.2)
+            showOverlayStatus(
+                automaticDictionaryLearningSuccessMessage(for: persistResult),
+                presentation: .dictionaryLearning,
+                clearAfter: 3.2
+            )
         }
 
         return historyStore.entry(id: entry.id)
@@ -326,46 +353,7 @@ extension AppDelegate {
     private func automaticDictionaryLearningSuccessMessage(
         for result: AutomaticDictionaryLearningPersistResult
     ) -> String {
-        if result.addedTerms.isEmpty {
-            return automaticDictionaryLearningReinforcedMessage(for: result.reinforcedTerms)
-        }
-        if result.reinforcedTerms.isEmpty {
-            return automaticDictionaryLearningAddedMessage(for: result.addedTerms)
-        }
-        return AppLocalization.format(
-            "Added %d corrected terms and reinforced %d existing dictionary terms: %@",
-            result.addedTerms.count,
-            result.reinforcedTerms.count,
-            result.effectiveTerms.joined(separator: ", ")
-        )
-    }
-
-    private func automaticDictionaryLearningAddedMessage(for addedTerms: [String]) -> String {
-        if addedTerms.count == 1 {
-            return AppLocalization.format(
-                "Added 1 corrected term to the dictionary: %@",
-                addedTerms[0]
-            )
-        }
-        return AppLocalization.format(
-            "Added %d corrected terms to the dictionary: %@",
-            addedTerms.count,
-            addedTerms.joined(separator: ", ")
-        )
-    }
-
-    private func automaticDictionaryLearningReinforcedMessage(for reinforcedTerms: [String]) -> String {
-        if reinforcedTerms.count == 1 {
-            return AppLocalization.format(
-                "Reinforced existing dictionary term: %@",
-                reinforcedTerms[0]
-            )
-        }
-        return AppLocalization.format(
-            "Reinforced %d existing dictionary terms: %@",
-            reinforcedTerms.count,
-            reinforcedTerms.joined(separator: ", ")
-        )
+        AutomaticDictionaryLearningFeedback.message(for: result.effectiveTerms)
     }
 
     private func runAutomaticDictionaryLearningPrompt(

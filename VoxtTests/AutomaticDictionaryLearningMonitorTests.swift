@@ -392,23 +392,75 @@ final class AutomaticDictionaryLearningMonitorTests: XCTestCase {
         )
     }
 
-    func testObservationStopsAfterConsecutiveMissingSnapshotsBeforeAnyEdit() {
+    func testObservationContinuesPollingMissingSnapshotsBeforeAnyEdit() {
         var state = AutomaticDictionaryLearningObservationState(
             baselineText: "baseline"
         )
 
-        XCTAssertEqual(
-            AutomaticDictionaryLearningMonitor.observeMissingSnapshot(state: &state),
-            .continueObserving
+        // Empty/unreadable snapshots must keep polling until the outer 30s deadline,
+        // not stop after a few consecutive misses before any user edit.
+        for expectedCount in 1...10 {
+            XCTAssertEqual(
+                AutomaticDictionaryLearningMonitor.observeMissingSnapshot(state: &state),
+                .continueObserving
+            )
+            XCTAssertEqual(state.consecutiveMissingSnapshots, expectedCount)
+            XCTAssertFalse(state.didObserveChange)
+        }
+    }
+
+    func testBuildsLearningRequestUsingInjectedTextAsBaselineAgainstCorrectedField() {
+        // Injected text is used as baseline when early AX snapshots are unavailable.
+        let insertedText = "Please ship anthropic ai today."
+        let correctedFieldText = "Please ship Anthropic today."
+
+        let scopedBaseline = AutomaticDictionaryLearningMonitor.observationScopedText(
+            insertedText: insertedText,
+            baselineText: insertedText,
+            currentText: insertedText
         )
-        XCTAssertEqual(
-            AutomaticDictionaryLearningMonitor.observeMissingSnapshot(state: &state),
-            .continueObserving
+        // Snapshot equal to injected text stays unmodified for observation baseline.
+        XCTAssertEqual(scopedBaseline, insertedText)
+
+        let scopedFinal = AutomaticDictionaryLearningMonitor.observationScopedText(
+            insertedText: insertedText,
+            baselineText: insertedText,
+            currentText: correctedFieldText
         )
-        XCTAssertEqual(
-            AutomaticDictionaryLearningMonitor.observeMissingSnapshot(state: &state),
-            .stopWithoutAnalysis
+        XCTAssertEqual(scopedFinal, correctedFieldText)
+
+        let outcome = AutomaticDictionaryLearningMonitor.makeLearningRequest(
+            insertedText: insertedText,
+            baselineText: scopedBaseline,
+            finalText: scopedFinal
         )
+
+        guard case .ready(let request) = outcome else {
+            return XCTFail("Expected ready outcome from injected-text baseline, got \(outcome)")
+        }
+
+        XCTAssertEqual(request.insertedText, insertedText)
+        XCTAssertEqual(request.baselineChangedFragment, "anthropic ai")
+        XCTAssertEqual(request.finalChangedFragment, "Anthropic")
+        XCTAssertLessThanOrEqual(request.editRatio, AutomaticDictionaryLearningMonitor.maximumEditRatio)
+    }
+
+    func testEmptySnapshotsDoNotEndObservationBeforeEdit() {
+        var state = AutomaticDictionaryLearningObservationState(
+            baselineText: "Go Hoste"
+        )
+
+        for _ in 0..<20 {
+            XCTAssertEqual(
+                AutomaticDictionaryLearningMonitor.observeMissingSnapshot(state: &state),
+                .continueObserving,
+                "Missing snapshots before any edit must not terminate observation early"
+            )
+        }
+
+        XCTAssertFalse(state.didObserveChange)
+        XCTAssertEqual(state.latestText, "Go Hoste")
+        XCTAssertEqual(state.consecutiveMissingSnapshots, 20)
     }
 
     func testObservationSettlesAfterConsecutiveMissingSnapshotsOnceEditIsIdle() {
@@ -528,10 +580,35 @@ final class AutomaticDictionaryLearningMonitorTests: XCTestCase {
         )
     }
 
-    func testStableFocusedEditDoesNotFinalizeObservationImmediately() {
+    func testStableFocusedEditFinalizesObservationForAnalysis() {
+        // After a complete replacement is idle for idleSettleSeconds, settleForAnalysis
+        // must finalize while still focused (SayIt: analyze immediately, do not keep polling).
+        var state = AutomaticDictionaryLearningObservationState(
+            baselineText: "我们配合 Go Hoste 来实现 Terminal CLI 的输入。"
+        )
+        state.latestText = "我们配合 Ghostty 来实现 Terminal CLI 的输入。"
+        state.didObserveChange = true
+
+        let decision = AutomaticDictionaryLearningMonitor.observeSnapshot(
+            text: "我们配合 Ghostty 来实现 Terminal CLI 的输入。",
+            elapsedSinceLastChange: AutomaticDictionaryLearningMonitor.idleSettleSeconds + 0.1,
+            state: &state
+        )
+        XCTAssertEqual(
+            decision,
+            .settleForAnalysis(finalText: "我们配合 Ghostty 来实现 Terminal CLI 的输入。")
+        )
+        XCTAssertTrue(
+            AutomaticDictionaryLearningMonitor.shouldFinalizeWhileFocused(decision: decision)
+        )
         XCTAssertFalse(
             AutomaticDictionaryLearningMonitor.shouldFinalizeWhileFocused(
-                decision: .settleForAnalysis(finalText: "Claude Code")
+                decision: .continueObserving
+            )
+        )
+        XCTAssertTrue(
+            AutomaticDictionaryLearningMonitor.shouldFinalizeWhileFocused(
+                decision: .stopWithoutAnalysis
             )
         )
     }
