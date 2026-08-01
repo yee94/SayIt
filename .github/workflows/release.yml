@@ -160,20 +160,20 @@ jobs:
       CHANNEL: ${{ needs.preflight.outputs.channel }}
       RELEASE_BUILD_NUMBER: ${{ needs.preflight.outputs.release_build_number }}
       UPDATE_APPCAST: ${{ needs.preflight.outputs.update_appcast }}
-      DEVELOPER_ID_APP_CERT_P12: ${{ secrets.DEVELOPER_ID_APP_CERT_P12 }}
-      DEVELOPER_ID_APP_CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_APP_CERT_PASSWORD }}
+      # Prefer legacy Voxt secret names, fall back to the working SayIt migration secrets.
+      DEVELOPER_ID_APP_CERT_P12: ${{ secrets.DEVELOPER_ID_APP_CERT_P12 || secrets.APPLE_CERTIFICATE }}
+      DEVELOPER_ID_APP_CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_APP_CERT_PASSWORD || secrets.APPLE_CERTIFICATE_PASSWORD }}
       DEVELOPER_ID_INSTALLER_CERT_P12: ${{ secrets.DEVELOPER_ID_INSTALLER_CERT_P12 }}
       DEVELOPER_ID_INSTALLER_CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_INSTALLER_CERT_PASSWORD }}
-      DEVELOPER_ID_PROVISIONING_PROFILE: ${{ secrets.DEVELOPER_ID_PROVISIONING_PROFILE }}
       DEVELOPER_ID_APP_IDENTITY: ${{ secrets.DEVELOPER_ID_APP_IDENTITY }}
       DEVELOPER_ID_INSTALLER_IDENTITY: ${{ secrets.DEVELOPER_ID_INSTALLER_IDENTITY }}
-      KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
       APPLE_ID: ${{ secrets.APPLE_ID }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-      APPLE_NOTARIZATION_ISSUER: ${{ secrets.APPLE_NOTARIZATION_ISSUER }}
-      APPLE_NOTARIZATION_KEY_ID: ${{ secrets.APPLE_NOTARIZATION_KEY_ID }}
+      APPLE_NOTARIZATION_ISSUER: ${{ secrets.APPLE_NOTARIZATION_ISSUER || secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APPLE_NOTARIZATION_KEY_ID: ${{ secrets.APPLE_NOTARIZATION_KEY_ID || secrets.APP_STORE_CONNECT_KEY_ID }}
       APPLE_NOTARIZATION_KEY: ${{ secrets.APPLE_NOTARIZATION_KEY }}
+      APP_STORE_CONNECT_PRIVATE_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY_BASE64 }}
       NOTARY_PROFILE_NAME: ${{ secrets.NOTARY_PROFILE_NAME }}
       SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
       SHERPA_ONNX_REF: 142807252687d81b40d6315f23470a1512a00de3
@@ -231,26 +231,28 @@ jobs:
           version: "0.11.16"
 
       - name: Validate required secrets
+        id: secrets
         run: |
           set -euo pipefail
+          if [ -z "${DEVELOPER_ID_APP_IDENTITY:-}" ]; then
+            DEVELOPER_ID_APP_IDENTITY="Developer ID Application: yee wang (6W97S9B7CZ)"
+            echo "DEVELOPER_ID_APP_IDENTITY=$DEVELOPER_ID_APP_IDENTITY" >> "$GITHUB_ENV"
+          fi
           for key in \
             DEVELOPER_ID_APP_CERT_P12 \
             DEVELOPER_ID_APP_CERT_PASSWORD \
-            DEVELOPER_ID_INSTALLER_CERT_P12 \
-            DEVELOPER_ID_INSTALLER_CERT_PASSWORD \
-            DEVELOPER_ID_PROVISIONING_PROFILE \
-            DEVELOPER_ID_APP_IDENTITY \
-            DEVELOPER_ID_INSTALLER_IDENTITY \
-            KEYCHAIN_PASSWORD; do
+            DEVELOPER_ID_APP_IDENTITY; do
             if [ -z "${!key:-}" ]; then
-              echo "::error::Missing required secret: $key"
+              echo "::error::Missing required secret: $key (or APPLE_CERTIFICATE / APPLE_CERTIFICATE_PASSWORD fallback)"
               exit 1
             fi
           done
 
           HAS_API_KEY_AUTH=0
-          if [ -n "${APPLE_NOTARIZATION_ISSUER:-}" ] && [ -n "${APPLE_NOTARIZATION_KEY_ID:-}" ] && [ -n "${APPLE_NOTARIZATION_KEY:-}" ]; then
-            HAS_API_KEY_AUTH=1
+          if [ -n "${APPLE_NOTARIZATION_ISSUER:-}" ] && [ -n "${APPLE_NOTARIZATION_KEY_ID:-}" ]; then
+            if [ -n "${APPLE_NOTARIZATION_KEY:-}" ] || [ -n "${APP_STORE_CONNECT_PRIVATE_KEY_BASE64:-}" ]; then
+              HAS_API_KEY_AUTH=1
+            fi
           fi
 
           HAS_APPLE_ID_AUTH=0
@@ -259,13 +261,23 @@ jobs:
           fi
 
           if [ "$HAS_API_KEY_AUTH" -eq 0 ] && [ "$HAS_APPLE_ID_AUTH" -eq 0 ]; then
-            echo "::error::Missing notarization credentials: provide API key (APPLE_NOTARIZATION_ISSUER/KEY_ID/KEY) or Apple ID credentials (APPLE_ID/APPLE_TEAM_ID/APPLE_APP_SPECIFIC_PASSWORD)."
+            echo "::error::Missing notarization credentials: provide App Store Connect API key (APP_STORE_CONNECT_* or APPLE_NOTARIZATION_*) or Apple ID credentials."
             exit 1
           fi
 
+          if [ -n "${DEVELOPER_ID_INSTALLER_CERT_P12:-}" ] && [ -n "${DEVELOPER_ID_INSTALLER_CERT_PASSWORD:-}" ] && [ -n "${DEVELOPER_ID_INSTALLER_IDENTITY:-}" ]; then
+            echo "build_pkg=true" >> "$GITHUB_OUTPUT"
+            echo "Installer certificate available; PKG will be signed."
+          else
+            echo "build_pkg=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Installer certificate secrets are missing; skipping signed PKG (ZIP + DMG only)."
+          fi
+
           if [ "${UPDATE_APPCAST:-false}" = "true" ] && [ -z "${SPARKLE_PRIVATE_KEY:-}" ]; then
-            echo "::error::Missing required secret for Sparkle appcast signing: SPARKLE_PRIVATE_KEY"
-            exit 1
+            echo "sparkle_enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::SPARKLE_PRIVATE_KEY is missing; shipping release without Sparkle edSignature/appcast update."
+          else
+            echo "sparkle_enabled=${UPDATE_APPCAST:-false}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Validate MARKETING_VERSION matches tag
@@ -313,8 +325,9 @@ jobs:
       - name: Setup keychain and import certificates
         run: |
           set -euo pipefail
-          echo "$DEVELOPER_ID_APP_CERT_P12" | base64 --decode > app-cert.p12
-          echo "$DEVELOPER_ID_INSTALLER_CERT_P12" | base64 --decode > installer-cert.p12
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          echo "KEYCHAIN_PASSWORD=$KEYCHAIN_PASSWORD" >> "$GITHUB_ENV"
+          printf '%s' "$DEVELOPER_ID_APP_CERT_P12" | base64 --decode > app-cert.p12
 
           security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           security set-keychain-settings -t 3600 -u build.keychain
@@ -322,8 +335,12 @@ jobs:
 
           security import app-cert.p12 -k build.keychain -P "$DEVELOPER_ID_APP_CERT_PASSWORD" \
             -T /usr/bin/codesign -T /usr/bin/security -T /usr/bin/xcodebuild > /dev/null
-          security import installer-cert.p12 -k build.keychain -P "$DEVELOPER_ID_INSTALLER_CERT_PASSWORD" \
-            -T /usr/bin/productbuild -T /usr/bin/security > /dev/null
+
+          if [ "${{ steps.secrets.outputs.build_pkg }}" = "true" ]; then
+            printf '%s' "$DEVELOPER_ID_INSTALLER_CERT_P12" | base64 --decode > installer-cert.p12
+            security import installer-cert.p12 -k build.keychain -P "$DEVELOPER_ID_INSTALLER_CERT_PASSWORD" \
+              -T /usr/bin/productbuild -T /usr/bin/security > /dev/null
+          fi
 
           security set-key-partition-list -S apple-tool:,apple:,codesign:,productbuild: -s -k "$KEYCHAIN_PASSWORD" build.keychain > /dev/null
           security list-keychains -d user -s build.keychain $(security list-keychains -d user | tr -d '"')
@@ -332,66 +349,41 @@ jobs:
       - name: Verify signing identities in keychain
         run: |
           set -euo pipefail
+          security find-identity -v -p codesigning build.keychain
           if ! security find-identity -v -p codesigning build.keychain | grep -F "$DEVELOPER_ID_APP_IDENTITY" >/dev/null; then
             echo "::error::Developer ID Application identity not found in keychain: $DEVELOPER_ID_APP_IDENTITY"
             exit 1
           fi
-          if ! security find-identity -v -p basic build.keychain | grep -F "$DEVELOPER_ID_INSTALLER_IDENTITY" >/dev/null; then
-            echo "::error::Developer ID Installer identity not found in keychain: $DEVELOPER_ID_INSTALLER_IDENTITY"
-            exit 1
+          if [ "${{ steps.secrets.outputs.build_pkg }}" = "true" ]; then
+            if ! security find-identity -v -p basic build.keychain | grep -F "$DEVELOPER_ID_INSTALLER_IDENTITY" >/dev/null; then
+              echo "::error::Developer ID Installer identity not found in keychain: $DEVELOPER_ID_INSTALLER_IDENTITY"
+              exit 1
+            fi
           fi
-
-      - name: Decode Developer ID provisioning profile
-        run: |
-          set -euo pipefail
-          PROFILE_PATH="build/Voxt_Developer_ID.provisionprofile"
-          PROFILE_PLIST="build/Voxt_Developer_ID.plist"
-
-          mkdir -p build
-          printf '%s' "$DEVELOPER_ID_PROVISIONING_PROFILE" | base64 --decode > "$PROFILE_PATH"
-          security cms -D -i "$PROFILE_PATH" > "$PROFILE_PLIST"
-
-          PROFILE_NAME="$(/usr/libexec/PlistBuddy -c 'Print :Name' "$PROFILE_PLIST" 2>/dev/null || true)"
-          PROFILE_UUID="$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$PROFILE_PLIST" 2>/dev/null || true)"
-          PROFILE_PREFIX="$(/usr/libexec/PlistBuddy -c 'Print :ApplicationIdentifierPrefix:0' "$PROFILE_PLIST" 2>/dev/null || true)"
-          PROFILE_TEAM_IDENTIFIER="$(/usr/libexec/PlistBuddy -c 'Print :TeamIdentifier:0' "$PROFILE_PLIST" 2>/dev/null || true)"
-          PROVISIONS_ALL_DEVICES="$(/usr/libexec/PlistBuddy -c 'Print :ProvisionsAllDevices' "$PROFILE_PLIST" 2>/dev/null || true)"
-          if [ -z "$PROFILE_NAME" ] || [ -z "$PROFILE_UUID" ] || [ -z "$PROFILE_PREFIX" ] || [ -z "$PROFILE_TEAM_IDENTIFIER" ]; then
-            echo "::error::Developer ID provisioning profile is missing Name, UUID, ApplicationIdentifierPrefix, or TeamIdentifier"
-            exit 1
-          fi
-          if [ "$PROVISIONS_ALL_DEVICES" != "true" ]; then
-            echo "::error::Provisioning profile is not a Developer ID distribution profile: $PROFILE_NAME"
-            exit 1
-          fi
-
-          EXPIRATION="$(plutil -extract ExpirationDate raw -o - "$PROFILE_PLIST" 2>/dev/null || true)"
-          EXPIRATION_EPOCH="$(date -j -f '%Y-%m-%dT%H:%M:%SZ' "$EXPIRATION" '+%s' 2>/dev/null || true)"
-          if [ -z "$EXPIRATION_EPOCH" ] || [ "$EXPIRATION_EPOCH" -le "$(date '+%s')" ]; then
-            echo "::error::Developer ID provisioning profile is expired or has an invalid expiration date: ${EXPIRATION:-<missing>}"
-            exit 1
-          fi
-
-          echo "Validated Developer ID provisioning profile: $PROFILE_NAME ($PROFILE_UUID)"
 
       - name: Setup notarytool authentication mode
         run: |
           set -euo pipefail
+          mkdir -p build
 
           PROFILE="${NOTARY_PROFILE_NAME:-notarytool-profile}"
           echo "NOTARY_PROFILE_NAME=$PROFILE" >> "$GITHUB_ENV"
 
-          if [ -n "${APPLE_NOTARIZATION_ISSUER:-}" ] && [ -n "${APPLE_NOTARIZATION_KEY_ID:-}" ] && [ -n "${APPLE_NOTARIZATION_KEY:-}" ]; then
+          if [ -n "${APPLE_NOTARIZATION_ISSUER:-}" ] && [ -n "${APPLE_NOTARIZATION_KEY_ID:-}" ]; then
             KEY_FILE="build/notary-api-key.p8"
-            mkdir -p build
-            printf '%s' "$APPLE_NOTARIZATION_KEY" > "$KEY_FILE"
+            if [ -n "${APPLE_NOTARIZATION_KEY:-}" ]; then
+              printf '%s' "$APPLE_NOTARIZATION_KEY" > "$KEY_FILE"
+            else
+              printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY_BASE64" | base64 --decode > "$KEY_FILE"
+            fi
+            chmod 600 "$KEY_FILE"
             xcrun notarytool store-credentials "$PROFILE" \
               --key "$KEY_FILE" \
               --key-id "$APPLE_NOTARIZATION_KEY_ID" \
               --issuer "$APPLE_NOTARIZATION_ISSUER"
             rm -f "$KEY_FILE"
             echo "NOTARY_AUTH_MODE=profile" >> "$GITHUB_ENV"
-            echo "Using notary auth mode: profile"
+            echo "Using notary auth mode: profile (App Store Connect API key)"
           else
             echo "NOTARY_AUTH_MODE=apple-id" >> "$GITHUB_ENV"
             echo "Using notary auth mode: apple-id"
@@ -614,10 +606,14 @@ jobs:
 
           ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ZIP_PATH"
           tools/build_dmg.sh "$APP_PATH" "$DMG_PATH"
-          productbuild \
-            --component "$APP_PATH" /Applications \
-            --sign "$DEVELOPER_ID_INSTALLER_IDENTITY" \
-            "$PKG_PATH"
+          if [ "${{ steps.secrets.outputs.build_pkg }}" = "true" ]; then
+            productbuild \
+              --component "$APP_PATH" /Applications \
+              --sign "$DEVELOPER_ID_INSTALLER_IDENTITY" \
+              "$PKG_PATH"
+          else
+            echo "Skipping PKG: installer certificate not configured."
+          fi
 
       - name: Notarize and staple release artifacts
         run: |
@@ -814,7 +810,9 @@ jobs:
           # Apple notarytool accepts release containers like ZIP, PKG, and DMG.
           # ZIP archives cannot be stapled directly, so we notarize them without stapling.
           notarize_file "$ZIP_PATH" "zip" "none" "false"
-          notarize_file "$PKG_PATH" "pkg" "install" "true"
+          if [ -f "$PKG_PATH" ]; then
+            notarize_file "$PKG_PATH" "pkg" "install" "true"
+          fi
           notarize_file "$DMG_PATH" "dmg" "none" "true"
 
       - name: Upload notarization diagnostics
@@ -835,10 +833,12 @@ jobs:
           ZIP_SHA_PATH="build/SayIt-${VERSION}-macOS.zip.sha256"
           SHA_PATH="build/SayIt-${VERSION}.pkg.sha256"
           shasum -a 256 "$ZIP_PATH" | awk '{print $1}' > "$ZIP_SHA_PATH"
-          shasum -a 256 "$PKG_PATH" | awk '{print $1}' > "$SHA_PATH"
+          if [ -f "$PKG_PATH" ]; then
+            shasum -a 256 "$PKG_PATH" | awk '{print $1}' > "$SHA_PATH"
+          fi
 
       - name: Generate Sparkle edSignature metadata
-        if: needs.preflight.outputs.update_appcast == 'true'
+        if: needs.preflight.outputs.update_appcast == 'true' && steps.secrets.outputs.sparkle_enabled == 'true'
         run: |
           set -euo pipefail
           ZIP_PATH="build/SayIt-${VERSION}-macOS.zip"
@@ -897,6 +897,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: release-artifacts-${{ needs.preflight.outputs.version }}
+          if-no-files-found: error
           path: |
             build/SayIt-${{ needs.preflight.outputs.version }}-macOS.zip
             build/SayIt-${{ needs.preflight.outputs.version }}-macOS.zip.sha256
@@ -959,7 +960,7 @@ jobs:
           fi
 
           if [ ! -s "$NOTES_FILE" ]; then
-            printf '## Voxt %s\n' "$TAG" > "$NOTES_FILE"
+            printf '## SayIt %s\n' "$TAG" > "$NOTES_FILE"
           fi
 
       - name: Create or update release and upload assets
@@ -973,15 +974,27 @@ jobs:
           DMG_PATH="build/SayIt-${VERSION}.dmg"
           PKG_PATH="build/SayIt-${VERSION}.pkg"
           SHA_PATH="build/SayIt-${VERSION}.pkg.sha256"
+          ZIP_SHA_PATH="build/SayIt-${VERSION}-macOS.zip.sha256"
           NOTES_FILE="build/release-notes.md"
           PRERELEASE_ARGS=()
           if [ "$CHANNEL" = "beta" ]; then
             PRERELEASE_ARGS=(--prerelease)
           fi
 
+          ASSETS=("$ZIP_PATH" "$DMG_PATH")
+          if [ -f "$ZIP_SHA_PATH" ]; then
+            ASSETS+=("$ZIP_SHA_PATH")
+          fi
+          if [ -f "$PKG_PATH" ]; then
+            ASSETS+=("$PKG_PATH")
+          fi
+          if [ -f "$SHA_PATH" ]; then
+            ASSETS+=("$SHA_PATH")
+          fi
+
           if gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release edit "$TAG" \
-              --title "Voxt $TAG" \
+              --title "SayIt $TAG" \
               --notes-file "$NOTES_FILE" \
               "${PRERELEASE_ARGS[@]}" \
               -R "$GITHUB_REPOSITORY"
@@ -990,22 +1003,22 @@ jobs:
             else
               gh release edit "$TAG" --draft=false -R "$GITHUB_REPOSITORY"
             fi
-            gh release upload "$TAG" "$ZIP_PATH" "$DMG_PATH" "$PKG_PATH" "$SHA_PATH" \
+            gh release upload "$TAG" "${ASSETS[@]}" \
               --clobber \
               -R "$GITHUB_REPOSITORY"
           else
             if [ "$DRAFT_RELEASE" = "true" ]; then
-              gh release create "$TAG" "$ZIP_PATH" "$DMG_PATH" "$PKG_PATH" "$SHA_PATH" \
+              gh release create "$TAG" "${ASSETS[@]}" \
                 --draft \
                 --target "$GITHUB_SHA" \
-                --title "Voxt $TAG" \
+                --title "SayIt $TAG" \
                 --notes-file "$NOTES_FILE" \
                 "${PRERELEASE_ARGS[@]}" \
                 -R "$GITHUB_REPOSITORY"
             else
-              gh release create "$TAG" "$ZIP_PATH" "$DMG_PATH" "$PKG_PATH" "$SHA_PATH" \
+              gh release create "$TAG" "${ASSETS[@]}" \
                 --target "$GITHUB_SHA" \
-                --title "Voxt $TAG" \
+                --title "SayIt $TAG" \
                 --notes-file "$NOTES_FILE" \
                 "${PRERELEASE_ARGS[@]}" \
                 -R "$GITHUB_REPOSITORY"
@@ -1025,15 +1038,30 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       VOXT_UPDATE_API_BASE: ${{ secrets.VOXT_UPDATE_API_BASE }}
       VOXT_RELEASE_API_KEY: ${{ secrets.VOXT_RELEASE_API_KEY }}
+      SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
     steps:
+      - name: Gate on optional Sparkle/appcast secrets
+        id: gate
+        run: |
+          set -euo pipefail
+          if [ -z "${SPARKLE_PRIVATE_KEY:-}" ] || [ -z "${VOXT_UPDATE_API_BASE:-}" ] || [ -z "${VOXT_RELEASE_API_KEY:-}" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::Skipping Voxt appcast publish: SPARKLE_PRIVATE_KEY / VOXT_UPDATE_API_BASE / VOXT_RELEASE_API_KEY not all configured."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/checkout@v5
+        if: steps.gate.outputs.skip != 'true'
 
       - uses: actions/download-artifact@v4
+        if: steps.gate.outputs.skip != 'true'
         with:
           name: release-artifacts-${{ needs.preflight.outputs.version }}
           path: build
 
       - name: Validate publish API secrets
+        if: steps.gate.outputs.skip != 'true'
         run: |
           set -euo pipefail
           if [ -z "${VOXT_UPDATE_API_BASE:-}" ]; then
@@ -1046,6 +1074,7 @@ jobs:
           fi
 
       - name: Upload app update metadata and trigger appcast
+        if: steps.gate.outputs.skip != 'true'
         run: |
           set -euo pipefail
           API_BASE="${VOXT_UPDATE_API_BASE%/}"
