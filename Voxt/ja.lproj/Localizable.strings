@@ -2305,3 +2305,16 @@
 "Stop" = "停止";
 "Prompt Settings" = "プロンプト設定";
 "Send" = "送信";
+
+"No sync folder set" = "同期フォルダ未設定";
+"No folder set" = "パス未設定";
+"Choose Sync Folder" = "同期フォルダを選択";
+"Change Folder" = "フォルダを変更";
+"Clear Path" = "パスをクリア";
+"Sync path" = "同期パス";
+"iCloud Dictionary Sync" = "iCloud 辞書同期";
+"Pick a shared folder to enable automatic dictionary sync. Each device writes its own snapshot file and merges with others." = "共有フォルダを選ぶと辞書同期が有効になります。各デバイスがスナップショットを書き込み、他デバイスとマージします。";
+"Choose a shared folder for dictionary sync (for example under iCloud Drive)." = "辞書同期用の共有フォルダを選択してください（例: iCloud Drive）。";
+"Tip: prefer a dedicated folder under iCloud Drive, such as SayIt Dictionary." = "iCloud Drive 内の専用フォルダ（例: SayIt Dictionary）を推奨します。";
+"Not synced yet" = "まだ同期していません";
+"Sync folder is unavailable" = "同期フォルダを利用できません";

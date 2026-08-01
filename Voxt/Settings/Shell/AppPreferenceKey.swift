@@ -191,6 +191,14 @@ enum AppPreferenceKey {
     static let dictionarySuggestionHistoryScanCheckpoint = "dictionarySuggestionHistoryScanCheckpoint"
     static let dictionarySuggestionFilterSettings = "dictionarySuggestionFilterSettings"
     static let dictionarySuggestionIngestModelOptionID = "dictionarySuggestionIngestModelOptionID"
+    /// User-selected shared folder for dictionary snapshot sync (path display + fallback).
+    static let dictionarySyncDirectoryPath = "dictionarySyncDirectoryPath"
+    /// Security-scoped bookmark for the dictionary sync folder.
+    static let dictionarySyncDirectoryBookmark = "dictionarySyncDirectoryBookmark"
+    /// Stable per-device id used in snapshot filenames.
+    static let dictionarySyncDeviceId = "dictionarySyncDeviceId"
+    /// Last successful folder sync timestamp (timeIntervalSince1970).
+    static let dictionarySyncLastSyncedAt = "dictionarySyncLastSyncedAt"
     static let autoCheckForUpdates = "autoCheckForUpdates"
     static let betaUpdatesEnabled = "betaUpdatesEnabled"
     nonisolated static let hotkeyDebugLoggingEnabled = "hotkeyDebugLoggingEnabled"

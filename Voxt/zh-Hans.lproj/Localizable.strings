@@ -2310,3 +2310,16 @@
 "Stop" = "停止";
 "Prompt Settings" = "提示词设置";
 "Send" = "发送";
+
+"No sync folder set" = "尚未设置同步文件夹";
+"No folder set" = "尚未设置路径";
+"Choose Sync Folder" = "选择同步文件夹";
+"Change Folder" = "更改文件夹";
+"Clear Path" = "清除路径";
+"Sync path" = "同步路径";
+"iCloud Dictionary Sync" = "iCloud 词典同步";
+"Pick a shared folder to enable automatic dictionary sync. Each device writes its own snapshot file and merges with others." = "选择 iCloud 或共享文件夹后自动开启词典同步。每台设备写入自己的快照文件并与其他设备合并。";
+"Choose a shared folder for dictionary sync (for example under iCloud Drive)." = "选择用于词典同步的共享文件夹（例如 iCloud Drive 下的目录）。";
+"Tip: prefer a dedicated folder under iCloud Drive, such as SayIt Dictionary." = "建议使用 iCloud Drive 下的专用文件夹，例如 SayIt Dictionary。";
+"Not synced yet" = "尚未同步";
+"Sync folder is unavailable" = "同步文件夹不可用";

@@ -70,17 +70,5 @@
 
 	<!-- Accessibility (for CGEvent tap to detect Option key globally) -->
 	<!-- Note: this is requested at runtime; the user must grant it in System Settings -->
-
-	<!-- iCloud / CloudKit private-database sync for dictionary hotwords -->
-	<key>com.apple.developer.icloud-container-identifiers</key>
-	<array>
-		<string>iCloud.$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-	</array>
-	<key>com.apple.developer.icloud-services</key>
-	<array>
-		<string>CloudKit</string>
-	</array>
-	<key>com.apple.developer.ubiquity-kvstore-identifier</key>
-	<string>iCloud.$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 </dict>
 </plist>

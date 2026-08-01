@@ -2310,3 +2310,16 @@
 "Stop" = "Stop";
 "Prompt Settings" = "Prompt Settings";
 "Send" = "Send";
+
+"No sync folder set" = "No sync folder set";
+"No folder set" = "No folder set";
+"Choose Sync Folder" = "Choose Sync Folder";
+"Change Folder" = "Change Folder";
+"Clear Path" = "Clear Path";
+"Sync path" = "Sync path";
+"iCloud Dictionary Sync" = "iCloud Dictionary Sync";
+"Pick a shared folder to enable automatic dictionary sync. Each device writes its own snapshot file and merges with others." = "Pick a shared folder to enable automatic dictionary sync. Each device writes its own snapshot file and merges with others.";
+"Choose a shared folder for dictionary sync (for example under iCloud Drive)." = "Choose a shared folder for dictionary sync (for example under iCloud Drive).";
+"Tip: prefer a dedicated folder under iCloud Drive, such as SayIt Dictionary." = "Tip: prefer a dedicated folder under iCloud Drive, such as SayIt Dictionary.";
+"Not synced yet" = "Not synced yet";
+"Sync folder is unavailable" = "Sync folder is unavailable";

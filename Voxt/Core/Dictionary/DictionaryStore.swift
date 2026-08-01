@@ -425,7 +425,7 @@ final class DictionaryStore: ObservableObject {
     @Published private(set) var categories: [DictionaryCategory] = [DictionaryCategory.defaultCategory]
     @Published private(set) var isLoading = false
 
-    /// When true, DictionaryCloudSyncService should not schedule a push for the current mutation.
+    /// When true, folder/cloud sync observers should not schedule a push for the current mutation.
     private(set) var isApplyingRemoteSync = false
 
     private let defaults: UserDefaults
@@ -1028,7 +1028,7 @@ final class DictionaryStore: ObservableObject {
         return true
     }
 
-    /// Applies a remote CloudKit merge result into the local store (write-through).
+    /// Applies a remote merge result into the local store (write-through).
     /// Sets `isApplyingRemoteSync` so observers can skip re-uploading the same payload.
     func applyRemoteSync(
         entries remoteEntries: [DictionaryEntry],

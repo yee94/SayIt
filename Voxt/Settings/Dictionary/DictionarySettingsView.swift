@@ -19,6 +19,7 @@ struct DictionarySettingsView: View {
     @ObservedObject var historyStore: TranscriptionHistoryStore
     @ObservedObject var dictionaryStore: DictionaryStore
     @ObservedObject var dictionarySuggestionStore: DictionarySuggestionStore
+    @ObservedObject var dictionaryCloudSyncService: DictionaryCloudSyncService
     let availableHistoryScanModels: () -> [DictionaryHistoryScanModelOption]
     let onIngestSuggestionsFromHistory: (DictionaryHistoryScanRequest, Bool) -> Void
     let onCancelIngestSuggestionsFromHistory: () -> Void
@@ -106,6 +107,7 @@ struct DictionarySettingsView: View {
                 automaticLearningPromptDraft: $automaticLearningPromptDraft,
                 dictionaryHighConfidenceCorrectionEnabled: $dictionaryHighConfidenceCorrectionEnabled,
                 isPresented: $showDictionaryAdvancedSettings,
+                dictionaryCloudSyncService: dictionaryCloudSyncService,
                 onRestoreDefaultAutomaticLearningPrompt: restoreAutomaticLearningPromptToDefault,
                 onSave: saveDictionaryAdvancedSettings
             )

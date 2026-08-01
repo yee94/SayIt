@@ -24,6 +24,7 @@ struct SettingsView: View {
     @ObservedObject var noteStore: VoxtNoteStore
     @ObservedObject var dictionaryStore: DictionaryStore
     @ObservedObject var dictionarySuggestionStore: DictionarySuggestionStore
+    @ObservedObject var dictionaryCloudSyncService: DictionaryCloudSyncService
     @ObservedObject var appUpdateManager: AppUpdateManager
     @ObservedObject var mainWindowState: MainWindowVisibilityState
     @AppStorage(AppPreferenceKey.interfaceLanguage) private var interfaceLanguageRaw = AppInterfaceLanguage.system.rawValue
@@ -75,6 +76,7 @@ struct SettingsView: View {
         noteStore: VoxtNoteStore,
         dictionaryStore: DictionaryStore,
         dictionarySuggestionStore: DictionarySuggestionStore,
+        dictionaryCloudSyncService: DictionaryCloudSyncService,
         appUpdateManager: AppUpdateManager,
         mainWindowState: MainWindowVisibilityState,
         initialNavigationTarget: SettingsNavigationTarget = SettingsNavigationTarget(tab: .report),
@@ -91,6 +93,7 @@ struct SettingsView: View {
         self.noteStore = noteStore
         self.dictionaryStore = dictionaryStore
         self.dictionarySuggestionStore = dictionarySuggestionStore
+        self.dictionaryCloudSyncService = dictionaryCloudSyncService
         self.appUpdateManager = appUpdateManager
         self.mainWindowState = mainWindowState
         _selectedTab = State(initialValue: initialNavigationTarget.tab)
@@ -536,6 +539,7 @@ struct SettingsView: View {
                         historyStore: historyStore,
                         dictionaryStore: dictionaryStore,
                         dictionarySuggestionStore: dictionarySuggestionStore,
+                        dictionaryCloudSyncService: dictionaryCloudSyncService,
                         availableHistoryScanModels: availableDictionaryHistoryScanModels,
                         onIngestSuggestionsFromHistory: onIngestDictionarySuggestionsFromHistory,
                         onCancelIngestSuggestionsFromHistory: onCancelDictionarySuggestionsFromHistory,

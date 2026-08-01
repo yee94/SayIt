@@ -507,6 +507,7 @@ extension AppDelegate {
             noteStore: noteStore,
             dictionaryStore: dictionaryStore,
             dictionarySuggestionStore: dictionarySuggestionStore,
+            dictionaryCloudSyncService: dictionaryCloudSyncService,
             appUpdateManager: appUpdateManager,
             mainWindowState: mainWindowVisibilityState,
             initialNavigationTarget: navigationRequest.target,

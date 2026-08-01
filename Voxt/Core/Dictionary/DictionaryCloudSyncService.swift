@@ -1,11 +1,11 @@
 // DictionaryCloudSyncService.swift
-// CloudKit private-database sync for dictionary entries and categories.
+// Folder-based dictionary sync (SayIt-compatible): pick a shared directory to enable.
 
 import Foundation
-import CloudKit
 import Combine
+import AppKit
 
-/// Sync state machine for dictionary iCloud synchronization.
+/// Sync state machine for folder-based dictionary synchronization.
 enum DictionaryCloudSyncState: Equatable {
     case syncDisabled
     case idle
@@ -16,7 +16,7 @@ enum DictionaryCloudSyncState: Equatable {
     var statusText: String {
         switch self {
         case .syncDisabled:
-            return AppLocalization.localizedString("iCloud unavailable")
+            return AppLocalization.localizedString("No sync folder set")
         case .idle:
             return AppLocalization.localizedString("Ready to sync")
         case .syncing:
@@ -29,62 +29,65 @@ enum DictionaryCloudSyncState: Equatable {
     }
 }
 
-/// Bidirectional CloudKit sync for dictionary hotwords (private database).
-/// Merge strategy: last-write-wins by `updatedAt` timestamp on each record.
+/// Lightweight snapshot entry used for cross-device folder merge (SayIt CSV shape).
+struct DictionarySyncSnapshotEntry: Equatable, Hashable {
+    var id: String
+    var term: String
+    var weight: Int
+    var source: String
+    var createdAt: String
+}
+
+/// Bidirectional dictionary sync via a user-selected shared folder.
+/// Each device writes `sayit-vocabulary-{deviceId}.csv`; all snapshots are merged
+/// with SayIt rules (term key union, max weight, manual > ai/auto, LWW by createdAt).
 @MainActor
 final class DictionaryCloudSyncService: ObservableObject {
-    /// Matches entitlements `iCloud.$(PRODUCT_BUNDLE_IDENTIFIER)` (e.g. iCloud.com.sayit.app).
-    nonisolated static var containerIdentifier: String {
-        let bundleID = Bundle.main.bundleIdentifier ?? "com.sayit.app"
-        return "iCloud.\(bundleID)"
-    }
-    static let entryRecordType = "DictionaryEntry"
-    static let categoryRecordType = "DictionaryCategory"
-    static let deletionRecordType = "DictionaryDeletion"
+    nonisolated static let snapshotFilePrefix = "sayit-vocabulary-"
+    nonisolated static let snapshotFileSuffix = ".csv"
+    nonisolated static let csvHeader = "id,term,weight,source,created_at"
 
-    private static let enabledKey = "dictionaryCloudSyncEnabled"
-    private static let lastSyncKey = "dictionaryCloudSyncLastSyncAt"
-    private static let changeTokenKey = "dictionaryCloudSyncServerChangeToken"
-    private static let pushDebounceNanoseconds: UInt64 = 3_000_000_000
+    private static let pushDebounceNanoseconds: UInt64 = 30_000_000_000
+    private static let pollIntervalNanoseconds: UInt64 = 300_000_000_000
 
     @Published private(set) var state: DictionaryCloudSyncState = .syncDisabled
     @Published private(set) var lastSyncAt: Date?
+    @Published private(set) var directoryPath: String = ""
     @Published private(set) var isEnabled: Bool = false
 
     private let dictionaryStore: DictionaryStore
     private let defaults: UserDefaults
-    private let containerIdentifier: String
-
-    private var container: CKContainer?
-    private var database: CKDatabase?
     private var cancellables = Set<AnyCancellable>()
     private var pushTask: Task<Void, Never>?
     private var syncTask: Task<Void, Never>?
+    private var pollTask: Task<Void, Never>?
     private var isSyncInFlight = false
     private var needsAnotherSync = false
-    private var accountStatus: CKAccountStatus = .couldNotDetermine
-    private var knownEntryIDs: Set<UUID> = []
-    private var knownCategoryIDs: Set<UUID> = []
-    private var pendingDeletedEntryIDs: Set<UUID> = []
-    private var pendingDeletedCategoryIDs: Set<UUID> = []
 
     init(
         dictionaryStore: DictionaryStore,
-        defaults: UserDefaults = .standard,
-        containerIdentifier: String? = nil
+        defaults: UserDefaults = .standard
     ) {
         self.dictionaryStore = dictionaryStore
         self.defaults = defaults
-        self.containerIdentifier = containerIdentifier ?? DictionaryCloudSyncService.containerIdentifier
-        self.isEnabled = defaults.bool(forKey: Self.enabledKey)
-        if let interval = defaults.object(forKey: Self.lastSyncKey) as? Double {
+        self.directoryPath = defaults.string(forKey: AppPreferenceKey.dictionarySyncDirectoryPath) ?? ""
+        self.isEnabled = !directoryPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        if let interval = defaults.object(forKey: AppPreferenceKey.dictionarySyncLastSyncedAt) as? Double {
             self.lastSyncAt = Date(timeIntervalSince1970: interval)
         }
-        self.knownEntryIDs = Set(dictionaryStore.entries.map(\.id))
-        self.knownCategoryIDs = Set(dictionaryStore.categories.map(\.id))
+        // Drop legacy CloudKit preference if present.
+        defaults.removeObject(forKey: "dictionaryCloudSyncEnabled")
+        defaults.removeObject(forKey: "dictionaryCloudSyncServerChangeToken")
+        if defaults.object(forKey: "dictionaryCloudSyncLastSyncAt") != nil,
+           defaults.object(forKey: AppPreferenceKey.dictionarySyncLastSyncedAt) == nil,
+           let legacy = defaults.object(forKey: "dictionaryCloudSyncLastSyncAt") as? Double {
+            defaults.set(legacy, forKey: AppPreferenceKey.dictionarySyncLastSyncedAt)
+            lastSyncAt = Date(timeIntervalSince1970: legacy)
+        }
+        defaults.removeObject(forKey: "dictionaryCloudSyncLastSyncAt")
     }
 
-    /// Call once after app launch (or when the settings dialog opens) to restore prior preference.
+    /// Call once after app launch to restore prior folder preference.
     func bootstrap() {
         guard !VoxtRuntimeEnvironment.isRunningUnitTests else {
             state = .syncDisabled
@@ -97,26 +100,69 @@ final class DictionaryCloudSyncService: ObservableObject {
         }
     }
 
-    func enableSync() {
-        isEnabled = true
-        defaults.set(true, forKey: Self.enabledKey)
-        Task { await startSyncIfPossible(triggerImmediateSync: true) }
+    var deviceId: String {
+        if let existing = defaults.string(forKey: AppPreferenceKey.dictionarySyncDeviceId)?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !existing.isEmpty {
+            return existing
+        }
+        let created = UUID().uuidString.lowercased()
+        defaults.set(created, forKey: AppPreferenceKey.dictionarySyncDeviceId)
+        return created
     }
 
-    func disableSync() {
+    @discardableResult
+    func pickSyncDirectory() -> Bool {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = AppLocalization.localizedString("Choose Sync Folder")
+        panel.message = AppLocalization.localizedString(
+            "Choose a shared folder for dictionary sync (for example under iCloud Drive)."
+        )
+        guard panel.runModal() == .OK, let url = panel.url else { return false }
+        return setSyncDirectory(url)
+    }
+
+    @discardableResult
+    func setSyncDirectory(_ url: URL) -> Bool {
+        do {
+            let bookmark = try SecurityScopedBookmarkSupport.createBookmark(for: url)
+            let path = url.standardizedFileURL.path
+            defaults.set(bookmark, forKey: AppPreferenceKey.dictionarySyncDirectoryBookmark)
+            defaults.set(path, forKey: AppPreferenceKey.dictionarySyncDirectoryPath)
+            _ = deviceId
+            directoryPath = path
+            isEnabled = true
+            Task { await startSyncIfPossible(triggerImmediateSync: true) }
+            return true
+        } catch {
+            state = .error(error.localizedDescription)
+            VoxtLog.dictionaryWarning("Dictionary folder sync save failed: \(error.localizedDescription)")
+            return false
+        }
+    }
+
+    func clearSyncDirectory() {
         isEnabled = false
-        defaults.set(false, forKey: Self.enabledKey)
+        directoryPath = ""
+        defaults.removeObject(forKey: AppPreferenceKey.dictionarySyncDirectoryPath)
+        defaults.removeObject(forKey: AppPreferenceKey.dictionarySyncDirectoryBookmark)
+        defaults.removeObject(forKey: AppPreferenceKey.dictionarySyncLastSyncedAt)
+        lastSyncAt = nil
         pushTask?.cancel()
         pushTask = nil
         syncTask?.cancel()
         syncTask = nil
+        pollTask?.cancel()
+        pollTask = nil
         isSyncInFlight = false
         needsAnotherSync = false
         cancellables.removeAll()
-        container = nil
-        database = nil
         state = .syncDisabled
-        VoxtLog.dictionary("Dictionary CloudKit sync disabled.")
+        VoxtLog.dictionary("Dictionary folder sync disabled.")
     }
 
     func syncNow() {
@@ -127,94 +173,56 @@ final class DictionaryCloudSyncService: ObservableObject {
     // MARK: - Lifecycle
 
     private func startSyncIfPossible(triggerImmediateSync: Bool) async {
-        let available = await refreshAccountAvailability()
-        guard available else {
-            state = .syncDisabled
+        guard accessSyncDirectory() != nil else {
+            state = .error(AppLocalization.localizedString("Sync folder is unavailable"))
             return
         }
         wireLocalChangeObservers()
+        startPollingIfNeeded()
         state = lastSyncAt == nil ? .idle : .synced
         if triggerImmediateSync {
             await performSync(reason: "enable")
         }
     }
 
-    private func refreshAccountAvailability() async -> Bool {
-        let ckContainer = CKContainer(identifier: containerIdentifier)
-        container = ckContainer
-        do {
-            let status = try await ckContainer.accountStatus()
-            accountStatus = status
-            guard status == .available else {
-                VoxtLog.dictionary("Dictionary CloudKit account unavailable. status=\(status.rawValue)")
-                database = nil
-                return false
-            }
-            database = ckContainer.privateCloudDatabase
-            return true
-        } catch {
-            VoxtLog.dictionaryWarning("Dictionary CloudKit accountStatus failed: \(error.localizedDescription)")
-            accountStatus = .couldNotDetermine
-            database = nil
-            return false
-        }
+    private func accessSyncDirectory() -> SecurityScopedBookmarkSupport.Access? {
+        SecurityScopedBookmarkSupport.accessDirectoryURL(
+            bookmarkData: defaults.data(forKey: AppPreferenceKey.dictionarySyncDirectoryBookmark),
+            fallbackPath: defaults.string(forKey: AppPreferenceKey.dictionarySyncDirectoryPath) ?? ""
+        )
     }
 
     private func wireLocalChangeObservers() {
         cancellables.removeAll()
-        knownEntryIDs = Set(dictionaryStore.entries.map(\.id))
-        knownCategoryIDs = Set(dictionaryStore.categories.map(\.id))
         dictionaryStore.$entries
             .dropFirst()
-            .sink { [weak self] entries in
+            .sink { [weak self] _ in
                 guard let self else { return }
-                self.noteLocalEntrySnapshot(entries)
-                self.schedulePushAfterLocalChange()
-            }
-            .store(in: &cancellables)
-        dictionaryStore.$categories
-            .dropFirst()
-            .sink { [weak self] categories in
-                guard let self else { return }
-                self.noteLocalCategorySnapshot(categories)
+                guard !self.dictionaryStore.isApplyingRemoteSync else { return }
                 self.schedulePushAfterLocalChange()
             }
             .store(in: &cancellables)
     }
 
-    private func noteLocalEntrySnapshot(_ entries: [DictionaryEntry]) {
-        let currentIDs = Set(entries.map(\.id))
-        if !dictionaryStore.isApplyingRemoteSync {
-            let removed = knownEntryIDs.subtracting(currentIDs)
-            pendingDeletedEntryIDs.formUnion(removed)
+    private func startPollingIfNeeded() {
+        pollTask?.cancel()
+        pollTask = Task { @MainActor [weak self] in
+            while let self, !Task.isCancelled, self.isEnabled {
+                try? await Task.sleep(nanoseconds: Self.pollIntervalNanoseconds)
+                guard !Task.isCancelled, self.isEnabled else { return }
+                await self.performSync(reason: "poll")
+            }
         }
-        knownEntryIDs = currentIDs
-        pendingDeletedEntryIDs.subtract(currentIDs)
-    }
-
-    private func noteLocalCategorySnapshot(_ categories: [DictionaryCategory]) {
-        let currentIDs = Set(categories.map(\.id))
-        if !dictionaryStore.isApplyingRemoteSync {
-            let removed = knownCategoryIDs.subtracting(currentIDs)
-                .filter { $0 != DictionaryCategory.defaultID }
-            pendingDeletedCategoryIDs.formUnion(removed)
-        }
-        knownCategoryIDs = currentIDs
-        pendingDeletedCategoryIDs.subtract(currentIDs)
     }
 
     private func schedulePushAfterLocalChange() {
-        guard isEnabled else { return }
-        guard !dictionaryStore.isApplyingRemoteSync else { return }
         pushTask?.cancel()
         pushTask = Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: Self.pushDebounceNanoseconds)
-            guard let self, !Task.isCancelled else { return }
-            await self.performSync(reason: "localChange")
+            guard let self, !Task.isCancelled, self.isEnabled else { return }
+            await self.performSync(reason: "local-change")
         }
     }
-
-    // MARK: - Sync pipeline
 
     private func performSync(reason: String) async {
         guard isEnabled else { return }
@@ -228,366 +236,339 @@ final class DictionaryCloudSyncService: ObservableObject {
             isSyncInFlight = false
             if needsAnotherSync {
                 needsAnotherSync = false
-                Task { await self.performSync(reason: "coalesced") }
+                Task { await performSync(reason: "coalesced") }
             }
         }
 
-        let available = await refreshAccountAvailability()
-        guard available, let database else {
-            state = .syncDisabled
-            return
-        }
-
         do {
-            try await pullRemoteChanges(database: database)
-            try await pushLocalSnapshot(database: database)
+            guard let access = accessSyncDirectory() else {
+                throw DictionaryFolderSyncError.folderUnavailable
+            }
+            let directoryURL = access.url
+            let localEntries = dictionaryStore.entries
+            let snapshotEntries = localEntries.map(Self.snapshotEntry(from:))
+            let content = Self.serializeCSV(snapshotEntries)
+            try Self.writeSnapshot(
+                content: content,
+                directoryURL: directoryURL,
+                deviceId: deviceId
+            )
+
+            let snapshots = try Self.listSnapshots(in: directoryURL)
+            let parsed = snapshots.compactMap { snapshot -> (deviceId: String, entries: [DictionarySyncSnapshotEntry])? in
+                let entries = Self.parseCSV(snapshot.content)
+                return (snapshot.deviceId, entries)
+            }
+            let withoutSelf = parsed.filter { $0.deviceId != deviceId }
+            let mergedSnapshots = withoutSelf + [(deviceId, snapshotEntries)]
+            let merged = Self.mergeSnapshots(mergedSnapshots)
+            let localSorted = Self.sortSnapshotEntries(snapshotEntries)
+            let mergedSorted = Self.sortSnapshotEntries(merged)
+            let changed = localSorted != mergedSorted
+
+            if changed {
+                let remoteEntries = mergedSorted.map { Self.dictionaryEntry(from: $0) }
+                dictionaryStore.applyRemoteSync(
+                    entries: remoteEntries,
+                    categories: [],
+                    deletedEntryIDs: [],
+                    deletedCategoryIDs: []
+                )
+                // Remove local terms that no longer exist after merge (term-key based union).
+                let mergedIDs = Set(remoteEntries.map(\.id))
+                let staleIDs = Set(localEntries.map(\.id)).subtracting(mergedIDs)
+                if !staleIDs.isEmpty {
+                    dictionaryStore.applyRemoteSync(
+                        entries: [],
+                        categories: [],
+                        deletedEntryIDs: staleIDs,
+                        deletedCategoryIDs: []
+                    )
+                }
+            }
+
             let now = Date()
             lastSyncAt = now
-            defaults.set(now.timeIntervalSince1970, forKey: Self.lastSyncKey)
+            defaults.set(now.timeIntervalSince1970, forKey: AppPreferenceKey.dictionarySyncLastSyncedAt)
             state = .synced
-            VoxtLog.dictionary("Dictionary CloudKit sync finished. reason=\(reason)")
-        } catch is CancellationError {
-            state = lastSyncAt == nil ? .idle : .synced
+            VoxtLog.dictionary(
+                "Dictionary folder sync finished. reason=\(reason) snapshots=\(max(snapshots.count, 1)) changed=\(changed)"
+            )
         } catch {
             let message = error.localizedDescription
             state = .error(message)
-            VoxtLog.dictionaryWarning("Dictionary CloudKit sync failed: \(message)")
+            VoxtLog.dictionaryWarning("Dictionary folder sync failed: \(message)")
         }
     }
 
-    // MARK: - Pull
+    // MARK: - Snapshot IO
 
-    private func pullRemoteChanges(database: CKDatabase) async throws {
-        var entryRecords: [CKRecord] = []
-        var categoryRecords: [CKRecord] = []
-        var deletionRecords: [CKRecord] = []
+    nonisolated static func snapshotFileName(deviceId: String) -> String {
+        "\(snapshotFilePrefix)\(deviceId)\(snapshotFileSuffix)"
+    }
 
-        try await fetchAllRecords(
-            database: database,
-            recordType: Self.entryRecordType,
-            into: &entryRecords
+    nonisolated static func writeSnapshot(content: String, directoryURL: URL, deviceId: String) throws {
+        let fileURL = directoryURL.appendingPathComponent(snapshotFileName(deviceId: deviceId), isDirectory: false)
+        let tempURL = directoryURL.appendingPathComponent(
+            "\(snapshotFileName(deviceId: deviceId)).tmp",
+            isDirectory: false
         )
-        try await fetchAllRecords(
-            database: database,
-            recordType: Self.categoryRecordType,
-            into: &categoryRecords
-        )
-        try await fetchAllRecords(
-            database: database,
-            recordType: Self.deletionRecordType,
-            into: &deletionRecords
-        )
+        if FileManager.default.fileExists(atPath: tempURL.path) {
+            try FileManager.default.removeItem(at: tempURL)
+        }
+        try content.write(to: tempURL, atomically: true, encoding: .utf8)
+        if FileManager.default.fileExists(atPath: fileURL.path) {
+            try FileManager.default.removeItem(at: fileURL)
+        }
+        try FileManager.default.moveItem(at: tempURL, to: fileURL)
+    }
 
-        let remoteEntries = entryRecords.compactMap(Self.entry(from:))
-        let remoteCategories = categoryRecords.compactMap(Self.category(from:))
+    nonisolated static func listSnapshots(in directoryURL: URL) throws -> [(deviceId: String, path: String, content: String)] {
+        let contents = try FileManager.default.contentsOfDirectory(
+            at: directoryURL,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        )
+        var snapshots: [(deviceId: String, path: String, content: String)] = []
+        for fileURL in contents {
+            let name = fileURL.lastPathComponent
+            guard name.hasPrefix(snapshotFilePrefix),
+                  name.hasSuffix(snapshotFileSuffix),
+                  !name.hasSuffix(".tmp") else { continue }
+            let devicePart = String(
+                name.dropFirst(snapshotFilePrefix.count).dropLast(snapshotFileSuffix.count)
+            )
+            guard !devicePart.isEmpty else { continue }
+            let content = (try? String(contentsOf: fileURL, encoding: .utf8)) ?? ""
+            snapshots.append((devicePart, fileURL.path, content))
+        }
+        return snapshots
+    }
 
-        var deletedEntryIDs = Set<UUID>()
-        var deletedCategoryIDs = Set<UUID>()
-        for record in deletionRecords {
-            guard let kind = record["kind"] as? String,
-                  let idString = record["targetID"] as? String,
-                  let id = UUID(uuidString: idString)
-            else {
+    // MARK: - CSV
+
+    nonisolated static func escapeCSVField(_ value: String) -> String {
+        if value.rangeOfCharacter(from: CharacterSet(charactersIn: "\",\r\n")) != nil {
+            return "\"\(value.replacingOccurrences(of: "\"", with: "\"\""))\""
+        }
+        return value
+    }
+
+    nonisolated static func parseCSVLine(_ line: String) -> [String] {
+        var fields: [String] = []
+        var current = ""
+        var inQuotes = false
+        let chars = Array(line)
+        var index = 0
+        while index < chars.count {
+            let ch = chars[index]
+            if inQuotes {
+                if ch == "\"" {
+                    if index + 1 < chars.count, chars[index + 1] == "\"" {
+                        current.append("\"")
+                        index += 1
+                    } else {
+                        inQuotes = false
+                    }
+                } else {
+                    current.append(ch)
+                }
+            } else if ch == "\"" {
+                inQuotes = true
+            } else if ch == "," {
+                fields.append(current)
+                current = ""
+            } else {
+                current.append(ch)
+            }
+            index += 1
+        }
+        fields.append(current)
+        return fields
+    }
+
+    nonisolated static func serializeCSV(_ entries: [DictionarySyncSnapshotEntry]) -> String {
+        var lines = [csvHeader]
+        for entry in entries {
+            lines.append(
+                [
+                    escapeCSVField(entry.id),
+                    escapeCSVField(entry.term),
+                    String(entry.weight),
+                    escapeCSVField(entry.source),
+                    escapeCSVField(entry.createdAt)
+                ].joined(separator: ",")
+            )
+        }
+        return lines.joined(separator: "\n") + "\n"
+    }
+
+    nonisolated static func parseCSV(_ content: String) -> [DictionarySyncSnapshotEntry] {
+        let normalized = content.trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "\u{FEFF}", with: "")
+        guard !normalized.isEmpty else { return [] }
+        let lines = normalized.split(whereSeparator: \.isNewline).map(String.init).filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        guard !lines.isEmpty else { return [] }
+
+        let firstFields = parseCSVLine(lines[0]).map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+        let startIndex = firstFields.joined(separator: ",") == csvHeader ? 1 : 0
+
+        var entries: [DictionarySyncSnapshotEntry] = []
+        for line in lines.dropFirst(startIndex) {
+            let fields = parseCSVLine(line)
+            guard fields.count >= 5 else { continue }
+            let id = fields[0].trimmingCharacters(in: .whitespacesAndNewlines)
+            let term = fields[1].trimmingCharacters(in: .whitespacesAndNewlines)
+            let weightRaw = fields[2].trimmingCharacters(in: .whitespacesAndNewlines)
+            let source = fields[3].trimmingCharacters(in: .whitespacesAndNewlines)
+            let createdAt = fields[4].trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !id.isEmpty, !term.isEmpty, !createdAt.isEmpty else { continue }
+            guard source == "manual" || source == "ai" || source == "auto" || source == "codex" || source == "claude" else {
                 continue
             }
-            if kind == "entry" {
-                deletedEntryIDs.insert(id)
-            } else if kind == "category" {
-                deletedCategoryIDs.insert(id)
-            }
-        }
-
-        // Prefer live records over deletion markers when both exist (record recreated later).
-        deletedEntryIDs.subtract(remoteEntries.map(\.id))
-        deletedCategoryIDs.subtract(remoteCategories.map(\.id))
-
-        guard !remoteEntries.isEmpty
-            || !remoteCategories.isEmpty
-            || !deletedEntryIDs.isEmpty
-            || !deletedCategoryIDs.isEmpty
-        else {
-            return
-        }
-
-        dictionaryStore.applyRemoteSync(
-            entries: remoteEntries,
-            categories: remoteCategories,
-            deletedEntryIDs: deletedEntryIDs,
-            deletedCategoryIDs: deletedCategoryIDs
-        )
-    }
-
-    private func fetchAllRecords(
-        database: CKDatabase,
-        recordType: String,
-        into records: inout [CKRecord]
-    ) async throws {
-        // Avoid sortDescriptors so queries work before CloudKit indexes are configured.
-        let query = CKQuery(recordType: recordType, predicate: NSPredicate(value: true))
-
-        var cursor: CKQueryOperation.Cursor?
-        do {
-            let (matchResults, queryCursor) = try await database.records(
-                matching: query,
-                inZoneWith: nil,
-                desiredKeys: nil,
-                resultsLimit: CKQueryOperation.maximumResults
+            let weight = Int(weightRaw) ?? 1
+            entries.append(
+                DictionarySyncSnapshotEntry(
+                    id: id,
+                    term: term,
+                    weight: weight > 0 ? weight : 1,
+                    source: source,
+                    createdAt: createdAt
+                )
             )
-            for (_, result) in matchResults {
-                if case .success(let record) = result {
-                    records.append(record)
-                }
-            }
-            cursor = queryCursor
-        } catch let error as CKError where error.code == .unknownItem {
-            // Record type not yet created in the private database; treat as empty.
-            return
         }
-
-        while let currentCursor = cursor {
-            let (pageResults, nextCursor) = try await database.records(
-                continuingMatchFrom: currentCursor,
-                desiredKeys: nil,
-                resultsLimit: CKQueryOperation.maximumResults
-            )
-            for (_, result) in pageResults {
-                if case .success(let record) = result {
-                    records.append(record)
-                }
-            }
-            cursor = nextCursor
-        }
+        return entries
     }
 
-    // MARK: - Push
+    // MARK: - Merge (SayIt rules)
 
-    private func pushLocalSnapshot(database: CKDatabase) async throws {
-        let localEntries = dictionaryStore.entries
-        let localCategories = dictionaryStore.categories
-
-        var recordsToSave: [CKRecord] = []
-        recordsToSave.reserveCapacity(
-            localEntries.count + localCategories.count
-                + pendingDeletedEntryIDs.count + pendingDeletedCategoryIDs.count
-        )
-
-        for category in localCategories {
-            recordsToSave.append(Self.record(from: category))
-        }
-        for entry in localEntries {
-            recordsToSave.append(Self.record(from: entry))
-        }
-
-        let deletedEntryIDs = pendingDeletedEntryIDs
-        let deletedCategoryIDs = pendingDeletedCategoryIDs
-        let now = Date()
-        for entryID in deletedEntryIDs {
-            recordsToSave.append(Self.deletionRecord(kind: "entry", targetID: entryID, updatedAt: now))
-        }
-        for categoryID in deletedCategoryIDs {
-            recordsToSave.append(Self.deletionRecord(kind: "category", targetID: categoryID, updatedAt: now))
-        }
-
-        var recordIDsToDelete: [CKRecord.ID] = []
-        for entryID in deletedEntryIDs {
-            recordIDsToDelete.append(CKRecord.ID(recordName: entryID.uuidString))
-        }
-        for categoryID in deletedCategoryIDs {
-            recordIDsToDelete.append(CKRecord.ID(recordName: categoryID.uuidString))
-        }
-
-        if !recordsToSave.isEmpty {
-            for chunk in recordsToSave.chunked(into: 200) {
-                try await modifyRecords(saving: chunk, deleting: [], database: database)
-            }
-        }
-        if !recordIDsToDelete.isEmpty {
-            for chunk in recordIDsToDelete.chunked(into: 200) {
-                try await modifyRecords(saving: [], deleting: chunk, database: database)
-            }
-        }
-
-        pendingDeletedEntryIDs.subtract(deletedEntryIDs)
-        pendingDeletedCategoryIDs.subtract(deletedCategoryIDs)
+    nonisolated static func normalizeTermKey(_ term: String) -> String {
+        term.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
-    private func modifyRecords(
-        saving records: [CKRecord],
-        deleting recordIDs: [CKRecord.ID],
-        database: CKDatabase
-    ) async throws {
-        guard !records.isEmpty || !recordIDs.isEmpty else { return }
-        let result = try await database.modifyRecords(
-            saving: records,
-            deleting: recordIDs,
-            savePolicy: .allKeys,
-            atomically: false
-        )
-        for (_, saveResult) in result.saveResults {
-            if case .failure(let error) = saveResult {
-                // Server-record-changed is expected under concurrent edits; last-write-wins
-                // on the next pull cycle. Other failures bubble up.
-                if let ckError = error as? CKError, ckError.code == .serverRecordChanged {
+    nonisolated static func sourceRank(_ source: String) -> Int {
+        source == "manual" ? 2 : 1
+    }
+
+    nonisolated static func mergeSnapshots(
+        _ snapshotList: [(deviceId: String, entries: [DictionarySyncSnapshotEntry])]
+    ) -> [DictionarySyncSnapshotEntry] {
+        struct Candidate {
+            var entry: DictionarySyncSnapshotEntry
+            var deviceId: String
+        }
+
+        var byTerm: [String: Candidate] = [:]
+        for snapshot in snapshotList {
+            for entry in snapshot.entries {
+                let key = normalizeTermKey(entry.term)
+                guard !key.isEmpty else { continue }
+                let incoming = Candidate(
+                    entry: DictionarySyncSnapshotEntry(
+                        id: entry.id,
+                        term: entry.term.trimmingCharacters(in: .whitespacesAndNewlines),
+                        weight: max(1, entry.weight),
+                        source: entry.source,
+                        createdAt: entry.createdAt
+                    ),
+                    deviceId: snapshot.deviceId
+                )
+                guard let existing = byTerm[key] else {
+                    byTerm[key] = incoming
                     continue
                 }
-                throw error
+
+                let weight = max(existing.entry.weight, incoming.entry.weight)
+                let source = sourceRank(existing.entry.source) >= sourceRank(incoming.entry.source)
+                    ? existing.entry.source
+                    : incoming.entry.source
+                let createdCmp = incoming.entry.createdAt.compare(existing.entry.createdAt)
+                let deviceCmp = incoming.deviceId.compare(existing.deviceId)
+                let preferIncoming = createdCmp == .orderedDescending
+                    || (createdCmp == .orderedSame && deviceCmp == .orderedDescending)
+                let winner = preferIncoming ? incoming : existing
+                byTerm[key] = Candidate(
+                    entry: DictionarySyncSnapshotEntry(
+                        id: winner.entry.id,
+                        term: winner.entry.term,
+                        weight: weight,
+                        source: source,
+                        createdAt: winner.entry.createdAt
+                    ),
+                    deviceId: winner.deviceId
+                )
             }
         }
-        for (_, deleteResult) in result.deleteResults {
-            if case .failure(let error) = deleteResult {
-                if let ckError = error as? CKError,
-                   ckError.code == .unknownItem || ckError.code == .serverRecordChanged {
-                    continue
-                }
-                throw error
-            }
+        return sortSnapshotEntries(Array(byTerm.values.map(\.entry)))
+    }
+
+    nonisolated static func sortSnapshotEntries(_ entries: [DictionarySyncSnapshotEntry]) -> [DictionarySyncSnapshotEntry] {
+        entries.sorted { lhs, rhs in
+            if lhs.weight != rhs.weight { return lhs.weight > rhs.weight }
+            return lhs.createdAt > rhs.createdAt
         }
     }
 
-    // MARK: - Record mapping
+    // MARK: - Mapping
 
-    nonisolated static func record(from entry: DictionaryEntry) -> CKRecord {
-        let recordID = CKRecord.ID(recordName: entry.id.uuidString)
-        let record = CKRecord(recordType: entryRecordType, recordID: recordID)
-        record["term"] = entry.term as CKRecordValue
-        record["normalizedTerm"] = entry.normalizedTerm as CKRecordValue
-        record["categoryID"] = entry.categoryID.uuidString as CKRecordValue
-        if let snapshot = entry.categoryNameSnapshot {
-            record["categoryNameSnapshot"] = snapshot as CKRecordValue
+    private static let isoFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    private static let isoFormatterFallback: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
+
+    static func snapshotEntry(from entry: DictionaryEntry) -> DictionarySyncSnapshotEntry {
+        let source: String
+        switch entry.source {
+        case .manual:
+            source = "manual"
+        case .auto, .codex, .claude:
+            // SayIt only has manual|ai; map non-manual to ai for interoperability.
+            source = "ai"
         }
-        if let groupID = entry.groupID {
-            record["groupID"] = groupID.uuidString as CKRecordValue
-        }
-        if let groupName = entry.groupNameSnapshot {
-            record["groupNameSnapshot"] = groupName as CKRecordValue
-        }
-        record["source"] = entry.source.rawValue as CKRecordValue
-        record["status"] = entry.status.rawValue as CKRecordValue
-        record["matchCount"] = entry.matchCount as CKRecordValue
-        record["createdAt"] = entry.createdAt as CKRecordValue
-        record["updatedAt"] = entry.updatedAt as CKRecordValue
-        if let lastMatchedAt = entry.lastMatchedAt {
-            record["lastMatchedAt"] = lastMatchedAt as CKRecordValue
-        }
-        if let data = try? JSONEncoder().encode(entry.replacementTerms),
-           let json = String(data: data, encoding: .utf8) {
-            record["replacementTermsJSON"] = json as CKRecordValue
-        }
-        if let data = try? JSONEncoder().encode(entry.observedVariants),
-           let json = String(data: data, encoding: .utf8) {
-            record["observedVariantsJSON"] = json as CKRecordValue
-        }
-        return record
+        return DictionarySyncSnapshotEntry(
+            id: entry.id.uuidString.lowercased(),
+            term: entry.term,
+            weight: max(1, entry.matchCount),
+            source: source,
+            createdAt: isoFormatter.string(from: entry.createdAt)
+        )
     }
 
-    nonisolated static func record(from category: DictionaryCategory) -> CKRecord {
-        let recordID = CKRecord.ID(recordName: category.id.uuidString)
-        let record = CKRecord(recordType: categoryRecordType, recordID: recordID)
-        record["name"] = category.name as CKRecordValue
-        record["normalizedName"] = category.normalizedName as CKRecordValue
-        record["isDefault"] = (category.isDefault ? 1 : 0) as CKRecordValue
-        record["isExpanded"] = (category.isExpanded ? 1 : 0) as CKRecordValue
-        record["sortOrder"] = category.sortOrder as CKRecordValue
-        record["createdAt"] = category.createdAt as CKRecordValue
-        record["updatedAt"] = category.updatedAt as CKRecordValue
-        return record
-    }
-
-    nonisolated static func deletionRecord(kind: String, targetID: UUID, updatedAt: Date) -> CKRecord {
-        let recordName = "del-\(kind)-\(targetID.uuidString)"
-        let recordID = CKRecord.ID(recordName: recordName)
-        let record = CKRecord(recordType: deletionRecordType, recordID: recordID)
-        record["kind"] = kind as CKRecordValue
-        record["targetID"] = targetID.uuidString as CKRecordValue
-        record["updatedAt"] = updatedAt as CKRecordValue
-        return record
-    }
-
-    nonisolated static func entry(from record: CKRecord) -> DictionaryEntry? {
-        guard record.recordType == entryRecordType else { return nil }
-        let id = UUID(uuidString: record.recordID.recordName) ?? UUID()
-        guard let term = record["term"] as? String,
-              let normalizedTerm = record["normalizedTerm"] as? String
-        else {
-            return nil
-        }
-        let categoryID = (record["categoryID"] as? String).flatMap(UUID.init(uuidString:))
-            ?? DictionaryCategory.defaultID
-        let sourceRaw = (record["source"] as? String) ?? DictionaryEntrySource.manual.rawValue
-        let statusRaw = (record["status"] as? String) ?? DictionaryEntryStatus.active.rawValue
-        let createdAt = (record["createdAt"] as? Date) ?? Date()
-        let updatedAt = (record["updatedAt"] as? Date) ?? createdAt
-        let matchCount = (record["matchCount"] as? Int) ?? 0
-
-        var replacementTerms: [DictionaryReplacementTerm] = []
-        if let json = record["replacementTermsJSON"] as? String,
-           let data = json.data(using: .utf8),
-           let decoded = try? JSONDecoder().decode([DictionaryReplacementTerm].self, from: data) {
-            replacementTerms = decoded
-        }
-
-        var observedVariants: [ObservedVariant] = []
-        if let json = record["observedVariantsJSON"] as? String,
-           let data = json.data(using: .utf8),
-           let decoded = try? JSONDecoder().decode([ObservedVariant].self, from: data) {
-            observedVariants = decoded
-        }
-
+    static func dictionaryEntry(from snapshot: DictionarySyncSnapshotEntry) -> DictionaryEntry {
+        let id = UUID(uuidString: snapshot.id) ?? UUID()
+        let source: DictionaryEntrySource = snapshot.source == "manual" ? .manual : .auto
+        let createdAt = isoFormatter.date(from: snapshot.createdAt)
+            ?? isoFormatterFallback.date(from: snapshot.createdAt)
+            ?? Date()
+        let term = snapshot.term.trimmingCharacters(in: .whitespacesAndNewlines)
         return DictionaryEntry(
             id: id,
             term: term,
-            normalizedTerm: normalizedTerm,
-            categoryID: categoryID,
-            categoryNameSnapshot: record["categoryNameSnapshot"] as? String,
-            groupID: (record["groupID"] as? String).flatMap(UUID.init(uuidString:)),
-            groupNameSnapshot: record["groupNameSnapshot"] as? String,
-            source: DictionaryEntrySource(rawValue: sourceRaw) ?? .manual,
+            normalizedTerm: DictionaryStore.normalizeTerm(term),
+            categoryID: DictionaryCategory.defaultID,
+            categoryNameSnapshot: DictionaryCategory.defaultName,
+            source: source,
             createdAt: createdAt,
-            updatedAt: updatedAt,
-            lastMatchedAt: record["lastMatchedAt"] as? Date,
-            matchCount: matchCount,
-            status: DictionaryEntryStatus(rawValue: statusRaw) ?? .active,
-            observedVariants: observedVariants,
-            replacementTerms: replacementTerms
-        )
-    }
-
-    nonisolated static func category(from record: CKRecord) -> DictionaryCategory? {
-        guard record.recordType == categoryRecordType else { return nil }
-        guard let id = UUID(uuidString: record.recordID.recordName) else { return nil }
-        guard let name = record["name"] as? String else { return nil }
-        let normalizedName = (record["normalizedName"] as? String)
-            ?? DictionaryStore.normalizeTerm(name)
-        let isDefault = ((record["isDefault"] as? Int) ?? 0) != 0
-            || id == DictionaryCategory.defaultID
-        let isExpanded = ((record["isExpanded"] as? Int) ?? 1) != 0
-        let sortOrder = (record["sortOrder"] as? Int) ?? 0
-        let createdAt = (record["createdAt"] as? Date) ?? Date()
-        let updatedAt = (record["updatedAt"] as? Date) ?? createdAt
-        return DictionaryCategory(
-            id: id,
-            name: name,
-            normalizedName: normalizedName,
-            isDefault: isDefault,
-            isExpanded: isExpanded,
-            sortOrder: sortOrder,
-            createdAt: createdAt,
-            updatedAt: updatedAt
+            updatedAt: createdAt,
+            matchCount: max(0, snapshot.weight)
         )
     }
 }
 
-private extension Array {
-    func chunked(into size: Int) -> [[Element]] {
-        guard size > 0, !isEmpty else { return isEmpty ? [] : [self] }
-        var result: [[Element]] = []
-        result.reserveCapacity((count + size - 1) / size)
-        var index = startIndex
-        while index < endIndex {
-            let next = self.index(index, offsetBy: size, limitedBy: endIndex) ?? endIndex
-            result.append(Array(self[index..<next]))
-            index = next
+private enum DictionaryFolderSyncError: LocalizedError {
+    case folderUnavailable
+
+    var errorDescription: String? {
+        switch self {
+        case .folderUnavailable:
+            return AppLocalization.localizedString("Sync folder is unavailable")
         }
-        return result
     }
 }
