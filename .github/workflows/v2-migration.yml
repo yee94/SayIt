@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - v2
+    paths-ignore:
+      - "README.md"
+      - "docs/**"
+      - "**/*.md"
   workflow_dispatch:
 
 concurrency:
@@ -14,21 +18,18 @@ permissions:
   contents: read
 
 jobs:
-  build-sign-notarize:
-    name: Build, Sign, Notarize
+  # ---------------------------------------------------------------------------
+  # Job 1: compile only (heavy). Cache MLX/SwiftPM/Xcode intermediates + save.
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build arm64 App
     runs-on: macos-26
     outputs:
       version: ${{ steps.release_metadata.outputs.version }}
       tag: ${{ steps.release_metadata.outputs.tag }}
-    env:
-      DEVELOPER_ID_APP_IDENTITY: "Developer ID Application: yee wang (6W97S9B7CZ)"
-      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-      APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-      APP_STORE_CONNECT_PRIVATE_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY_BASE64 }}
-      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      cache-hit-compilation: ${{ steps.compilation_cache.outputs.cache-hit }}
+      cache-hit-spm: ${{ steps.spm_cache.outputs.cache-hit }}
+      cache-hit-sherpa: ${{ steps.sherpa_runtime.outputs.cache-hit }}
     steps:
       - uses: actions/checkout@v5
 
@@ -43,6 +44,168 @@ jobs:
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve cache keys
+        id: cache_key
+        run: |
+          set -euo pipefail
+          XCODE_VERSION="$(xcodebuild -version | tr '\n' '-' | sed -E 's/[^A-Za-z0-9._-]+/-/g; s/-+$//')"
+          SHERPA_SCRIPT_HASH="$(shasum -a 256 tools/build_sherpa_onnx_macos.sh | awk '{print $1}')"
+          PACKAGE_HASH="$(shasum -a 256 Voxt.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved | awk '{print $1}')"
+          # Bump cache version suffix when cache layout changes (v2 adds SourcePackages + ModuleCache).
+          COMPILE_PREFIX="xcode-compile-${RUNNER_OS}-${RUNNER_ARCH}-${XCODE_VERSION}-release-arm64-v2"
+          SPM_PREFIX="spm-source-${RUNNER_OS}-${RUNNER_ARCH}-${XCODE_VERSION}-v2"
+          echo "xcode_version=$XCODE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "package_hash=$PACKAGE_HASH" >> "$GITHUB_OUTPUT"
+          echo "sherpa_key=sherpa-onnx-${RUNNER_OS}-${RUNNER_ARCH}-${XCODE_VERSION}-142807252687d81b40d6315f23470a1512a00de3-${SHERPA_SCRIPT_HASH}" >> "$GITHUB_OUTPUT"
+          echo "compilation_key=${COMPILE_PREFIX}-${PACKAGE_HASH}" >> "$GITHUB_OUTPUT"
+          echo "compilation_restore_prefix=${COMPILE_PREFIX}-" >> "$GITHUB_OUTPUT"
+          echo "spm_key=${SPM_PREFIX}-${PACKAGE_HASH}" >> "$GITHUB_OUTPUT"
+          echo "spm_restore_prefix=${SPM_PREFIX}-" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare Sherpa ONNX runtime
+        id: sherpa_runtime
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            ThirdParty/sherpa-onnx/install
+            ThirdParty/sherpa-onnx/sherpa-onnx.xcframework
+          key: ${{ steps.cache_key.outputs.sherpa_key }}
+
+      - name: Build Sherpa ONNX runtime on cache miss
+        if: steps.sherpa_runtime.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          tools/build_sherpa_onnx_macos.sh
+
+      - name: Configure Sherpa ONNX runtime
+        run: |
+          set -euo pipefail
+          cp Config/SherpaOnnx.local.xcconfig.example Config/SherpaOnnx.local.xcconfig
+
+      - name: Restore SwiftPM SourcePackages cache (MLX / llama / etc.)
+        id: spm_cache
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            build/DerivedData/SourcePackages
+            build/DerivedData/ModuleCache.noindex
+          key: ${{ steps.cache_key.outputs.spm_key }}
+          restore-keys: |
+            ${{ steps.cache_key.outputs.spm_restore_prefix }}
+
+      - name: Restore Xcode compilation cache
+        id: compilation_cache
+        uses: actions/cache/restore@v5
+        with:
+          path: build/DerivedData/CompilationCache.noindex
+          key: ${{ steps.cache_key.outputs.compilation_key }}
+          restore-keys: |
+            ${{ steps.cache_key.outputs.compilation_restore_prefix }}
+
+      - name: Report cache status
+        run: |
+          {
+            echo "### Build caches"
+            echo "- Sherpa ONNX: ${{ steps.sherpa_runtime.outputs.cache-hit == 'true' && 'hit' || 'miss' }}"
+            echo "- SwiftPM/ModuleCache: ${{ steps.spm_cache.outputs.cache-hit == 'true' && 'exact hit' || 'miss/partial' }}"
+            echo "- Xcode CompilationCache: ${{ steps.compilation_cache.outputs.cache-hit == 'true' && 'exact hit' || 'miss/partial' }}"
+            echo "- Package.resolved: \`${{ steps.cache_key.outputs.package_hash }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build arm64 release app
+        run: |
+          set -euo pipefail
+          mkdir -p build/DerivedData
+          xcodebuild \
+            -project Voxt.xcodeproj \
+            -scheme Voxt \
+            -configuration Release \
+            -destination "platform=macOS,arch=arm64" \
+            -derivedDataPath build/DerivedData \
+            -clonedSourcePackagesDirPath build/DerivedData/SourcePackages \
+            -onlyUsePackageVersionsFromResolvedFile \
+            -skipPackagePluginValidation \
+            -showBuildTimingSummary \
+            build \
+            ARCHS=arm64 \
+            ONLY_ACTIVE_ARCH=YES \
+            EXCLUDED_ARCHS=x86_64 \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+          test -d build/DerivedData/Build/Products/Release/SayIt.app
+          test -f build/DerivedData/Build/Products/Release/SayIt.app/Contents/MacOS/SayIt
+          lipo -info build/DerivedData/Build/Products/Release/SayIt.app/Contents/MacOS/SayIt | tee build/arch-info.txt
+          grep -E 'arm64|aarch64' build/arch-info.txt > /dev/null
+          if grep -E 'x86_64' build/arch-info.txt; then
+            echo "::error::Expected arm64-only binary, found x86_64"
+            exit 1
+          fi
+
+      - name: Package unsigned app for signing job
+        run: |
+          set -euo pipefail
+          mkdir -p build/unsigned
+          # Keep only the product app for the sign job (avoids re-uploading whole DerivedData).
+          ditto build/DerivedData/Build/Products/Release/SayIt.app build/unsigned/SayIt.app
+          cp build/arch-info.txt build/unsigned/arch-info.txt
+          du -sh build/unsigned/SayIt.app
+          du -sh build/DerivedData/SourcePackages 2>/dev/null || true
+          du -sh build/DerivedData/CompilationCache.noindex 2>/dev/null || true
+          du -sh build/DerivedData/ModuleCache.noindex 2>/dev/null || true
+
+      - name: Save SwiftPM SourcePackages + ModuleCache
+        if: steps.spm_cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            build/DerivedData/SourcePackages
+            build/DerivedData/ModuleCache.noindex
+          key: ${{ steps.cache_key.outputs.spm_key }}
+
+      - name: Save Xcode compilation cache
+        if: steps.compilation_cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: build/DerivedData/CompilationCache.noindex
+          key: ${{ steps.cache_key.outputs.compilation_key }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sayit-v2-unsigned-app-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 3
+          path: |
+            build/unsigned/SayIt.app
+            build/unsigned/arch-info.txt
+
+  # ---------------------------------------------------------------------------
+  # Job 2: sign + notarize only (reuses compiled app; no MLX rebuild).
+  # ---------------------------------------------------------------------------
+  sign-notarize:
+    name: Sign, Notarize, Package
+    runs-on: macos-26
+    needs: build
+    outputs:
+      version: ${{ needs.build.outputs.version }}
+      tag: ${{ needs.build.outputs.tag }}
+    env:
+      DEVELOPER_ID_APP_IDENTITY: "Developer ID Application: yee wang (6W97S9B7CZ)"
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+      APP_STORE_CONNECT_PRIVATE_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY_BASE64 }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: sayit-v2-unsigned-app-${{ github.sha }}
+          path: build/unsigned
 
       - name: Validate SayIt signing secrets
         run: |
@@ -87,76 +250,14 @@ jobs:
           chmod 600 "$KEY_PATH"
           echo "NOTARY_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
 
-      - name: Resolve release cache key
-        id: cache_key
-        run: |
-          set -euo pipefail
-          XCODE_VERSION="$(xcodebuild -version | tr '\n' '-' | sed -E 's/[^A-Za-z0-9._-]+/-/g; s/-+$//')"
-          SHERPA_SCRIPT_HASH="$(shasum -a 256 tools/build_sherpa_onnx_macos.sh | awk '{print $1}')"
-          PACKAGE_HASH="$(shasum -a 256 Voxt.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved | awk '{print $1}')"
-          echo "sherpa_key=sherpa-onnx-${RUNNER_OS}-${RUNNER_ARCH}-${XCODE_VERSION}-142807252687d81b40d6315f23470a1512a00de3-${SHERPA_SCRIPT_HASH}" >> "$GITHUB_OUTPUT"
-          echo "compilation_key=xcode-compilation-${RUNNER_OS}-${RUNNER_ARCH}-${XCODE_VERSION}-release-arm64-v1-${PACKAGE_HASH}" >> "$GITHUB_OUTPUT"
-          echo "compilation_restore_prefix=xcode-compilation-${RUNNER_OS}-${RUNNER_ARCH}-${XCODE_VERSION}-release-arm64-v1-" >> "$GITHUB_OUTPUT"
-
-      - name: Prepare Sherpa ONNX runtime
-        id: sherpa_runtime
-        uses: actions/cache/restore@v5
-        with:
-          path: |
-            ThirdParty/sherpa-onnx/install
-            ThirdParty/sherpa-onnx/sherpa-onnx.xcframework
-          key: ${{ steps.cache_key.outputs.sherpa_key }}
-
-      - name: Build Sherpa ONNX runtime on cache miss
-        if: steps.sherpa_runtime.outputs.cache-hit != 'true'
-        run: |
-          set -euo pipefail
-          tools/build_sherpa_onnx_macos.sh
-
-      - name: Configure Sherpa ONNX runtime
-        run: |
-          set -euo pipefail
-          cp Config/SherpaOnnx.local.xcconfig.example Config/SherpaOnnx.local.xcconfig
-
-      - name: Restore Xcode compilation cache
-        uses: actions/cache/restore@v5
-        with:
-          path: build/DerivedData/CompilationCache.noindex
-          key: ${{ steps.cache_key.outputs.compilation_key }}
-          restore-keys: |
-            ${{ steps.cache_key.outputs.compilation_restore_prefix }}
-
-      - name: Build arm64 release app
-        run: |
-          set -euo pipefail
-          xcodebuild \
-            -project Voxt.xcodeproj \
-            -scheme Voxt \
-            -configuration Release \
-            -destination "platform=macOS,arch=arm64" \
-            -derivedDataPath build/DerivedData \
-            -onlyUsePackageVersionsFromResolvedFile \
-            -skipPackagePluginValidation \
-            build \
-            ARCHS=arm64 \
-            ONLY_ACTIVE_ARCH=YES \
-            EXCLUDED_ARCHS=x86_64 \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY=""
-
       - name: Sign the app with SayIt Developer ID
         run: |
           set -euo pipefail
-          APP_PATH="build/DerivedData/Build/Products/Release/SayIt.app"
+          APP_PATH="build/unsigned/SayIt.app"
           ENTITLEMENTS_PATH="Voxt/Voxt.DeveloperID.entitlements"
           BUNDLE_ID="com.sayit.app"
           test -d "$APP_PATH"
           test -f "$ENTITLEMENTS_PATH"
-          # Product executable is already named SayIt. Do NOT create
-          # Contents/MacOS/sayit -> SayIt: on case-insensitive APFS that becomes
-          # a self-referential symlink and codesign fails with
-          # "Too many levels of symbolic links".
           test -f "$APP_PATH/Contents/MacOS/SayIt"
           ls -la "$APP_PATH/Contents/MacOS"
           # Fail only on real entitlement keys, not comments.
@@ -201,9 +302,10 @@ jobs:
       - name: Notarize and staple
         run: |
           set -euo pipefail
-          APP_PATH="build/DerivedData/Build/Products/Release/SayIt.app"
-          VERSION="${{ steps.release_metadata.outputs.version }}"
+          APP_PATH="build/unsigned/SayIt.app"
+          VERSION="${{ needs.build.outputs.version }}"
           ZIP_PATH="build/SayIt-${VERSION}-macOS.zip"
+          mkdir -p build
           ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ZIP_PATH"
           xcrun notarytool submit "$ZIP_PATH" \
             --key "$NOTARY_KEY_PATH" \
@@ -219,9 +321,9 @@ jobs:
       - name: Build Tauri migration payload
         run: |
           set -euo pipefail
-          APP_PATH="build/DerivedData/Build/Products/Release/SayIt.app"
-          VERSION="${{ steps.release_metadata.outputs.version }}"
-          TAG="${{ steps.release_metadata.outputs.tag }}"
+          APP_PATH="build/unsigned/SayIt.app"
+          VERSION="${{ needs.build.outputs.version }}"
+          TAG="${{ needs.build.outputs.tag }}"
           PAYLOAD_NAME="SayIt-${VERSION}-aarch64.app.tar.gz"
           PAYLOAD_PATH="build/${PAYLOAD_NAME}"
           KEY_PATH="$RUNNER_TEMP/sayit-tauri.key"
@@ -257,11 +359,10 @@ jobs:
               },
               endpoint: $endpoint
             }' > build/latest.json
-          lipo -info "$APP_PATH/Contents/MacOS/SayIt" | tee build/arch-info.txt
-          grep -E 'arm64|aarch64' build/arch-info.txt > /dev/null
-          if grep -E 'x86_64' build/arch-info.txt; then
-            echo "::error::Expected arm64-only binary, found x86_64"
-            exit 1
+          if [ -f build/unsigned/arch-info.txt ]; then
+            cp build/unsigned/arch-info.txt build/arch-info.txt
+          else
+            lipo -info "$APP_PATH/Contents/MacOS/SayIt" | tee build/arch-info.txt
           fi
 
       - uses: actions/upload-artifact@v4
@@ -277,15 +378,18 @@ jobs:
             build/codesign.txt
             build/arch-info.txt
 
+  # ---------------------------------------------------------------------------
+  # Job 3: publish release + updater feed (linux; no compile).
+  # ---------------------------------------------------------------------------
   publish-release:
     name: Publish GitHub Release + Vercel Updater
     runs-on: ubuntu-latest
-    needs: build-sign-notarize
+    needs: sign-notarize
     permissions:
       contents: write
     env:
-      TAG: ${{ needs.build-sign-notarize.outputs.tag }}
-      VERSION: ${{ needs.build-sign-notarize.outputs.version }}
+      TAG: ${{ needs.sign-notarize.outputs.tag }}
+      VERSION: ${{ needs.sign-notarize.outputs.version }}
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
