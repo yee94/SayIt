@@ -147,10 +147,11 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p build/unsigned
-          # Keep only the product app for the sign job (avoids re-uploading whole DerivedData).
-          ditto build/DerivedData/Build/Products/Release/SayIt.app build/unsigned/SayIt.app
+          # Tar preserves framework symlinks (Sparkle Versions/Current). Plain
+          # artifact upload of .app trees can make Sparkle "bundle format ambiguous".
+          tar -C build/DerivedData/Build/Products/Release -czf build/unsigned/SayIt.app.tar.gz SayIt.app
           cp build/arch-info.txt build/unsigned/arch-info.txt
-          du -sh build/unsigned/SayIt.app
+          du -sh build/unsigned/SayIt.app.tar.gz
           du -sh build/DerivedData/SourcePackages 2>/dev/null || true
           du -sh build/DerivedData/CompilationCache.noindex 2>/dev/null || true
           du -sh build/DerivedData/ModuleCache.noindex 2>/dev/null || true
@@ -177,7 +178,7 @@ jobs:
           if-no-files-found: error
           retention-days: 3
           path: |
-            build/unsigned/SayIt.app
+            build/unsigned/SayIt.app.tar.gz
             build/unsigned/arch-info.txt
 
   # ---------------------------------------------------------------------------
@@ -206,6 +207,19 @@ jobs:
         with:
           name: sayit-v2-unsigned-app-${{ github.sha }}
           path: build/unsigned
+
+      - name: Extract unsigned app (preserve framework symlinks)
+        run: |
+          set -euo pipefail
+          test -f build/unsigned/SayIt.app.tar.gz
+          tar -xzf build/unsigned/SayIt.app.tar.gz -C build/unsigned
+          test -d build/unsigned/SayIt.app
+          test -f build/unsigned/SayIt.app/Contents/MacOS/SayIt
+          # Sparkle must keep Versions/Current symlink structure.
+          test -L build/unsigned/SayIt.app/Contents/Frameworks/Sparkle.framework/Versions/Current \
+            || test -d build/unsigned/SayIt.app/Contents/Frameworks/Sparkle.framework/Versions/B
+          ls -la build/unsigned/SayIt.app/Contents/Frameworks/Sparkle.framework || true
+          ls -la build/unsigned/SayIt.app/Contents/MacOS
 
       - name: Validate SayIt signing secrets
         run: |
