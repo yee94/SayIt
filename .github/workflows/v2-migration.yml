@@ -269,7 +269,7 @@ jobs:
           name: sayit-v2-signed-migration-${{ github.sha }}
           if-no-files-found: error
           path: |
-            build/Voxt-*-macOS.zip
+            build/SayIt-*-macOS.zip
             build/SayIt-*-aarch64.app.tar.gz
             build/SayIt-*-aarch64.app.tar.gz.sig
             build/SayIt-*-aarch64.app.tar.gz.sha256
@@ -313,7 +313,7 @@ jobs:
           else
             gh release create "$TAG" "$ZIP_PATH" "$PAYLOAD_PATH" "$PAYLOAD_PATH.sig" "$PAYLOAD_PATH.sha256" build/latest.json \
               --target "$GITHUB_SHA" \
-              --title "Voxt $TAG" \
+              --title "SayIt $TAG" \
               --notes "SayIt has migrated to Voxt. Updater feed: https://sayit-update.vercel.app/latest.json" \
               -R "$GITHUB_REPOSITORY"
           fi
