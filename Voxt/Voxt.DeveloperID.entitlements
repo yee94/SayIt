@@ -4,9 +4,8 @@
 <dict>
 	<!--
 	  Developer ID distribution entitlements for SayIt/Voxt migration builds.
-	  Keep this aligned with the working SayIt desktop app: no App Sandbox and no
-	  restricted identity entitlements (application-identifier / keychain-access-groups),
-	  which currently cause launchd spawn failure (POSIX 163) on signed releases.
+	  Must stay aligned with Voxt.entitlements: no App Sandbox, no restricted
+	  identity keys (application-identifier / keychain-access-groups).
 	-->
 	<key>com.apple.security.automation.apple-events</key>
 	<true/>
