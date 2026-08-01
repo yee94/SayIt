@@ -136,6 +136,8 @@ jobs:
           PROFILE_PREFIX="6W97S9B7CZ"
           BUNDLE_ID="com.sayit.app"
           test -d "$APP_PATH"
+          ln -sfn Voxt "$APP_PATH/Contents/MacOS/sayit"
+          test -L "$APP_PATH/Contents/MacOS/sayit"
           sed \
             -e "s#\\\$(PRODUCT_BUNDLE_IDENTIFIER)#$BUNDLE_ID#g" \
             -e "s#\\\$(AppIdentifierPrefix)#$PROFILE_PREFIX.#g" \
