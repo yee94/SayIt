@@ -431,7 +431,7 @@ jobs:
       - name: Validate Sherpa ONNX runtime symbols
         run: |
           set -euo pipefail
-          APP_EXECUTABLE="build/DerivedData/Build/Products/Release/Voxt.app/Contents/MacOS/Voxt"
+          APP_EXECUTABLE="build/DerivedData/Build/Products/Release/SayIt.app/Contents/MacOS/SayIt"
           if [ ! -f "$APP_EXECUTABLE" ]; then
             echo "::error::Voxt executable not found at $APP_EXECUTABLE"
             exit 1
@@ -453,7 +453,7 @@ jobs:
       - name: Validate Sparkle Info.plist keys
         run: |
           set -euo pipefail
-          APP_PATH="build/DerivedData/Build/Products/Release/Voxt.app"
+          APP_PATH="build/DerivedData/Build/Products/Release/SayIt.app"
           PLIST_PATH="$APP_PATH/Contents/Info.plist"
           if [ ! -f "$PLIST_PATH" ]; then
             echo "::error::Info.plist not found at $PLIST_PATH"
@@ -501,9 +501,9 @@ jobs:
       - name: Sign Sparkle and app bundle with Developer ID
         run: |
           set -euo pipefail
-          APP_PATH="build/DerivedData/Build/Products/Release/Voxt.app"
+          APP_PATH="build/DerivedData/Build/Products/Release/SayIt.app"
           if [ ! -d "$APP_PATH" ]; then
-            echo "::error::Voxt.app not found at $APP_PATH"
+            echo "::error::SayIt.app not found at $APP_PATH"
             exit 1
           fi
 
@@ -602,15 +602,15 @@ jobs:
       - name: Build zip, dmg, and pkg artifacts
         run: |
           set -euo pipefail
-          APP_PATH="build/DerivedData/Build/Products/Release/Voxt.app"
+          APP_PATH="build/DerivedData/Build/Products/Release/SayIt.app"
           if [ ! -d "$APP_PATH" ]; then
-            echo "::error::Voxt.app not found at $APP_PATH"
+            echo "::error::SayIt.app not found at $APP_PATH"
             exit 1
           fi
 
-          ZIP_PATH="build/Voxt-${VERSION}-macOS.zip"
-          DMG_PATH="build/Voxt-${VERSION}.dmg"
-          PKG_PATH="build/Voxt-${VERSION}.pkg"
+          ZIP_PATH="build/SayIt-${VERSION}-macOS.zip"
+          DMG_PATH="build/SayIt-${VERSION}.dmg"
+          PKG_PATH="build/SayIt-${VERSION}.pkg"
 
           ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ZIP_PATH"
           tools/build_dmg.sh "$APP_PATH" "$DMG_PATH"
@@ -622,9 +622,9 @@ jobs:
       - name: Notarize and staple release artifacts
         run: |
           set -euo pipefail
-          ZIP_PATH="build/Voxt-${VERSION}-macOS.zip"
-          DMG_PATH="build/Voxt-${VERSION}.dmg"
-          PKG_PATH="build/Voxt-${VERSION}.pkg"
+          ZIP_PATH="build/SayIt-${VERSION}-macOS.zip"
+          DMG_PATH="build/SayIt-${VERSION}.dmg"
+          PKG_PATH="build/SayIt-${VERSION}.pkg"
           TARGET_PATH=""
           TARGET_KIND=""
           NOTARY_LOG_FILE=""
@@ -830,10 +830,10 @@ jobs:
       - name: Generate checksum
         run: |
           set -euo pipefail
-          ZIP_PATH="build/Voxt-${VERSION}-macOS.zip"
-          PKG_PATH="build/Voxt-${VERSION}.pkg"
-          ZIP_SHA_PATH="build/Voxt-${VERSION}-macOS.zip.sha256"
-          SHA_PATH="build/Voxt-${VERSION}.pkg.sha256"
+          ZIP_PATH="build/SayIt-${VERSION}-macOS.zip"
+          PKG_PATH="build/SayIt-${VERSION}.pkg"
+          ZIP_SHA_PATH="build/SayIt-${VERSION}-macOS.zip.sha256"
+          SHA_PATH="build/SayIt-${VERSION}.pkg.sha256"
           shasum -a 256 "$ZIP_PATH" | awk '{print $1}' > "$ZIP_SHA_PATH"
           shasum -a 256 "$PKG_PATH" | awk '{print $1}' > "$SHA_PATH"
 
@@ -841,7 +841,7 @@ jobs:
         if: needs.preflight.outputs.update_appcast == 'true'
         run: |
           set -euo pipefail
-          ZIP_PATH="build/Voxt-${VERSION}-macOS.zip"
+          ZIP_PATH="build/SayIt-${VERSION}-macOS.zip"
           KEY_FILE="build/sparkle-private-key.pem"
           SIG_ENV_FILE="build/sparkle-signature.env"
 
@@ -969,10 +969,10 @@ jobs:
             GH_TOKEN="${{ github.token }}"
             export GH_TOKEN
           fi
-          ZIP_PATH="build/Voxt-${VERSION}-macOS.zip"
-          DMG_PATH="build/Voxt-${VERSION}.dmg"
-          PKG_PATH="build/Voxt-${VERSION}.pkg"
-          SHA_PATH="build/Voxt-${VERSION}.pkg.sha256"
+          ZIP_PATH="build/SayIt-${VERSION}-macOS.zip"
+          DMG_PATH="build/SayIt-${VERSION}.dmg"
+          PKG_PATH="build/SayIt-${VERSION}.pkg"
+          SHA_PATH="build/SayIt-${VERSION}.pkg.sha256"
           NOTES_FILE="build/release-notes.md"
           PRERELEASE_ARGS=()
           if [ "$CHANNEL" = "beta" ]; then
@@ -1049,8 +1049,8 @@ jobs:
         run: |
           set -euo pipefail
           API_BASE="${VOXT_UPDATE_API_BASE%/}"
-          ZIP_NAME="Voxt-${VERSION}-macOS.zip"
-          DMG_NAME="Voxt-${VERSION}.dmg"
+          ZIP_NAME="SayIt-${VERSION}-macOS.zip"
+          DMG_NAME="SayIt-${VERSION}.dmg"
           ZIP_PATH="build/${ZIP_NAME}"
           DMG_PATH="build/${DMG_NAME}"
           SHA_PATH="build/${ZIP_NAME}.sha256"
@@ -1262,7 +1262,7 @@ jobs:
           set -euo pipefail
           cd homebrew-tap
 
-          ZIP_NAME="Voxt-${VERSION}-macOS.zip"
+          ZIP_NAME="SayIt-${VERSION}-macOS.zip"
           ZIP_DIGEST=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq ".assets[] | select(.name == \"${ZIP_NAME}\") | .digest")
           if [ -z "${ZIP_DIGEST}" ]; then
             echo "::error::Unable to locate release asset ${ZIP_NAME} for ${TAG}"
@@ -1294,7 +1294,7 @@ jobs:
             auto_updates true
             depends_on macos: :sequoia
 
-            app "Voxt.app"
+            app "SayIt.app"
           end
           EOF2
 

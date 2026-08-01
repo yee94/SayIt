@@ -3,7 +3,7 @@
 set -euo pipefail
 
 if [ "$#" -ne 2 ]; then
-  echo "Usage: $0 <Voxt.app path> <output.dmg path>" >&2
+  echo "Usage: $0 <SayIt.app path> <output.dmg path>" >&2
   exit 64
 fi
 
@@ -18,7 +18,7 @@ VOLUME_ICON_PATH="$APP_PATH/Contents/Resources/VoxtIcon.icns"
 DMGBUILD_VERSION="1.6.7"
 
 if [ ! -d "$APP_PATH" ]; then
-  echo "Voxt.app not found at $APP_PATH" >&2
+  echo "SayIt.app not found at $APP_PATH" >&2
   exit 1
 fi
 

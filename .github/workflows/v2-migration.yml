@@ -148,12 +148,12 @@ jobs:
       - name: Sign the app with SayIt Developer ID
         run: |
           set -euo pipefail
-          APP_PATH="build/DerivedData/Build/Products/Release/Voxt.app"
+          APP_PATH="build/DerivedData/Build/Products/Release/SayIt.app"
           ENTITLEMENTS_PATH="Voxt/Voxt.DeveloperID.entitlements"
           BUNDLE_ID="com.sayit.app"
           test -d "$APP_PATH"
           test -f "$ENTITLEMENTS_PATH"
-          ln -sfn Voxt "$APP_PATH/Contents/MacOS/sayit"
+          ln -sfn SayIt "$APP_PATH/Contents/MacOS/sayit"
           test -L "$APP_PATH/Contents/MacOS/sayit"
           # Fail only on real entitlement keys, not comments.
           if grep -E '<key>com\.apple\.security\.app-sandbox</key>|<key>com\.apple\.application-identifier</key>|<key>keychain-access-groups</key>|<key>com\.apple\.developer\.icloud' "$ENTITLEMENTS_PATH"; then
@@ -197,9 +197,9 @@ jobs:
       - name: Notarize and staple
         run: |
           set -euo pipefail
-          APP_PATH="build/DerivedData/Build/Products/Release/Voxt.app"
+          APP_PATH="build/DerivedData/Build/Products/Release/SayIt.app"
           VERSION="${{ steps.release_metadata.outputs.version }}"
-          ZIP_PATH="build/Voxt-${VERSION}-macOS.zip"
+          ZIP_PATH="build/SayIt-${VERSION}-macOS.zip"
           ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ZIP_PATH"
           xcrun notarytool submit "$ZIP_PATH" \
             --key "$NOTARY_KEY_PATH" \
@@ -215,7 +215,7 @@ jobs:
       - name: Build Tauri migration payload
         run: |
           set -euo pipefail
-          APP_PATH="build/DerivedData/Build/Products/Release/Voxt.app"
+          APP_PATH="build/DerivedData/Build/Products/Release/SayIt.app"
           VERSION="${{ steps.release_metadata.outputs.version }}"
           TAG="${{ steps.release_metadata.outputs.tag }}"
           PAYLOAD_NAME="SayIt-${VERSION}-aarch64.app.tar.gz"
@@ -224,8 +224,8 @@ jobs:
           STAGING_PATH="$RUNNER_TEMP/sayit-migration"
           rm -rf "$STAGING_PATH"
           mkdir -p "$STAGING_PATH"
-          cp -R "$APP_PATH" "$STAGING_PATH/Voxt.app"
-          tar -czf "$PAYLOAD_PATH" -C "$STAGING_PATH" Voxt.app
+          cp -R "$APP_PATH" "$STAGING_PATH/SayIt.app"
+          tar -czf "$PAYLOAD_PATH" -C "$STAGING_PATH" SayIt.app
           printf '%s' "$TAURI_SIGNING_PRIVATE_KEY" > "$KEY_PATH"
           chmod 600 "$KEY_PATH"
           env -u TAURI_SIGNING_PRIVATE_KEY npx --yes @tauri-apps/cli@2.10.0 signer sign \
@@ -253,7 +253,7 @@ jobs:
               },
               endpoint: $endpoint
             }' > build/latest.json
-          lipo -info "$APP_PATH/Contents/MacOS/Voxt" | tee build/arch-info.txt
+          lipo -info "$APP_PATH/Contents/MacOS/SayIt" | tee build/arch-info.txt
           grep -E 'arm64|aarch64' build/arch-info.txt > /dev/null
           if grep -E 'x86_64' build/arch-info.txt; then
             echo "::error::Expected arm64-only binary, found x86_64"
@@ -296,7 +296,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          ZIP_PATH="build/Voxt-${VERSION}-macOS.zip"
+          ZIP_PATH="build/SayIt-${VERSION}-macOS.zip"
           PAYLOAD_PATH="build/SayIt-${VERSION}-aarch64.app.tar.gz"
           test -f "$ZIP_PATH"
           test -f "$PAYLOAD_PATH"

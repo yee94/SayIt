@@ -262,7 +262,7 @@ if [[ "$SKIP_BUILD" != "true" ]]; then
 fi
 
 if [[ -z "$APP_PATH" ]]; then
-  APP_PATH="$DERIVED_DATA/Build/Products/$CONFIGURATION/Voxt.app"
+  APP_PATH="$DERIVED_DATA/Build/Products/$CONFIGURATION/SayIt.app"
 fi
 
 [[ -d "$APP_PATH" ]] || die "app bundle not found: $APP_PATH"

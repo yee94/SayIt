@@ -530,7 +530,7 @@ extension AppDelegate {
             backing: .buffered,
             defer: false
         )
-        window.title = "Voxt"
+        window.title = "SayIt"
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.toolbar = nil
