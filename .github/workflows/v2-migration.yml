@@ -72,11 +72,44 @@ jobs:
           chmod 600 "$KEY_PATH"
           echo "NOTARY_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
 
+      - name: Resolve release cache key
+        id: cache_key
+        run: |
+          set -euo pipefail
+          XCODE_VERSION="$(xcodebuild -version | tr '\n' '-' | sed -E 's/[^A-Za-z0-9._-]+/-/g; s/-+$//')"
+          SHERPA_SCRIPT_HASH="$(shasum -a 256 tools/build_sherpa_onnx_macos.sh | awk '{print $1}')"
+          PACKAGE_HASH="$(shasum -a 256 Voxt.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved | awk '{print $1}')"
+          echo "sherpa_key=sherpa-onnx-${RUNNER_OS}-${RUNNER_ARCH}-${XCODE_VERSION}-142807252687d81b40d6315f23470a1512a00de3-${SHERPA_SCRIPT_HASH}" >> "$GITHUB_OUTPUT"
+          echo "compilation_key=xcode-compilation-${RUNNER_OS}-${RUNNER_ARCH}-${XCODE_VERSION}-release-universal-v1-${PACKAGE_HASH}" >> "$GITHUB_OUTPUT"
+          echo "compilation_restore_prefix=xcode-compilation-${RUNNER_OS}-${RUNNER_ARCH}-${XCODE_VERSION}-release-universal-v1-" >> "$GITHUB_OUTPUT"
+
       - name: Prepare Sherpa ONNX runtime
+        id: sherpa_runtime
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            ThirdParty/sherpa-onnx/install
+            ThirdParty/sherpa-onnx/sherpa-onnx.xcframework
+          key: ${{ steps.cache_key.outputs.sherpa_key }}
+
+      - name: Build Sherpa ONNX runtime on cache miss
+        if: steps.sherpa_runtime.outputs.cache-hit != 'true'
         run: |
           set -euo pipefail
           tools/build_sherpa_onnx_macos.sh
+
+      - name: Configure Sherpa ONNX runtime
+        run: |
+          set -euo pipefail
           cp Config/SherpaOnnx.local.xcconfig.example Config/SherpaOnnx.local.xcconfig
+
+      - name: Restore Xcode compilation cache
+        uses: actions/cache/restore@v5
+        with:
+          path: build/DerivedData/CompilationCache.noindex
+          key: ${{ steps.cache_key.outputs.compilation_key }}
+          restore-keys: |
+            ${{ steps.cache_key.outputs.compilation_restore_prefix }}
 
       - name: Build universal release app
         run: |
@@ -170,7 +203,7 @@ jobs:
           tar -czf "$PAYLOAD_PATH" -C "$STAGING_PATH" Voxt.app
           printf '%s' "$TAURI_SIGNING_PRIVATE_KEY" > "$KEY_PATH"
           chmod 600 "$KEY_PATH"
-          npx --yes @tauri-apps/cli@2.10.0 signer sign \
+          env -u TAURI_SIGNING_PRIVATE_KEY npx --yes @tauri-apps/cli@2.10.0 signer sign \
             --private-key-path "$KEY_PATH" \
             --password "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" \
             "$PAYLOAD_PATH"
