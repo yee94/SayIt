@@ -85,9 +85,15 @@ struct WaveformView: View {
     private let barAreaHeight: CGFloat = 28
     private let waveformSlotWidth: CGFloat = Self.defaultWaveformSlotWidth
     private let barCount = 16
+    /// Match NotchHudView: settle unstable tail after text stops changing.
+    private static let transcriptStabilizationMilliseconds: UInt64 = 420
     @State private var appeared = false
     @State private var didCopyAnswer = false
     @State private var copyFeedbackToken = UUID()
+    @State private var previousTranscriptText = ""
+    @State private var stableTranscriptText = ""
+    @State private var unstableTranscriptText = ""
+    @State private var transcriptStabilizationToken = UUID()
     @StateObject private var waveformState = RecentAudioWaveformState(
         barCount: 16,
         historyDuration: 0.9,
@@ -99,13 +105,30 @@ struct WaveformView: View {
         fallSmoothing: 0.24
     )
 
-    private var displayText: String {
-        let message = statusMessage.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !message.isEmpty { return message }
+    private var trimmedStatusMessage: String {
+        statusMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var liveTranscriptText: String {
         // Connecting mic stays in the waveform slot so the compact bubble
         // never expands for a second text row.
         guard isAnswerMode || realtimeTextDisplayEnabled else { return "" }
         return sanitizedDisplayText(transcribedText)
+    }
+
+    private var usesLiveTranscriptUnderline: Bool {
+        trimmedStatusMessage.isEmpty &&
+            !isDictionaryLearningFeedback &&
+            !isAnswerMode &&
+            !liveTranscriptText.isEmpty
+    }
+
+    private var displayText: String {
+        if !trimmedStatusMessage.isEmpty { return trimmedStatusMessage }
+        if usesLiveTranscriptUnderline {
+            return stableTranscriptText + unstableTranscriptText
+        }
+        return liveTranscriptText
     }
 
     private var connectingMicrophoneText: String {
@@ -199,6 +222,7 @@ struct WaveformView: View {
         }
         .onAppear {
             updateWaveformStateActivity()
+            updateLiveTranscript(liveTranscriptText)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
                 appeared = true
             }
@@ -224,6 +248,16 @@ struct WaveformView: View {
         }
         .onChange(of: audioLevel) {
             waveformState.ingest(level: emphasizedWaveformInputLevel(audioLevel))
+        }
+        .onChange(of: liveTranscriptText) { _, text in
+            updateLiveTranscript(text)
+        }
+        .onChange(of: usesLiveTranscriptUnderline) { _, enabled in
+            if !enabled {
+                resetLiveTranscriptSplit()
+            } else {
+                updateLiveTranscript(liveTranscriptText)
+            }
         }
     }
 
@@ -266,20 +300,40 @@ struct WaveformView: View {
 
             if hasText {
                 GeometryReader { geometry in
-                    Text(displayText)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.85))
-                        .lineLimit(1)
-                        .truncationMode(.head)
-                        .frame(
-                            maxWidth: .infinity,
-                            alignment: transcriptAlignment(availableWidth: geometry.size.width)
-                        )
+                    compactTranscriptRow(availableWidth: geometry.size.width)
                 }
                 .frame(width: 260, height: 16)
                 .transition(.opacity)
             }
         }
+    }
+
+    @ViewBuilder
+    private func compactTranscriptRow(availableWidth: CGFloat) -> some View {
+        let alignment = transcriptAlignment(availableWidth: availableWidth)
+        Group {
+            if usesLiveTranscriptUnderline {
+                // Keep bubble text flat white; only reuse the stable/unstable
+                // underline split, not the notch shimmer highlight.
+                compactLiveTranscriptText
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.85))
+            } else {
+                Text(displayText)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.85))
+            }
+        }
+        .lineLimit(1)
+        .truncationMode(.head)
+        .frame(maxWidth: .infinity, alignment: alignment)
+    }
+
+    private var compactLiveTranscriptText: Text {
+        Text(stableTranscriptText) + Text(unstableTranscriptText).underline(
+            true,
+            color: Color.white.opacity(0.55)
+        )
     }
 
     private var dictionaryLearningCard: some View {
@@ -586,8 +640,7 @@ struct WaveformView: View {
     }
 
     private func transcriptAlignment(availableWidth: CGFloat) -> Alignment {
-        let trimmedStatus = statusMessage.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmedStatus.isEmpty else { return .center }
+        guard trimmedStatusMessage.isEmpty else { return .center }
         let alignmentMargin: CGFloat = 4
         return measuredTranscriptWidth <= max(availableWidth - alignmentMargin, 0) ? .center : .trailing
     }
@@ -599,5 +652,41 @@ struct WaveformView: View {
         let glyphWidth = (displayText as NSString).size(withAttributes: attributes).width
         let trackingAllowance: CGFloat = 2
         return ceil(glyphWidth + trackingAllowance)
+    }
+
+    private func updateLiveTranscript(_ text: String) {
+        let token = UUID()
+        transcriptStabilizationToken = token
+        guard !text.isEmpty else {
+            resetLiveTranscriptSplit()
+            return
+        }
+
+        if previousTranscriptText.isEmpty {
+            stableTranscriptText = ""
+            unstableTranscriptText = text
+        } else {
+            let prefix = longestCommonPrefix(previousTranscriptText, text)
+            stableTranscriptText = prefix
+            unstableTranscriptText = String(text.dropFirst(prefix.count))
+        }
+        previousTranscriptText = text
+
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(Self.transcriptStabilizationMilliseconds))
+            guard transcriptStabilizationToken == token, previousTranscriptText == text else { return }
+            stableTranscriptText = text
+            unstableTranscriptText = ""
+        }
+    }
+
+    private func resetLiveTranscriptSplit() {
+        previousTranscriptText = ""
+        stableTranscriptText = ""
+        unstableTranscriptText = ""
+    }
+
+    private func longestCommonPrefix(_ lhs: String, _ rhs: String) -> String {
+        String(zip(lhs, rhs).prefix { $0 == $1 }.map(\.0))
     }
 }

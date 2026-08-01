@@ -60,6 +60,7 @@ struct NotchHudView: View {
     var shouldAnimate: Bool
     var transcribedText: String
     var statusMessage: String = ""
+    var statusPresentation: OverlayStatusPresentation = .standard
     var isEnhancing: Bool = false
     var isRequesting: Bool = false
     var isFinalizingTranscription: Bool = false
@@ -97,8 +98,14 @@ struct NotchHudView: View {
         0.34, 1.56, 0.64, 1,
         duration: presentationDuration
     )
+    /// Learning feedback only grows downward; keep X locked to the notch band.
+    private static let learningPresentationAnimation = Animation.timingCurve(
+        0.22, 1, 0.36, 1,
+        duration: 0.28
+    )
     private static let collapsedScaleX: CGFloat = 0.6
     private static let collapsedScaleY: CGFloat = 0.3
+    private static let learningCollapsedScaleY: CGFloat = 0.35
 
     /// Maps notch corner-radius preference onto the notch silhouette.
     /// Default 24pt → top 14 / bottom 22 (the designed notch shape).
@@ -163,6 +170,10 @@ struct NotchHudView: View {
         AppLocalization.localizedString("Connecting to microphone…")
     }
 
+    private var isDictionaryLearningFeedback: Bool {
+        statusPresentation == .dictionaryLearning && !trimmedStatus.isEmpty
+    }
+
     private var subtitleTextIsVisible: Bool {
         // Completing / success / exit must never re-surface the live transcript.
         // Otherwise "整理中..." flickers back into the previous underlined text
@@ -170,8 +181,13 @@ struct NotchHudView: View {
         if isCompleting || visualMode == .success || !isPresented {
             return false
         }
+        // Learned terms sit below the camera/notch band, matching SayIt's
+        // expanded learned row rather than centering text inside the notch.
+        if isDictionaryLearningFeedback { return true }
         if isError { return !trimmedStatus.isEmpty }
-        if visualMode == .connecting { return true }
+        // Keep connecting mic inside the collapsed top row so the notch HUD
+        // does not expand/contract for a temporary status line.
+        if visualMode == .connecting { return false }
         if isOrganizing { return true }
         // After organizing ends, collapse subtitle immediately — do not revive
         // the previous streaming transcript with underlines.
@@ -186,13 +202,29 @@ struct NotchHudView: View {
     }
 
     private var targetWidth: CGFloat {
-        usesCompactWidth ? compactWidth : hudWidth
+        // Learning feedback stays at the default notch width so only the
+        // vertical drop below the camera band changes size.
+        if isDictionaryLearningFeedback { return hudWidth }
+        return usesCompactWidth ? compactWidth : hudWidth
     }
 
     private var usesCompactWidth: Bool {
         // Only success mode uses the narrow pill. Exit must not shrink width,
         // otherwise the top-center scale reads as collapsing toward the top-left.
-        visualMode == .success
+        // Learning feedback also keeps full notch width (no left/right expand).
+        visualMode == .success && !isDictionaryLearningFeedback
+    }
+
+    private var entranceScaleX: CGFloat {
+        isDictionaryLearningFeedback ? 1 : Self.collapsedScaleX
+    }
+
+    private var entranceScaleY: CGFloat {
+        isDictionaryLearningFeedback ? Self.learningCollapsedScaleY : Self.collapsedScaleY
+    }
+
+    private var activePresentationAnimation: Animation {
+        isDictionaryLearningFeedback ? Self.learningPresentationAnimation : Self.presentationAnimation
     }
 
     /// Top-center anchor so enter/exit scale from the middle of the notch edge.
@@ -223,14 +255,23 @@ struct NotchHudView: View {
                         )
 
                     VStack(spacing: 0) {
-                        topRow
+                        Group {
+                            if isDictionaryLearningFeedback {
+                                // Leave the camera/notch band empty; content renders below.
+                                Color.clear
+                            } else {
+                                topRow
+                            }
+                        }
                             .frame(height: collapsedHeight)
 
                         if subtitleTextIsVisible && !usesCompactWidth {
                             subtitleRow
                                 .frame(height: expandedHeight - collapsedHeight, alignment: .top)
-                                .opacity(transcriptVisible ? 1 : 0)
-                                .offset(y: transcriptVisible ? 0 : -6)
+                                // Learning feedback must stay fully visible under the
+                                // camera band; skip the transcript fade/slide entrance.
+                                .opacity(isDictionaryLearningFeedback || transcriptVisible ? 1 : 0)
+                                .offset(y: isDictionaryLearningFeedback || transcriptVisible ? 0 : -6)
                         }
                     }
                     .clipShape(hudShape)
@@ -257,10 +298,13 @@ struct NotchHudView: View {
             var transaction = Transaction()
             transaction.disablesAnimations = true
             withTransaction(transaction) {
-                presentationScaleX = Self.collapsedScaleX
-                presentationScaleY = Self.collapsedScaleY
+                presentationScaleX = entranceScaleX
+                presentationScaleY = entranceScaleY
                 presentationOpacity = 0
                 didEnterOrganizing = isOrganizing
+                if isDictionaryLearningFeedback {
+                    transcriptVisible = true
+                }
             }
             updateTranscript(trimmedTranscript)
             updateVisualMode()
@@ -295,6 +339,11 @@ struct NotchHudView: View {
         .onChange(of: visualMode) { _, _ in
             updateVisualMode()
         }
+        .onChange(of: isDictionaryLearningFeedback) { _, isLearning in
+            if isLearning {
+                transcriptVisible = true
+            }
+        }
     }
 
     private var topRow: some View {
@@ -316,8 +365,13 @@ struct NotchHudView: View {
     private var statusVisual: some View {
         switch visualMode {
         case .connecting:
-            ProcessingDotsView(isAnimating: shouldAnimate)
-                .transition(.opacity.combined(with: .scale(scale: 0.72)))
+            Text(trimmedConnectingStatusText)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.white.opacity(0.9))
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                .transition(.opacity)
         case .recording:
             recordingWaveform
                 .transition(.opacity.combined(with: .scale(scale: 0.72)))
@@ -362,11 +416,16 @@ struct NotchHudView: View {
             let availableWidth = max(proxy.size.width - 48, 0)
 
             Group {
-                if isError {
+                if isDictionaryLearningFeedback {
+                    Text(trimmedStatus)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.95))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                } else if isError {
                     Text(trimmedStatus)
                         .foregroundStyle(Color.orange)
-                } else if visualMode == .connecting {
-                    ShimmeringTranscriptText(stableText: trimmedConnectingStatusText, unstableText: "", shouldAnimate: shouldAnimate)
                 } else if isOrganizing || didEnterOrganizing {
                     // Keep "整理中..." locked; never swap back to underlined transcript.
                     ShimmeringTranscriptText(stableText: "整理中...", unstableText: "", shouldAnimate: shouldAnimate && isOrganizing)
@@ -383,7 +442,7 @@ struct NotchHudView: View {
             .font(.system(size: 13, weight: .regular))
             .tracking(0.26)
             .lineLimit(1)
-            .truncationMode(.head)
+            .truncationMode(isDictionaryLearningFeedback ? .tail : .head)
             .frame(maxWidth: .infinity, alignment: subtitleAlignment(availableWidth: availableWidth))
             .padding(.horizontal, 24)
             .padding(.bottom, 8)
@@ -391,6 +450,7 @@ struct NotchHudView: View {
     }
 
     private func subtitleAlignment(availableWidth: CGFloat) -> Alignment {
+        if isDictionaryLearningFeedback { return .center }
         guard !isOrganizing, visualMode != .connecting, !isError, trimmedStatus.isEmpty else { return .center }
         let alignmentMargin: CGFloat = 4
         return measuredTranscriptWidth <= max(availableWidth - alignmentMargin, 0) ? .center : .trailing
@@ -415,16 +475,20 @@ struct NotchHudView: View {
     private func runEntrance() {
         // Snap to the shared collapsed origin, then open with the shared curve.
         // Exit uses the exact reverse values + same curve/duration.
+        // Learning feedback keeps X locked at 1 and only grows downward.
+        let startScaleX = entranceScaleX
+        let startScaleY = entranceScaleY
+        let animation = activePresentationAnimation
         var transaction = Transaction()
         transaction.disablesAnimations = true
         withTransaction(transaction) {
-            presentationScaleX = Self.collapsedScaleX
-            presentationScaleY = Self.collapsedScaleY
+            presentationScaleX = startScaleX
+            presentationScaleY = startScaleY
             presentationOpacity = 0
         }
 
         DispatchQueue.main.async {
-            withAnimation(Self.presentationAnimation) {
+            withAnimation(animation) {
                 presentationScaleX = 1
                 presentationScaleY = 1
                 presentationOpacity = 1
@@ -435,9 +499,10 @@ struct NotchHudView: View {
     private func runExit() {
         // Exact reverse of runEntrance: same duration, same cubic-bezier,
         // back to the same collapsed scale/opacity origin at top-center.
-        withAnimation(Self.presentationAnimation) {
-            presentationScaleX = Self.collapsedScaleX
-            presentationScaleY = Self.collapsedScaleY
+        // Learning feedback collapses downward only (no horizontal pinch).
+        withAnimation(activePresentationAnimation) {
+            presentationScaleX = entranceScaleX
+            presentationScaleY = entranceScaleY
             presentationOpacity = 0
         }
     }
@@ -476,6 +541,13 @@ struct NotchHudView: View {
 
     private func revealTranscript() {
         guard subtitleTextIsVisible else { return }
+        // Learning feedback is already visible in the expanded lower row; avoid
+        // a second fade that can look like left/right content expansion.
+        if isDictionaryLearningFeedback {
+            transcriptHasAppeared = true
+            transcriptVisible = true
+            return
+        }
         guard !transcriptHasAppeared else {
             var transaction = Transaction()
             transaction.disablesAnimations = true
@@ -680,7 +752,8 @@ private struct SuccessCheckmarkView: View {
     }
 }
 
-private struct ShimmeringTranscriptText: View {
+/// Shared live-transcript renderer: stable prefix + underlined unstable tail.
+struct ShimmeringTranscriptText: View {
     let stableText: String
     let unstableText: String
     let shouldAnimate: Bool
