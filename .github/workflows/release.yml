@@ -1,11 +1,11 @@
-name: Release
+name: Legacy Universal Release
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+# Deprecated after the SayIt mainline cutover.
+# Official releases use the v2 pipeline (v2-migration.yml), triggered by tags.
+# Keep this file only for manual recovery of the old universal/Sparkle path.
 on:
-  push:
-    tags:
-      - "v*.*.*"
   workflow_dispatch:
     inputs:
       tag:

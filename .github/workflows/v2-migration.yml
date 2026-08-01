@@ -1,12 +1,15 @@
-name: V2 Signed Migration Build
+name: Release
 
-# Migration feed for legacy Tauri clients. After the Swift mainline cutover,
-# only run this manually so push-to-main / push-to-v2 cannot double-publish.
+# Official SayIt release pipeline (the proven v2 build/sign/notarize flow).
+# Triggered only by version tags; workflow_dispatch remains for manual re-runs.
 on:
+  push:
+    tags:
+      - "v*.*.*"
   workflow_dispatch:
 
 concurrency:
-  group: v2-migration-${{ github.ref }}
+  group: release-${{ github.ref_name }}
   cancel-in-progress: false
 
 permissions:
@@ -37,8 +40,16 @@ jobs:
             echo "::error::Invalid MARKETING_VERSION: ${VERSION:-<missing>}"
             exit 1
           fi
+          TAG="v$VERSION"
+          if [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
+            if [ "$GITHUB_REF_NAME" != "$TAG" ]; then
+              echo "::error::Tag $GITHUB_REF_NAME does not match MARKETING_VERSION $VERSION (expected $TAG)"
+              exit 1
+            fi
+            TAG="$GITHUB_REF_NAME"
+          fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Resolve cache keys
         id: cache_key
