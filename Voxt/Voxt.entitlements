@@ -2,19 +2,11 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!--
-	  Unsandboxed Developer ID / local distribution entitlements.
-	  Voxt is a menu-bar voice input tool (same model as SayIt): it needs free
-	  access to focused text fields, accessibility, and pasteboard flows.
-	  App Sandbox is intentionally disabled and will not be used for releases.
-	-->
+	<!-- Unsandboxed distribution entitlements (SayIt model). -->
 	<key>com.apple.security.automation.apple-events</key>
 	<true/>
-
 	<!-- Microphone access -->
 	<key>com.apple.security.device.audio-input</key>
 	<true/>
-
-	<!-- Accessibility (CGEvent tap / focused field reads) is requested at runtime -->
 </dict>
 </plist>

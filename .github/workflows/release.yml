@@ -531,7 +531,7 @@ jobs:
             echo "::error::Missing unsandboxed Developer ID entitlements file"
             exit 1
           fi
-          if grep -E 'app-sandbox|application-identifier|keychain-access-groups|icloud' "$SIGNING_ENTITLEMENTS"; then
+          if grep -E '<key>com\.apple\.security\.app-sandbox</key>|<key>com\.apple\.application-identifier</key>|<key>keychain-access-groups</key>|<key>com\.apple\.developer\.icloud' "$SIGNING_ENTITLEMENTS"; then
             echo "::error::Developer ID entitlements must stay unsandboxed and free of restricted identity keys"
             exit 1
           fi
