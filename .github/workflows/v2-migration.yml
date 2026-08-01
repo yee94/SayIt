@@ -95,8 +95,8 @@ jobs:
           SHERPA_SCRIPT_HASH="$(shasum -a 256 tools/build_sherpa_onnx_macos.sh | awk '{print $1}')"
           PACKAGE_HASH="$(shasum -a 256 Voxt.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved | awk '{print $1}')"
           echo "sherpa_key=sherpa-onnx-${RUNNER_OS}-${RUNNER_ARCH}-${XCODE_VERSION}-142807252687d81b40d6315f23470a1512a00de3-${SHERPA_SCRIPT_HASH}" >> "$GITHUB_OUTPUT"
-          echo "compilation_key=xcode-compilation-${RUNNER_OS}-${RUNNER_ARCH}-${XCODE_VERSION}-release-universal-v1-${PACKAGE_HASH}" >> "$GITHUB_OUTPUT"
-          echo "compilation_restore_prefix=xcode-compilation-${RUNNER_OS}-${RUNNER_ARCH}-${XCODE_VERSION}-release-universal-v1-" >> "$GITHUB_OUTPUT"
+          echo "compilation_key=xcode-compilation-${RUNNER_OS}-${RUNNER_ARCH}-${XCODE_VERSION}-release-arm64-v1-${PACKAGE_HASH}" >> "$GITHUB_OUTPUT"
+          echo "compilation_restore_prefix=xcode-compilation-${RUNNER_OS}-${RUNNER_ARCH}-${XCODE_VERSION}-release-arm64-v1-" >> "$GITHUB_OUTPUT"
 
       - name: Prepare Sherpa ONNX runtime
         id: sherpa_runtime
@@ -126,18 +126,21 @@ jobs:
           restore-keys: |
             ${{ steps.cache_key.outputs.compilation_restore_prefix }}
 
-      - name: Build universal release app
+      - name: Build arm64 release app
         run: |
           set -euo pipefail
           xcodebuild \
             -project Voxt.xcodeproj \
             -scheme Voxt \
             -configuration Release \
-            -destination "generic/platform=macOS" \
+            -destination "platform=macOS,arch=arm64" \
             -derivedDataPath build/DerivedData \
             -onlyUsePackageVersionsFromResolvedFile \
             -skipPackagePluginValidation \
             build \
+            ARCHS=arm64 \
+            ONLY_ACTIVE_ARCH=YES \
+            EXCLUDED_ARCHS=x86_64 \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY=""
@@ -213,7 +216,7 @@ jobs:
           APP_PATH="build/DerivedData/Build/Products/Release/Voxt.app"
           VERSION="${{ steps.release_metadata.outputs.version }}"
           TAG="${{ steps.release_metadata.outputs.tag }}"
-          PAYLOAD_NAME="SayIt-${VERSION}-universal.app.tar.gz"
+          PAYLOAD_NAME="SayIt-${VERSION}-aarch64.app.tar.gz"
           PAYLOAD_PATH="build/${PAYLOAD_NAME}"
           KEY_PATH="$RUNNER_TEMP/sayit-tauri.key"
           STAGING_PATH="$RUNNER_TEMP/sayit-migration"
@@ -229,23 +232,31 @@ jobs:
             "$PAYLOAD_PATH"
           test -s "$PAYLOAD_PATH.sig"
           shasum -a 256 "$PAYLOAD_PATH" > "$PAYLOAD_PATH.sha256"
-          SIGNATURE="$(base64 < "$PAYLOAD_PATH.sig" | tr -d '\n')"
+          # Tauri expects the raw minisign signature text from the .sig file.
+          SIGNATURE="$(tr -d '\n' < "$PAYLOAD_PATH.sig")"
           PAYLOAD_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${PAYLOAD_NAME}"
+          UPDATE_ENDPOINT="https://sayit-update.vercel.app/latest.json"
           jq -n \
             --arg version "$VERSION" \
             --arg signature "$SIGNATURE" \
             --arg url "$PAYLOAD_URL" \
+            --arg endpoint "$UPDATE_ENDPOINT" \
             '{
               version: $version,
               notes: "SayIt has migrated to Voxt.",
               pub_date: (now | todate),
               platforms: {
                 "darwin-aarch64": { signature: $signature, url: $url },
-                "darwin-aarch64-app": { signature: $signature, url: $url },
-                "darwin-x86_64": { signature: $signature, url: $url },
-                "darwin-x86_64-app": { signature: $signature, url: $url }
-              }
+                "darwin-aarch64-app": { signature: $signature, url: $url }
+              },
+              endpoint: $endpoint
             }' > build/latest.json
+          lipo -info "$APP_PATH/Contents/MacOS/Voxt" | tee build/arch-info.txt
+          grep -E 'arm64|aarch64' build/arch-info.txt > /dev/null
+          if grep -E 'x86_64' build/arch-info.txt; then
+            echo "::error::Expected arm64-only binary, found x86_64"
+            exit 1
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
@@ -253,14 +264,15 @@ jobs:
           if-no-files-found: error
           path: |
             build/Voxt-*-macOS.zip
-            build/SayIt-*-universal.app.tar.gz
-            build/SayIt-*-universal.app.tar.gz.sig
-            build/SayIt-*-universal.app.tar.gz.sha256
+            build/SayIt-*-aarch64.app.tar.gz
+            build/SayIt-*-aarch64.app.tar.gz.sig
+            build/SayIt-*-aarch64.app.tar.gz.sha256
             build/latest.json
             build/codesign.txt
+            build/arch-info.txt
 
   publish-release:
-    name: Publish GitHub Release
+    name: Publish GitHub Release + Vercel Updater
     runs-on: ubuntu-latest
     needs: build-sign-notarize
     permissions:
@@ -268,6 +280,9 @@ jobs:
     env:
       TAG: ${{ needs.build-sign-notarize.outputs.tag }}
       VERSION: ${{ needs.build-sign-notarize.outputs.version }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -280,7 +295,11 @@ jobs:
         run: |
           set -euo pipefail
           ZIP_PATH="build/Voxt-${VERSION}-macOS.zip"
-          PAYLOAD_PATH="build/SayIt-${VERSION}-universal.app.tar.gz"
+          PAYLOAD_PATH="build/SayIt-${VERSION}-aarch64.app.tar.gz"
+          test -f "$ZIP_PATH"
+          test -f "$PAYLOAD_PATH"
+          test -f "$PAYLOAD_PATH.sig"
+          test -f build/latest.json
           if gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$TAG" "$ZIP_PATH" "$PAYLOAD_PATH" "$PAYLOAD_PATH.sig" "$PAYLOAD_PATH.sha256" build/latest.json \
               --clobber \
@@ -289,6 +308,110 @@ jobs:
             gh release create "$TAG" "$ZIP_PATH" "$PAYLOAD_PATH" "$PAYLOAD_PATH.sig" "$PAYLOAD_PATH.sha256" build/latest.json \
               --target "$GITHUB_SHA" \
               --title "Voxt $TAG" \
-              --notes "SayIt has migrated to Voxt." \
+              --notes "SayIt has migrated to Voxt. Updater feed: https://sayit-update.vercel.app/latest.json" \
               -R "$GITHUB_REPOSITORY"
           fi
+
+      - name: Deploy latest.json to Vercel
+        run: |
+          set -euo pipefail
+          for key in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+            if [ -z "${!key:-}" ]; then
+              echo "::error::Missing SayIt GitHub Actions secret: $key"
+              exit 1
+            fi
+          done
+
+          SITE_DIR="$RUNNER_TEMP/sayit-update-site"
+          rm -rf "$SITE_DIR"
+          mkdir -p "$SITE_DIR/public" "$SITE_DIR/.vercel"
+          cp build/latest.json "$SITE_DIR/public/latest.json"
+
+          python3 - "$SITE_DIR" "$VERCEL_PROJECT_ID" "$VERCEL_ORG_ID" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          site = pathlib.Path(sys.argv[1])
+          project_id = sys.argv[2]
+          org_id = sys.argv[3]
+
+          (site / "public" / "index.html").write_text(
+              """<!doctype html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8" />
+            <title>SayIt Update Feed</title>
+            <meta name="robots" content="noindex" />
+          </head>
+          <body>
+            <h1>SayIt Update Feed</h1>
+            <p>Updater metadata: <a href="/latest.json">/latest.json</a></p>
+          </body>
+          </html>
+          """,
+              encoding="utf-8",
+          )
+
+          vercel_config = {
+              "headers": [
+                  {
+                      "source": "/(.*)",
+                      "headers": [
+                          {"key": "Access-Control-Allow-Origin", "value": "*"},
+                          {"key": "Access-Control-Allow-Methods", "value": "GET, HEAD, OPTIONS"},
+                          {
+                              "key": "Cache-Control",
+                              "value": "public, max-age=60, s-maxage=60, must-revalidate",
+                          },
+                      ],
+                  },
+                  {
+                      "source": "/latest.json",
+                      "headers": [
+                          {"key": "Content-Type", "value": "application/json; charset=utf-8"},
+                          {
+                              "key": "Cache-Control",
+                              "value": "public, max-age=60, s-maxage=60, must-revalidate",
+                          },
+                      ],
+                  },
+              ]
+          }
+          (site / "vercel.json").write_text(
+              json.dumps(vercel_config, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          (site / ".vercel" / "project.json").write_text(
+              json.dumps({"projectId": project_id, "orgId": org_id}) + "\n",
+              encoding="utf-8",
+          )
+
+          expected = json.loads((site / "public" / "latest.json").read_text(encoding="utf-8"))
+          platforms = expected.get("platforms") or {}
+          if not expected.get("version"):
+              raise SystemExit("latest.json missing version")
+          if "darwin-aarch64" not in platforms:
+              raise SystemExit(f"latest.json missing darwin-aarch64: {platforms}")
+          if not platforms["darwin-aarch64"].get("url") or not platforms["darwin-aarch64"].get("signature"):
+              raise SystemExit("latest.json missing url/signature")
+          print("local latest.json validated for version", expected["version"])
+          PY
+
+          cd "$SITE_DIR"
+          npx --yes vercel@latest deploy --prod --yes --token "$VERCEL_TOKEN"
+          echo "Deployed updater feed: https://sayit-update.vercel.app/latest.json"
+          sleep 3
+          curl -fsSL "https://sayit-update.vercel.app/latest.json" | tee "$RUNNER_TEMP/deployed-latest.json"
+          python3 - "$SITE_DIR/public/latest.json" "$RUNNER_TEMP/deployed-latest.json" <<'PY'
+          import json
+          import sys
+
+          expected = json.load(open(sys.argv[1], encoding="utf-8"))
+          deployed = json.load(open(sys.argv[2], encoding="utf-8"))
+          if deployed.get("version") != expected.get("version"):
+              raise SystemExit(
+                  f"deployed version mismatch: {deployed.get('version')} != {expected.get('version')}"
+              )
+          print("latest.json live for version", expected["version"])
+          PY
