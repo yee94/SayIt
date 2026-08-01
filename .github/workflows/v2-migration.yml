@@ -1,0 +1,189 @@
+name: V2 Signed Migration Build
+
+on:
+  push:
+    branches:
+      - v2
+  workflow_dispatch:
+
+concurrency:
+  group: v2-migration-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build-sign-notarize:
+    name: Build, Sign, Notarize
+    runs-on: macos-26
+    env:
+      DEVELOPER_ID_APP_IDENTITY: "Developer ID Application: yee wang (6W97S9B7CZ)"
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+      APP_STORE_CONNECT_PRIVATE_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY_BASE64 }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Validate SayIt signing secrets
+        run: |
+          set -euo pipefail
+          for key in \
+            APPLE_CERTIFICATE \
+            APPLE_CERTIFICATE_PASSWORD \
+            APP_STORE_CONNECT_ISSUER_ID \
+            APP_STORE_CONNECT_KEY_ID \
+            APP_STORE_CONNECT_PRIVATE_KEY_BASE64 \
+            TAURI_SIGNING_PRIVATE_KEY \
+            TAURI_SIGNING_PRIVATE_KEY_PASSWORD; do
+            if [ -z "${!key:-}" ]; then
+              echo "::error::Missing SayIt GitHub Actions secret: $key"
+              exit 1
+            fi
+          done
+
+      - name: Install Developer ID certificate
+        run: |
+          set -euo pipefail
+          CERTIFICATE_PATH="$RUNNER_TEMP/sayit-developer-id.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/v2-build.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          printf '%s' "$APPLE_CERTIFICATE" | base64 --decode > "$CERTIFICATE_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" -k "$KEYCHAIN_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/security -T /usr/bin/xcodebuild > /dev/null
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH" > /dev/null
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+          security default-keychain -s "$KEYCHAIN_PATH"
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep -F "$DEVELOPER_ID_APP_IDENTITY" > /dev/null
+
+      - name: Install App Store Connect API key
+        run: |
+          set -euo pipefail
+          KEY_PATH="$RUNNER_TEMP/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+          printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY_BASE64" | base64 --decode > "$KEY_PATH"
+          chmod 600 "$KEY_PATH"
+          echo "NOTARY_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
+
+      - name: Prepare Sherpa ONNX runtime
+        run: |
+          set -euo pipefail
+          tools/build_sherpa_onnx_macos.sh
+          cp Config/SherpaOnnx.local.xcconfig.example Config/SherpaOnnx.local.xcconfig
+
+      - name: Build universal release app
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project Voxt.xcodeproj \
+            -scheme Voxt \
+            -configuration Release \
+            -destination "generic/platform=macOS" \
+            -derivedDataPath build/DerivedData \
+            -onlyUsePackageVersionsFromResolvedFile \
+            -skipPackagePluginValidation \
+            build \
+            CURRENT_PROJECT_VERSION="${GITHUB_RUN_NUMBER}" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Sign the app with SayIt Developer ID
+        run: |
+          set -euo pipefail
+          APP_PATH="build/DerivedData/Build/Products/Release/Voxt.app"
+          ENTITLEMENTS_PATH="build/SayItMigration.entitlements"
+          PROFILE_PREFIX="6W97S9B7CZ"
+          BUNDLE_ID="com.sayit.app"
+          test -d "$APP_PATH"
+          sed \
+            -e "s#\\\$(PRODUCT_BUNDLE_IDENTIFIER)#$BUNDLE_ID#g" \
+            -e "s#\\\$(AppIdentifierPrefix)#$PROFILE_PREFIX.#g" \
+            -e "s#\\\$(DEVELOPMENT_TEAM)#$PROFILE_PREFIX#g" \
+            Voxt/Voxt.entitlements > "$ENTITLEMENTS_PATH"
+          if grep -q '\$(' "$ENTITLEMENTS_PATH"; then
+            echo "::error::Failed to expand signing entitlements"
+            exit 1
+          fi
+          sign_target() {
+            local target="$1"
+            if [ -e "$target" ]; then
+              codesign --force --options runtime --timestamp --sign "$DEVELOPER_ID_APP_IDENTITY" "$target"
+            fi
+          }
+          SPARKLE_FRAMEWORK="$APP_PATH/Contents/Frameworks/Sparkle.framework"
+          test -d "$SPARKLE_FRAMEWORK"
+          sign_target "$SPARKLE_FRAMEWORK/Versions/B/XPCServices/Installer.xpc"
+          sign_target "$SPARKLE_FRAMEWORK/Versions/B/XPCServices/InstallerLauncher.xpc"
+          sign_target "$SPARKLE_FRAMEWORK/Versions/B/XPCServices/Downloader.xpc"
+          sign_target "$SPARKLE_FRAMEWORK/Versions/B/Autoupdate"
+          sign_target "$SPARKLE_FRAMEWORK/Versions/B/Updater.app"
+          sign_target "$SPARKLE_FRAMEWORK"
+          while IFS= read -r -d '' target; do
+            sign_target "$target"
+          done < <(find "$APP_PATH/Contents/Frameworks" -mindepth 1 -maxdepth 1 \
+            \( \( -type d -name '*.framework' \) -o \( -type f -name '*.dylib' \) \) \
+            ! -path "$SPARKLE_FRAMEWORK" -print0)
+          codesign --force --options runtime --timestamp \
+            --entitlements "$ENTITLEMENTS_PATH" \
+            --sign "$DEVELOPER_ID_APP_IDENTITY" \
+            "$APP_PATH"
+          codesign --verify --strict --verbose=4 "$APP_PATH"
+          codesign --display --verbose=4 "$APP_PATH" 2>&1 | tee build/codesign.txt
+          grep -F "TeamIdentifier=6W97S9B7CZ" build/codesign.txt > /dev/null
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_PATH/Contents/Info.plist" | grep -Fx "$BUNDLE_ID"
+
+      - name: Notarize and staple
+        run: |
+          set -euo pipefail
+          APP_PATH="build/DerivedData/Build/Products/Release/Voxt.app"
+          ZIP_PATH="build/Voxt-v2-${GITHUB_SHA::12}.zip"
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ZIP_PATH"
+          xcrun notarytool submit "$ZIP_PATH" \
+            --key "$NOTARY_KEY_PATH" \
+            --key-id "$APP_STORE_CONNECT_KEY_ID" \
+            --issuer "$APP_STORE_CONNECT_ISSUER_ID" \
+            --wait
+          xcrun stapler staple "$APP_PATH"
+          xcrun stapler validate "$APP_PATH"
+          spctl --assess --type execute --verbose=4 "$APP_PATH"
+          rm -f "$ZIP_PATH"
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ZIP_PATH"
+
+      - name: Build Tauri migration payload
+        run: |
+          set -euo pipefail
+          APP_PATH="build/DerivedData/Build/Products/Release/Voxt.app"
+          PAYLOAD_PATH="build/SayIt-v2-${GITHUB_SHA::12}.app.tar.gz"
+          KEY_PATH="$RUNNER_TEMP/sayit-tauri.key"
+          STAGING_PATH="$RUNNER_TEMP/sayit-migration"
+          rm -rf "$STAGING_PATH"
+          mkdir -p "$STAGING_PATH"
+          cp -R "$APP_PATH" "$STAGING_PATH/Voxt.app"
+          tar -czf "$PAYLOAD_PATH" -C "$STAGING_PATH" Voxt.app
+          printf '%s' "$TAURI_SIGNING_PRIVATE_KEY" > "$KEY_PATH"
+          chmod 600 "$KEY_PATH"
+          npx --yes @tauri-apps/cli@2.10.0 signer sign \
+            --private-key-path "$KEY_PATH" \
+            --password "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" \
+            "$PAYLOAD_PATH"
+          test -s "$PAYLOAD_PATH.sig"
+          shasum -a 256 "$PAYLOAD_PATH" > "$PAYLOAD_PATH.sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sayit-v2-signed-migration-${{ github.sha }}
+          if-no-files-found: error
+          path: |
+            build/Voxt-v2-*.zip
+            build/SayIt-v2-*.app.tar.gz
+            build/SayIt-v2-*.app.tar.gz.sig
+            build/SayIt-v2-*.app.tar.gz.sha256
+            build/codesign.txt

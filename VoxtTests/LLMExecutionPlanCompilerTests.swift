@@ -1,0 +1,255 @@
+// LLMExecutionPlanCompilerTests.swift
+// Provides LLMExecution Plan Compiler Tests for Voxt test coverage.
+
+import XCTest
+@testable import Voxt
+
+final class LLMExecutionPlanCompilerTests: XCTestCase {
+    func testUserMessageCompilationMovesGlossaryIntoInstructions() {
+        let plan = LLMExecutionPlan(
+            task: .translation(sourceText: "hello", targetLanguage: .english),
+            provider: .customLLM(repo: "test/repo"),
+            delivery: .userMessage,
+            promptContent: "Translate hello to English.",
+            fallbackText: "hello",
+            executionStrategy: TaskLLMStrategyResolver.resolve(
+                taskKind: .translation,
+                rawText: "hello",
+                promptCharacterCount: 27,
+                baseGlossarySelectionPolicy: DictionaryGlossaryPurpose.translation.selectionPolicy,
+                capabilities: .unknown
+            ),
+            outputTokenBudgetHint: nil,
+            contextBlocks: [
+                LLMContextBlock(
+                    kind: .glossary,
+                    title: "Dictionary Guidance",
+                    content: "Prefer these exact spellings:\n- OpenAI",
+                    isStablePrefixCandidate: true
+                )
+            ],
+            attachments: [],
+            conversationHistory: [],
+            previousResponseID: nil,
+            responseFormat: nil
+        )
+
+        let compiled = LLMExecutionPlanCompiler.compile(plan)
+
+        XCTAssertEqual(compiled.prompt, "Translate hello to English.")
+        XCTAssertContains(compiled.instructions, "### Dictionary Guidance")
+        XCTAssertContains(compiled.instructions, "- OpenAI")
+    }
+
+    func testSystemPromptCompilationKeepsRequestPromptDynamicAndGlossaryStable() {
+        let plan = LLMExecutionPlan(
+            task: .enhancement(rawText: "raw transcript"),
+            provider: .customLLM(repo: "test/repo"),
+            delivery: .systemPrompt,
+            promptContent: "Clean up the transcript.",
+            fallbackText: "raw transcript",
+            executionStrategy: TaskLLMStrategyResolver.resolve(
+                taskKind: .transcriptionEnhancement,
+                rawText: "raw transcript",
+                promptCharacterCount: 24,
+                baseGlossarySelectionPolicy: DictionaryGlossaryPurpose.enhancement.selectionPolicy,
+                capabilities: .unknown
+            ),
+            outputTokenBudgetHint: nil,
+            contextBlocks: [
+                LLMContextBlock(
+                    kind: .glossary,
+                    title: "Dictionary Guidance",
+                    content: "Prefer these exact spellings:\n- Anthropic",
+                    isStablePrefixCandidate: true
+                ),
+                LLMContextBlock(
+                    kind: .input,
+                    title: "Raw transcription",
+                    content: "raw transcript",
+                    isStablePrefixCandidate: false
+                )
+            ],
+            attachments: [],
+            conversationHistory: [],
+            previousResponseID: nil,
+            responseFormat: nil
+        )
+
+        let compiled = LLMExecutionPlanCompiler.compile(plan)
+
+        XCTAssertContains(compiled.instructions, "Clean up the transcript.")
+        XCTAssertContains(compiled.instructions, "### Dictionary Guidance")
+        XCTAssertContains(compiled.instructions, "- Anthropic")
+        XCTAssertContains(compiled.prompt, "Process this ASR transcription according to the system instructions.")
+        XCTAssertContains(compiled.prompt, "raw transcript")
+        XCTAssertFalse(compiled.prompt.contains("Clean this ASR transcription conservatively."))
+        XCTAssertFalse(compiled.instructions.contains("Raw transcription"))
+    }
+
+    func testSystemPromptCompilationIncludesMetadataAndAppBlocks() {
+        let plan = LLMExecutionPlan(
+            task: .enhancement(rawText: "raw transcript"),
+            provider: .customLLM(repo: "test/repo"),
+            delivery: .systemPrompt,
+            promptContent: "Clean up the transcript.",
+            fallbackText: "raw transcript",
+            executionStrategy: TaskLLMStrategyResolver.resolve(
+                taskKind: .transcriptionEnhancement,
+                rawText: "raw transcript",
+                promptCharacterCount: 24,
+                baseGlossarySelectionPolicy: DictionaryGlossaryPurpose.enhancement.selectionPolicy,
+                capabilities: .unknown
+            ),
+            outputTokenBudgetHint: nil,
+            contextBlocks: [
+                LLMContextBlock(
+                    kind: .app,
+                    title: "Enhancement source",
+                    content: "App group: Slack",
+                    isStablePrefixCandidate: true
+                ),
+                LLMContextBlock(
+                    kind: .metadata,
+                    title: "Latency profile",
+                    content: "quality",
+                    isStablePrefixCandidate: true
+                )
+            ],
+            attachments: [],
+            conversationHistory: [],
+            previousResponseID: nil,
+            responseFormat: nil
+        )
+
+        let compiled = LLMExecutionPlanCompiler.compile(plan)
+
+        XCTAssertContains(compiled.instructions, "### Latency profile")
+        XCTAssertContains(compiled.instructions, "quality")
+    }
+
+    func testCompilationKeepsConversationAsExternalRoleMessages() {
+        let history = [
+            RewriteConversationPromptTurn(
+                userPromptText: "北京今天的天气情况",
+                resultTitle: "北京天气",
+                resultContent: "请问您需要查询哪一天的天气？"
+            )
+        ]
+        let plan = LLMExecutionPlan(
+            task: .rewrite(dictatedPrompt: "对", sourceText: "", structuredAnswerOutput: false),
+            provider: .customLLM(repo: "test/repo"),
+            delivery: .systemPrompt,
+            promptContent: "Answer the follow-up directly.",
+            fallbackText: "",
+            executionStrategy: TaskLLMStrategyResolver.resolve(
+                taskKind: .rewrite,
+                rawText: "对",
+                promptCharacterCount: 30,
+                baseGlossarySelectionPolicy: DictionaryGlossaryPurpose.rewrite.selectionPolicy,
+                capabilities: .unknown
+            ),
+            outputTokenBudgetHint: nil,
+            contextBlocks: [
+                LLMContextBlock(
+                    kind: .conversation,
+                    title: "Previous conversation",
+                    content: "User: 北京今天的天气情况\nAssistant: 请问您需要查询哪一天的天气？",
+                    isStablePrefixCandidate: false
+                )
+            ],
+            attachments: [],
+            conversationHistory: history,
+            previousResponseID: nil,
+            responseFormat: nil
+        )
+
+        let compiled = LLMExecutionPlanCompiler.compile(plan)
+
+        XCTAssertEqual(compiled.conversationHistory, history)
+        XCTAssertFalse(compiled.instructions.contains("Previous conversation"))
+        XCTAssertFalse(compiled.instructions.contains("请问您需要查询哪一天"))
+        XCTAssertEqual(compiled.prompt, "对")
+    }
+
+    func testCompilationCarriesInputAttachmentsForward() {
+        let plan = LLMExecutionPlan(
+            task: .enhancement(rawText: "raw transcript"),
+            provider: .remote(
+                provider: .openAI,
+                configuration: TestFactories.makeRemoteConfiguration(
+                    providerID: RemoteLLMProvider.openAI.rawValue,
+                    model: "gpt-5"
+                )
+            ),
+            delivery: .systemPrompt,
+            promptContent: "Clean up the transcript.",
+            fallbackText: "raw transcript",
+            executionStrategy: TaskLLMStrategyResolver.resolve(
+                taskKind: .transcriptionEnhancement,
+                rawText: "raw transcript",
+                promptCharacterCount: 24,
+                baseGlossarySelectionPolicy: DictionaryGlossaryPurpose.enhancement.selectionPolicy,
+                capabilities: .unknown
+            ),
+            outputTokenBudgetHint: nil,
+            contextBlocks: [],
+            attachments: [
+                .image(
+                    LLMImageAttachment(
+                        data: Data([0x01, 0x02]),
+                        mimeType: "image/jpeg",
+                        detail: .high,
+                        filename: "capture.jpg"
+                    )
+                )
+            ],
+            conversationHistory: [],
+            previousResponseID: nil,
+            responseFormat: nil
+        )
+
+        let compiled = LLMExecutionPlanCompiler.compile(plan)
+
+        XCTAssertEqual(compiled.attachments, plan.attachments)
+    }
+
+    func testAttachmentPromptCharacterCostUsesDetailTier() {
+        let attachments: [LLMInputAttachment] = [
+            .image(
+                LLMImageAttachment(
+                    data: Data([0x01]),
+                    mimeType: "image/jpeg",
+                    detail: .low,
+                    filename: "low.jpg"
+                )
+            ),
+            .image(
+                LLMImageAttachment(
+                    data: Data([0x02]),
+                    mimeType: "image/jpeg",
+                    detail: .auto,
+                    filename: "auto.jpg"
+                )
+            ),
+            .image(
+                LLMImageAttachment(
+                    data: Data([0x03]),
+                    mimeType: "image/jpeg",
+                    detail: .high,
+                    filename: "high.jpg"
+                )
+            )
+        ]
+
+        XCTAssertEqual(attachments.estimatedPromptCharacterCost, 5_400)
+    }
+
+    func testReducedLongInputGlossaryPolicyTightensBudget() {
+        let standard = DictionaryGlossaryPurpose.rewrite.selectionPolicy
+        let reduced = standard.reducedForLongInput()
+
+        XCTAssertLessThan(reduced.maxTerms, standard.maxTerms)
+        XCTAssertLessThan(reduced.maxCharacters, standard.maxCharacters)
+    }
+}
