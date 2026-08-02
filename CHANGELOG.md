@@ -6,6 +6,26 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+## [1.15.2] - 2026-08-02
+
+### English
+
+#### Fixed
+- Fixed settings sidebar back navigation so returning from Feature Configuration no longer gets stuck on the settings submenu and can reach Home again.
+- Clicking the sidebar Home control or the bottom-left SayIt logo now jumps straight back to Home from nested settings pages.
+
+### 简体中文
+
+#### 修复
+- 修复设置侧栏返回逻辑：从「功能配置」返回时不再卡在设置二级菜单，可正常回到首页。
+- 在嵌套设置页点击侧栏 Home 控件或左下角 SayIt logo 时，可直接回到首页。
+
+### 日本語
+
+#### 修正
+- 設定サイドバーの戻る操作を修正し、「機能設定」から戻る際に設定のサブメニューで止まらず、ホームに戻れるようにしました。
+- 入れ子の設定ページから、サイドバーの Home コントロールまたは左下の SayIt ロゴで直接ホームへ戻れるようにしました。
+
 ## [1.13.7] - 2026-07-31
 
 ### English

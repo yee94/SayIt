@@ -270,18 +270,11 @@ struct SettingsView: View {
                     navigationRequest = nil
                     switchToHistoryFilter(filter)
                 },
-                onReturnToRoot: {
-                    navigationRequest = nil
-                    if selectedTab == .feature {
-                        // Feature configuration lives under Settings; return there instead of Home.
-                        sidebarMode = .settings
-                        selectedTab = .feature
-                        return
-                    }
-                    sidebarMode = .root
-                    if selectedTab == .history || Self.isSettingsTab(selectedTab) {
-                        selectedTab = .report
-                    }
+                onReturnOneLevel: {
+                    returnOneLevel()
+                },
+                onReturnToHome: {
+                    returnToHome()
                 },
                 featureAvailability: featureAvailability,
                 hasMissingPermissions: hasMissingPermissions,
@@ -329,7 +322,7 @@ struct SettingsView: View {
                     isHomeNotificationDialogPresented = true
                 },
                 onTapWebsite: {
-                    openOfficialWebsite()
+                    returnToHome()
                 },
                 onTapFeedback: {
                     isFeedbackDialogPresented = true
@@ -839,6 +832,28 @@ struct SettingsView: View {
         selectedHistoryFilter = filter
     }
 
+    /// Pop one sidebar level: feature submenu → settings, otherwise → home.
+    private func returnOneLevel() {
+        navigationRequest = nil
+        switch sidebarMode {
+        case .feature:
+            // Feature configuration lives under Settings; return there instead of Home.
+            sidebarMode = .settings
+            selectedTab = .feature
+        case .history, .settings:
+            returnToHome()
+        case .root:
+            break
+        }
+    }
+
+    /// Jump directly to the root home sidebar and content.
+    private func returnToHome() {
+        navigationRequest = nil
+        sidebarMode = .root
+        selectedTab = .report
+    }
+
     private func openOfficialWebsite() {
         NSWorkspace.shared.open(Self.officialWebsiteURL)
     }
@@ -1282,7 +1297,8 @@ private struct SettingsSidebar: View {
     let onSelectTab: (SettingsTab) -> Void
     let onSelectFeatureTab: (FeatureSettingsTab) -> Void
     let onSelectHistoryFilter: (HistoryFilterTab) -> Void
-    let onReturnToRoot: () -> Void
+    let onReturnOneLevel: () -> Void
+    let onReturnToHome: () -> Void
     let featureAvailability: FeatureAvailabilitySettings
     let hasMissingPermissions: Bool
     let hasNoAvailableMicrophones: Bool
@@ -1307,7 +1323,8 @@ private struct SettingsSidebar: View {
                 sidebarMode: sidebarMode,
                 updateBadgeState: updateBadgeState,
                 onTapUpdateBadge: onTapUpdateBadge,
-                onReturnToRoot: onReturnToRoot
+                onReturnOneLevel: onReturnOneLevel,
+                onReturnToHome: onReturnToHome
             )
 
             SettingsSidebarMenuPager(
@@ -1661,7 +1678,8 @@ private struct SettingsSidebarHeader: View {
     let sidebarMode: SettingsSidebarMode
     let updateBadgeState: UpdateBadgeState
     let onTapUpdateBadge: () -> Void
-    let onReturnToRoot: () -> Void
+    let onReturnOneLevel: () -> Void
+    let onReturnToHome: () -> Void
 
     private var appVersionText: String {
         let bundle = Bundle.main
@@ -1707,14 +1725,28 @@ private struct SettingsSidebarHeader: View {
             case .feature, .history, .settings:
                 Spacer(minLength: 0)
 
-                Button(action: onReturnToRoot) {
-                    SettingsSidebarBackIcon()
-                        .frame(width: 16, height: 16)
-                        .frame(width: 26, height: headerBadgeHeight)
-                        .contentShape(Capsule(style: .continuous))
+                HStack(spacing: 4) {
+                    Button(action: onReturnToHome) {
+                        Image(systemName: "house")
+                            .font(.system(size: 11, weight: .semibold))
+                            .frame(width: 14, height: 14)
+                            .frame(width: 26, height: headerBadgeHeight)
+                            .contentShape(Capsule(style: .continuous))
+                    }
+                    .buttonStyle(SettingsSidebarHeaderBackButtonStyle())
+                    .accessibilityLabel(settingsLocalized("Home"))
+                    .help(settingsLocalized("Home"))
+
+                    Button(action: onReturnOneLevel) {
+                        SettingsSidebarBackIcon()
+                            .frame(width: 16, height: 16)
+                            .frame(width: 26, height: headerBadgeHeight)
+                            .contentShape(Capsule(style: .continuous))
+                    }
+                    .buttonStyle(SettingsSidebarHeaderBackButtonStyle())
+                    .accessibilityLabel(settingsLocalized("Back"))
+                    .help(settingsLocalized("Back"))
                 }
-                .buttonStyle(SettingsSidebarHeaderBackButtonStyle())
-                .accessibilityLabel(settingsLocalized("Back"))
             }
         }
         .frame(maxWidth: .infinity, alignment: .trailing)
