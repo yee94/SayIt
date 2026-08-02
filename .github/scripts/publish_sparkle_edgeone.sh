@@ -1,15 +1,18 @@
 #!/usr/bin/env bash
 # Publish one Sparkle release item into deploy/sparkle-update-service and
-# deploy the static site to EdgeOne Pages.
+# deploy/redeploy the static site on EdgeOne.
 #
 # Required env:
 #   VERSION, TAG, CHANNEL (stable|beta), GITHUB_REPOSITORY
 # Optional env:
 #   SPARKLE_ED_SIGNATURE, SPARKLE_ED_LENGTH
-#   EDGEONE_API_TOKEN, EDGEONE_PROJECT_NAME (default sayit-sparkle-update)
+#   EDGEONE_API_TOKEN
+#   EDGEONE_PROJECT_NAME (default sayit-sparkle-update)
+#   EDGEONE_PROJECT_ID (default makers-2gtkiwcbcdiw)
+#   EDGEONE_DEPLOY_MODE: github | upload  (default github for GitHub-connected project)
+#   EDGEONE_PUBLIC_FEED_BASE (default https://sayit-update.xiaobe.top)
 #   EDGEONE_ENV (default production)
-#   RELEASE_BUILD_NUMBER (sparkle:version; falls back to CFBundle-style from VERSION)
-#   RELEASE_NOTES_HTML, PUBLISHED_AT, RELEASE_URL
+#   RELEASE_BUILD_NUMBER, RELEASE_NOTES_HTML, PUBLISHED_AT, RELEASE_URL
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -28,7 +31,11 @@ fi
 
 GITHUB_REPOSITORY="${GITHUB_REPOSITORY:-yee94/SayIt}"
 EDGEONE_PROJECT_NAME="${EDGEONE_PROJECT_NAME:-sayit-sparkle-update}"
+EDGEONE_PROJECT_ID="${EDGEONE_PROJECT_ID:-makers-2gtkiwcbcdiw}"
+EDGEONE_DEPLOY_MODE="${EDGEONE_DEPLOY_MODE:-github}"
 EDGEONE_ENV="${EDGEONE_ENV:-production}"
+EDGEONE_PUBLIC_FEED_BASE="${EDGEONE_PUBLIC_FEED_BASE:-https://sayit-update.xiaobe.top}"
+EDGEONE_API_BASE="${EDGEONE_API_BASE:-https://pages-api.edgeone.ai/v1}"
 
 ZIP_NAME="SayIt-${VERSION}-macOS.zip"
 ZIP_URL="${ZIP_URL:-https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${ZIP_NAME}}"
@@ -78,17 +85,84 @@ node scripts/write-appcast.mjs \
 test -f dist/updates/stable/appcast.xml
 test -f dist/updates/beta/appcast.xml
 
+edgeone_api() {
+  local action="$1"
+  local payload_json="$2"
+  python3 - "$EDGEONE_API_BASE" "$EDGEONE_API_TOKEN" "$action" "$payload_json" <<'PY'
+import json, sys, urllib.request
+base, token, action, payload = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+body = {"Action": action, "Region": "ap-singapore"}
+body.update(json.loads(payload))
+req = urllib.request.Request(
+    base,
+    data=json.dumps(body).encode(),
+    headers={
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {token}",
+    },
+)
+with urllib.request.urlopen(req, timeout=60) as resp:
+    print(resp.read().decode())
+PY
+}
+
 if [[ -z "${EDGEONE_API_TOKEN:-}" ]]; then
   echo "::warning::EDGEONE_API_TOKEN not set; appcast written locally but not deployed."
   exit 0
 fi
 
-npx --yes edgeone@1.6.19 pages deploy ./dist \
-  -n "$EDGEONE_PROJECT_NAME" \
-  -t "$EDGEONE_API_TOKEN" \
-  -e "$EDGEONE_ENV"
+if [[ "$EDGEONE_DEPLOY_MODE" == "upload" ]]; then
+  # Only works for Provider=Upload projects. makers-2gtkiwcbcdiw is GitHub-connected.
+  npx --yes edgeone@1.6.19 pages deploy ./dist \
+    -n "$EDGEONE_PROJECT_NAME" \
+    -t "$EDGEONE_API_TOKEN" \
+    -e "$EDGEONE_ENV"
+else
+  # GitHub-connected project: commit channel manifests (if dirty) then trigger redeploy.
+  cd "$ROOT"
+  if [[ -n "$(git status --porcelain deploy/sparkle-update-service/channels || true)" ]]; then
+    git add deploy/sparkle-update-service/channels
+    if git diff --cached --quiet; then
+      echo "No channel manifest changes to commit."
+    else
+      git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+        commit -m "chore: publish Sparkle appcast ${VERSION} (${CHANNEL})"
+      # Push only when we have write credentials in CI.
+      if git push origin "HEAD:${GITHUB_REF_NAME:-v2}" 2>/dev/null; then
+        echo "Pushed channel manifests for EdgeOne GitHub redeploy."
+      else
+        echo "::warning::Committed channel manifests locally but push failed; will still request EdgeOne redeploy."
+      fi
+    fi
+  fi
 
-echo "Sparkle feed deployed to EdgeOne project=${EDGEONE_PROJECT_NAME} channel=${CHANNEL} version=${VERSION}"
-echo "Feed paths:"
-echo "  /updates/stable/appcast.xml"
-echo "  /updates/beta/appcast.xml"
+  BRANCH="${GITHUB_REF_NAME:-v2}"
+  if [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
+    BRANCH="v2"
+  fi
+  RESP="$(
+    edgeone_api CreatePagesDeployment "$(
+      jq -n \
+        --arg projectId "$EDGEONE_PROJECT_ID" \
+        --arg branch "$BRANCH" \
+        '{
+          ProjectId: $projectId,
+          ViaMeta: "Github",
+          Provider: "Github",
+          Env: "Production",
+          RepoBranch: $branch
+        }'
+    )"
+  )"
+  DEPLOY_ID="$(printf '%s' "$RESP" | jq -r '.Data.Response.DeploymentId // empty')"
+  if [[ -z "$DEPLOY_ID" ]]; then
+    echo "::warning::EdgeOne GitHub redeploy response missing DeploymentId: $RESP"
+  else
+    echo "Triggered EdgeOne GitHub redeploy DeploymentId=$DEPLOY_ID project=$EDGEONE_PROJECT_ID branch=$BRANCH"
+  fi
+fi
+
+echo "Sparkle feed published for project=${EDGEONE_PROJECT_NAME} id=${EDGEONE_PROJECT_ID} channel=${CHANNEL} version=${VERSION}"
+echo "Public feed base: ${EDGEONE_PUBLIC_FEED_BASE}"
+echo "  ${EDGEONE_PUBLIC_FEED_BASE}/updates/stable/appcast.xml"
+echo "  ${EDGEONE_PUBLIC_FEED_BASE}/updates/beta/appcast.xml"

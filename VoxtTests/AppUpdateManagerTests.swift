@@ -13,7 +13,7 @@ final class AppUpdateManagerTests: XCTestCase {
             environment: [:]
         )
 
-        XCTAssertTrue(url.hasPrefix("https://sayit-sparkle-update.edgeone.cool/updates/stable/appcast.xml"))
+        XCTAssertTrue(url.hasPrefix("https://sayit-update.xiaobe.top/updates/stable/appcast.xml"))
         XCTAssertEqual(URLComponents(string: url)?.queryItems?.first(where: { $0.name == "lang" })?.value, "en")
     }
 
@@ -25,7 +25,7 @@ final class AppUpdateManagerTests: XCTestCase {
             environment: [:]
         )
 
-        XCTAssertTrue(url.hasPrefix("https://sayit-sparkle-update.edgeone.cool/updates/beta/appcast.xml"))
+        XCTAssertTrue(url.hasPrefix("https://sayit-update.xiaobe.top/updates/beta/appcast.xml"))
         XCTAssertEqual(URLComponents(string: url)?.queryItems?.first(where: { $0.name == "lang" })?.value, "zh-Hans")
     }
 
@@ -37,7 +37,7 @@ final class AppUpdateManagerTests: XCTestCase {
             environment: ["VOXT_UPDATE_CHANNEL": "stable"]
         )
 
-        XCTAssertTrue(url.hasPrefix("https://sayit-sparkle-update.edgeone.cool/updates/stable/appcast.xml"))
+        XCTAssertTrue(url.hasPrefix("https://sayit-update.xiaobe.top/updates/stable/appcast.xml"))
         XCTAssertEqual(URLComponents(string: url)?.queryItems?.first(where: { $0.name == "lang" })?.value, "ja")
     }
 
@@ -52,7 +52,7 @@ final class AppUpdateManagerTests: XCTestCase {
             ]
         )
 
-        XCTAssertTrue(url.hasPrefix("https://sayit-sparkle-update.edgeone.cool/updates/beta/appcast.xml"))
+        XCTAssertTrue(url.hasPrefix("https://sayit-update.xiaobe.top/updates/beta/appcast.xml"))
         XCTAssertEqual(URLComponents(string: url)?.queryItems?.first(where: { $0.name == "lang" })?.value, "en")
     }
 
@@ -112,7 +112,7 @@ final class AppUpdateManagerTests: XCTestCase {
     @MainActor
     func testLocalizedFeedURLStringUsesInterfaceLanguageQueryParameter() {
         let url = AppUpdateManager.localizedFeedURLString(
-            baseURLString: "https://sayit-sparkle-update.edgeone.cool/updates/stable/appcast.xml",
+            baseURLString: "https://sayit-update.xiaobe.top/updates/stable/appcast.xml",
             interfaceLanguage: .chineseSimplified
         )
 
@@ -123,7 +123,7 @@ final class AppUpdateManagerTests: XCTestCase {
     @MainActor
     func testLocalizedFeedURLStringPreservesExistingQueryItems() {
         let url = AppUpdateManager.localizedFeedURLString(
-            baseURLString: "https://sayit-sparkle-update.edgeone.cool/updates/stable/appcast.xml?channel=stable",
+            baseURLString: "https://sayit-update.xiaobe.top/updates/stable/appcast.xml?channel=stable",
             interfaceLanguage: .japanese
         )
 

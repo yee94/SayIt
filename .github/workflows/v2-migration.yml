@@ -511,7 +511,9 @@ jobs:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       EDGEONE_API_TOKEN: ${{ secrets.EDGEONE_API_TOKEN }}
+      # GitHub-connected EdgeOne project makers-2gtkiwcbcdiw (custom domain sayit-update.xiaobe.top)
       EDGEONE_PROJECT_NAME: sayit-sparkle-update
+      EDGEONE_PUBLIC_FEED_BASE: https://sayit-update.xiaobe.top
     steps:
       - uses: actions/checkout@v5
 
@@ -543,7 +545,7 @@ jobs:
 
           Updater feeds:
           - Tauri: https://sayit-update.vercel.app/latest.json
-          - Sparkle: https://sayit-sparkle-update.edgeone.cool/updates/stable/appcast.xml" \
+          - Sparkle: https://sayit-update.xiaobe.top/updates/stable/appcast.xml" \
               -R "$GITHUB_REPOSITORY"
           fi
 
@@ -703,6 +705,10 @@ jobs:
           export PUBLISHED_AT RELEASE_URL
           export EDGEONE_API_TOKEN EDGEONE_PROJECT_NAME
           export EDGEONE_ENV=production
+          export EDGEONE_PUBLIC_FEED_BASE="${EDGEONE_PUBLIC_FEED_BASE:-https://sayit-update.xiaobe.top}"
+          # makers-2gtkiwcbcdiw is GitHub-connected; commit manifests then trigger GitHub redeploy.
+          export EDGEONE_DEPLOY_MODE=github
+          export EDGEONE_PROJECT_ID=makers-2gtkiwcbcdiw
           export RELEASE_NOTES_HTML="<p>SayIt ${VERSION}</p>"
 
           bash .github/scripts/publish_sparkle_edgeone.sh

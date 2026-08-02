@@ -50,7 +50,7 @@
     <key>SUEnableAutomaticChecks</key>
     <true/>
 	<key>SUFeedURL</key>
-	<string>https://sayit-sparkle-update.edgeone.cool/updates/stable/appcast.xml</string>
+	<string>https://sayit-update.xiaobe.top/updates/stable/appcast.xml</string>
     <key>SUPublicEDKey</key>
     <!-- Must match GitHub secret SPARKLE_PRIVATE_KEY / local Keychain ed25519 seed. -->
     <string>1jLVHTAcmIr8zHAv8z91XK0/OFRat4n74n6fDgQC8C4=</string>

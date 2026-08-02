@@ -1,24 +1,22 @@
 name: Deploy Sparkle Feed (EdgeOne)
 
-# Redeploy the static Sparkle appcast site from repository channel manifests.
-# Full release pipeline also publishes new items via the main Release workflow.
+# Rebuild + redeploy the static Sparkle appcast for the GitHub-connected
+# EdgeOne project makers-2gtkiwcbcdiw (custom domain: sayit-update.xiaobe.top).
 on:
   workflow_dispatch:
     inputs:
-      environment:
-        description: "EdgeOne deploy environment"
+      branch:
+        description: "Repo branch EdgeOne should build"
         required: true
-        default: production
-        type: choice
-        options:
-          - production
-          - preview
+        default: v2
   push:
     branches:
+      - v2
       - main
     paths:
       - "deploy/sparkle-update-service/**"
       - ".github/workflows/deploy-sparkle-feed.yml"
+      - ".github/scripts/publish_sparkle_edgeone.sh"
 
 concurrency:
   group: sparkle-feed-${{ github.ref_name }}
@@ -29,12 +27,14 @@ permissions:
 
 jobs:
   deploy:
-    name: Build And Deploy EdgeOne Appcast
+    name: Build And Redeploy EdgeOne Appcast
     runs-on: ubuntu-latest
     env:
       EDGEONE_API_TOKEN: ${{ secrets.EDGEONE_API_TOKEN }}
       EDGEONE_PROJECT_NAME: sayit-sparkle-update
-      EDGEONE_ENV: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || 'production' }}
+      EDGEONE_PROJECT_ID: makers-2gtkiwcbcdiw
+      EDGEONE_PUBLIC_FEED_BASE: https://sayit-update.xiaobe.top
+      EDGEONE_API_BASE: https://pages-api.edgeone.ai/v1
     steps:
       - uses: actions/checkout@v5
 
@@ -65,15 +65,42 @@ jobs:
           test -f dist/health.json
           head -n 20 dist/updates/stable/appcast.xml
 
-      - name: Deploy to EdgeOne Pages
+      - name: Trigger EdgeOne GitHub redeploy
         if: steps.gate.outputs.skip != 'true'
-        working-directory: deploy/sparkle-update-service
         run: |
           set -euo pipefail
-          npx --yes edgeone@1.6.19 pages deploy ./dist \
-            -n "$EDGEONE_PROJECT_NAME" \
-            -t "$EDGEONE_API_TOKEN" \
-            -e "$EDGEONE_ENV"
-          echo "Deployed project=$EDGEONE_PROJECT_NAME env=$EDGEONE_ENV"
-          echo "Stable feed (project domain may require custom domain for public access):"
-          echo "  https://${EDGEONE_PROJECT_NAME}.edgeone.cool/updates/stable/appcast.xml"
+          BRANCH="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.branch || github.ref_name }}"
+          RESP="$(
+            python3 - <<PY
+          import json, urllib.request
+          body = {
+            "Action": "CreatePagesDeployment",
+            "Region": "ap-singapore",
+            "ProjectId": "${EDGEONE_PROJECT_ID}",
+            "ViaMeta": "Github",
+            "Provider": "Github",
+            "Env": "Production",
+            "RepoBranch": "${BRANCH}",
+          }
+          req = urllib.request.Request(
+              "${EDGEONE_API_BASE}",
+              data=json.dumps(body).encode(),
+              headers={
+                  "Content-Type": "application/json",
+                  "Authorization": f"Bearer ${EDGEONE_API_TOKEN}",
+              },
+          )
+          with urllib.request.urlopen(req, timeout=60) as resp:
+              print(resp.read().decode())
+          PY
+          )"
+          echo "$RESP"
+          DEPLOY_ID="$(printf '%s' "$RESP" | jq -r '.Data.Response.DeploymentId // empty')"
+          if [ -z "$DEPLOY_ID" ]; then
+            echo "::error::Failed to create EdgeOne deployment"
+            exit 1
+          fi
+          echo "Triggered EdgeOne deployment=$DEPLOY_ID project=${EDGEONE_PROJECT_ID} branch=${BRANCH}"
+          echo "Public feed:"
+          echo "  ${EDGEONE_PUBLIC_FEED_BASE}/updates/stable/appcast.xml"
+          echo "  ${EDGEONE_PUBLIC_FEED_BASE}/updates/beta/appcast.xml"

@@ -38,9 +38,10 @@ final class AppUpdateManager: NSObject, ObservableObject, SPUStandardUserDriverD
         return controller
     }
 
-    // Sparkle requires a real appcast XML feed hosted on EdgeOne Pages.
-    static let stableFeedURLString = "https://sayit-sparkle-update.edgeone.cool/updates/stable/appcast.xml"
-    static let betaFeedURLString = "https://sayit-sparkle-update.edgeone.cool/updates/beta/appcast.xml"
+    // Sparkle appcast hosted on EdgeOne project sayit-sparkle-update (makers-2gtkiwcbcdiw)
+    // via custom domain. Do not use *.edgeone.dev/*.edgeone.cool project domains in production.
+    static let stableFeedURLString = "https://sayit-update.xiaobe.top/updates/stable/appcast.xml"
+    static let betaFeedURLString = "https://sayit-update.xiaobe.top/updates/beta/appcast.xml"
     static let betaFeedEnableEnvKey = "VOXT_ENABLE_BETA_UPDATES"
     private let defaults: UserDefaults
     private let interactiveUIPresentationTimeout: Duration = .seconds(4)
