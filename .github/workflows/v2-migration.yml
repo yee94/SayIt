@@ -12,8 +12,9 @@ concurrency:
   group: release-${{ github.ref_name }}
   cancel-in-progress: false
 
+# contents:write is required so GITHUB_TOKEN can create GitHub Releases / upload assets.
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -216,6 +217,27 @@ jobs:
         with:
           name: sayit-v2-unsigned-app-${{ github.sha }}
           path: build/unsigned
+
+      - name: Resolve cache keys for Sparkle tooling
+        id: cache_key
+        run: |
+          set -euo pipefail
+          XCODE_VERSION="$(xcodebuild -version | tr '\n' '-' | sed -E 's/[^A-Za-z0-9._-]+/-/g; s/-+$//')"
+          PACKAGE_HASH="$(shasum -a 256 Voxt.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved | awk '{print $1}')"
+          SPM_PREFIX="spm-source-${RUNNER_OS}-${RUNNER_ARCH}-${XCODE_VERSION}-v2"
+          echo "spm_key=${SPM_PREFIX}-${PACKAGE_HASH}" >> "$GITHUB_OUTPUT"
+          echo "spm_restore_prefix=${SPM_PREFIX}-" >> "$GITHUB_OUTPUT"
+
+      # sign_update lives in SwiftPM checkout; restore the same cache built by the compile job.
+      - name: Restore SwiftPM SourcePackages cache for Sparkle sign_update
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            build/DerivedData/SourcePackages
+            build/DerivedData/ModuleCache.noindex
+          key: ${{ steps.cache_key.outputs.spm_key }}
+          restore-keys: |
+            ${{ steps.cache_key.outputs.spm_restore_prefix }}
 
       - name: Extract unsigned app (preserve framework symlinks)
         run: |
@@ -431,26 +453,31 @@ jobs:
           printf '%s' "$SPARKLE_PRIVATE_KEY" > "$KEY_FILE"
           chmod 600 "$KEY_FILE"
 
-          # Prefer Sparkle tooling from the app bundle SourcePackages if present;
-          # fall back to resolving via xcodebuild package cache in DerivedData.
+          # Prefer the same SwiftPM checkout used by the build job.
           SIGN_UPDATE_BIN="$(
-            find "$HOME/Library/Developer/Xcode/DerivedData" \
+            find build/DerivedData/SourcePackages \
               -path '*/Sparkle/bin/sign_update' -type f 2>/dev/null | head -n 1 || true
           )"
           if [ -z "$SIGN_UPDATE_BIN" ]; then
-            # Last resort: use swift package plugin binary if checkout exists under workspace.
+            SIGN_UPDATE_BIN="$(
+              find "$HOME/Library/Developer/Xcode/DerivedData" \
+                -path '*/Sparkle/bin/sign_update' -type f 2>/dev/null | head -n 1 || true
+            )"
+          fi
+          if [ -z "$SIGN_UPDATE_BIN" ]; then
             SIGN_UPDATE_BIN="$(find . -path '*/Sparkle/bin/sign_update' -type f 2>/dev/null | head -n 1 || true)"
           fi
           if [ -z "$SIGN_UPDATE_BIN" ]; then
             echo "sparkle_signed=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::Unable to locate Sparkle sign_update; publishing length only."
+            echo "::error::Unable to locate Sparkle sign_update; refusing to publish an unsigned Sparkle feed."
             {
               echo "SPARKLE_ED_SIGNATURE="
               echo "SPARKLE_ED_LENGTH=$(stat -f%z "$ZIP_PATH")"
             } > "$SIG_ENV_FILE"
             rm -f "$KEY_FILE"
-            exit 0
+            exit 1
           fi
+          echo "Using Sparkle sign_update at $SIGN_UPDATE_BIN"
 
           SIGN_OUTPUT="$("$SIGN_UPDATE_BIN" "$ZIP_PATH" --ed-key-file "$KEY_FILE" 2>/tmp/sign_update.err || true)"
           if [ -z "$SIGN_OUTPUT" ]; then
