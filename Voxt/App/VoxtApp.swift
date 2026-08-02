@@ -218,6 +218,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var isSessionActive = false
     var pendingSessionFinishTask: Task<Void, Never>?
     var silenceMonitorTask: Task<Void, Never>?
+    var pendingVADFlushStopTasksByToken: [UUID: Task<Void, Never>] = [:]
     var pauseLLMTask: Task<Void, Never>?
     var pendingDictionaryHistoryScanTask: Task<Void, Never>?
     var pendingAutomaticDictionaryLearningTask: Task<Void, Never>?
@@ -837,6 +838,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             pendingSelectedTextTranslationRefreshTask,
             pendingDeepIdleMemoryReclamationTask
         ].compactMap { $0 }
+        tasks.append(contentsOf: pendingVADFlushStopTasksByToken.values)
         tasks.append(contentsOf: llmWarmupTasksByRepo.values)
         tasks.append(contentsOf: remoteLLMWarmupTasksByKey.values)
         return tasks
@@ -846,6 +848,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         inputDevicesRefreshTask = nil
         pendingSessionFinishTask = nil
         silenceMonitorTask = nil
+        pendingVADFlushStopTasksByToken.removeAll()
         pauseLLMTask = nil
         pendingDictionaryHistoryScanTask = nil
         pendingAutomaticDictionaryLearningTask = nil

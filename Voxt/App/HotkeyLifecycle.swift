@@ -15,10 +15,21 @@ final class OverlayShortcutEventGate: @unchecked Sendable {
         }
     }
 
+    enum PhysicalEscapeClaim: Equatable {
+        /// First delivery of this physical ESC within the dedup window; caller should handle.
+        case primary
+        /// Duplicate delivery of the same physical ESC; caller should still consume but not re-handle.
+        case duplicate
+    }
+
+    /// Short window covering CGEvent tap + NSEvent local/global monitor deliveries for one key press.
+    static let physicalEscapeDedupInterval: TimeInterval = 0.1
+
     private let lock = NSLock()
     private var signatures: Set<KeySignature> = [
         KeySignature(keyCode: UInt16(kVK_Escape), modifiers: [])
     ]
+    private var lastPhysicalEscapeClaimAt: Date?
 
     func update(
         answerContinueShortcut: HotkeyPreference.Hotkey
@@ -56,6 +67,54 @@ final class OverlayShortcutEventGate: @unchecked Sendable {
         let shouldDispatch = signatures.contains(signature)
         lock.unlock()
         return shouldDispatch
+    }
+
+    /// Thread-safe claim for one physical ESC. Duplicates within the dedup window stay consumable
+    /// without re-running cancel/dismiss side effects (e.g. dismiss restored answer overlay).
+    func claimPhysicalEscape(
+        now: Date = Date(),
+        dedupInterval: TimeInterval = OverlayShortcutEventGate.physicalEscapeDedupInterval
+    ) -> PhysicalEscapeClaim {
+        lock.lock()
+        defer { lock.unlock() }
+        if let lastPhysicalEscapeClaimAt,
+           now.timeIntervalSince(lastPhysicalEscapeClaimAt) < dedupInterval {
+            return .duplicate
+        }
+        lastPhysicalEscapeClaimAt = now
+        return .primary
+    }
+
+    func hasRecentPhysicalEscapeClaim(
+        now: Date = Date(),
+        dedupInterval: TimeInterval = OverlayShortcutEventGate.physicalEscapeDedupInterval
+    ) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let lastPhysicalEscapeClaimAt else { return false }
+        return now.timeIntervalSince(lastPhysicalEscapeClaimAt) < dedupInterval
+    }
+}
+
+/// Pure routing for tap-path ESC: primary claim handles; duplicates keep consume semantics.
+enum EscapeShortcutRoute: Equatable {
+    case ignore
+    case handleAndConsume
+    case consumeDuplicate
+}
+
+enum EscapeShortcutRouting {
+    static func route(
+        shouldConsume: Bool,
+        claim: OverlayShortcutEventGate.PhysicalEscapeClaim
+    ) -> EscapeShortcutRoute {
+        guard shouldConsume else { return .ignore }
+        switch claim {
+        case .primary:
+            return .handleAndConsume
+        case .duplicate:
+            return .consumeDuplicate
+        }
     }
 }
 
@@ -127,12 +186,11 @@ extension AppDelegate {
             guard let self else { return }
             self.handleCommonStopHotkeyDown()
         }
+        // ESC must run synchronously on the main-queue callback so a following tap-start
+        // observes the cancelled session (no extra MainActor Task hop / reorder).
         hotkeyManager.onEscapeKeyDown = { [weak self] in
-            guard let self, self.shouldConsumeEscapeShortcut() else { return false }
-            Task { @MainActor [weak self] in
-                _ = self?.handleEscapeShortcut()
-            }
-            return true
+            guard let self else { return false }
+            return self.handleEscapeShortcutFromEventTap()
         }
         hotkeyManager.start()
         VoxtLog.hotkey("Hotkey callbacks configured.")
@@ -229,8 +287,39 @@ extension AppDelegate {
         }
 
         guard event.keyCode == UInt16(kVK_Escape) else { return event }
-        guard handleEscapeShortcut() else { return event }
-        return shouldConsume ? nil : event
+        switch routeEscapeShortcut() {
+        case .ignore:
+            return event
+        case .handleAndConsume:
+            guard handleEscapeShortcut() else { return event }
+            return shouldConsume ? nil : event
+        case .consumeDuplicate:
+            return shouldConsume ? nil : event
+        }
+    }
+
+    /// Event-tap ESC entry: synchronous on main so ordering vs subsequent tap start is stable.
+    func handleEscapeShortcutFromEventTap() -> Bool {
+        switch routeEscapeShortcut() {
+        case .ignore:
+            return false
+        case .handleAndConsume:
+            return handleEscapeShortcut()
+        case .consumeDuplicate:
+            return true
+        }
+    }
+
+    func routeEscapeShortcut() -> EscapeShortcutRoute {
+        guard shouldConsumeEscapeShortcut() else {
+            return overlayShortcutEventGate.hasRecentPhysicalEscapeClaim()
+                ? .consumeDuplicate
+                : .ignore
+        }
+        return EscapeShortcutRouting.route(
+            shouldConsume: true,
+            claim: overlayShortcutEventGate.claimPhysicalEscape()
+        )
     }
 
     func shouldConsumeEscapeShortcut() -> Bool {
@@ -240,6 +329,7 @@ extension AppDelegate {
         if overlayState.displayMode == .answer {
             return true
         }
+        // ESC cancel applies only to tap trigger mode (longPress keeps existing cancel UX elsewhere).
         guard HotkeyPreference.loadTriggerMode() == .tap else { return false }
         guard isSessionActive else { return false }
         guard !isSelectedTextTranslationFlow else { return false }

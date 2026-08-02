@@ -419,9 +419,20 @@ extension AppDelegate {
     }
 
     func stopActiveRecordingTranscriberAfterPendingVADFlush(sessionID: UUID) {
-        Task { [weak self] in
+        cancelPendingVADFlushStopTasks()
+        let token = UUID()
+        let task = Task { @MainActor [weak self] in
             guard let self else { return }
-            guard self.activeRecordingSessionID == sessionID else { return }
+            defer {
+                // Token-scoped clear: an older task must not wipe a newer task's entry.
+                self.pendingVADFlushStopTasksByToken[token] = nil
+            }
+
+            guard RecordingSessionOwnedTaskGate.isStillOwner(
+                isTaskCancelled: Task.isCancelled,
+                ownedSessionID: sessionID,
+                activeSessionID: self.activeRecordingSessionID
+            ) else { return }
 
             let monitorTask = self.silenceMonitorTask
             self.silenceMonitorTask?.cancel()
@@ -430,10 +441,33 @@ extension AppDelegate {
             self.pauseLLMTask = nil
             await monitorTask?.value
 
-            guard self.activeRecordingSessionID == sessionID else { return }
-            await self.flushPendingRecordingVoiceActivityFramesBeforeStop()
+            guard RecordingSessionOwnedTaskGate.isStillOwner(
+                isTaskCancelled: Task.isCancelled,
+                ownedSessionID: sessionID,
+                activeSessionID: self.activeRecordingSessionID
+            ) else { return }
+
+            await self.flushPendingRecordingVoiceActivityFramesBeforeStop(sessionID: sessionID)
+
+            guard RecordingSessionOwnedTaskGate.isStillOwner(
+                isTaskCancelled: Task.isCancelled,
+                ownedSessionID: sessionID,
+                activeSessionID: self.activeRecordingSessionID
+            ) else { return }
+
             self.stopActiveRecordingTranscriber()
         }
+        pendingVADFlushStopTasksByToken[token] = task
+    }
+
+    @discardableResult
+    func cancelPendingVADFlushStopTasks() -> [Task<Void, Never>] {
+        let tasks = Array(pendingVADFlushStopTasksByToken.values)
+        for task in tasks {
+            task.cancel()
+        }
+        pendingVADFlushStopTasksByToken.removeAll()
+        return tasks
     }
 
     func updateActiveRecordingTranscriberTranscribedText(_ text: String) {
@@ -483,6 +517,7 @@ extension AppDelegate {
         silenceMonitorTask = nil
         pauseLLMTask?.cancel()
         pauseLLMTask = nil
+        cancelPendingVADFlushStopTasks()
     }
 
     func cancelSessionControlTasks() {
@@ -544,13 +579,31 @@ extension AppDelegate {
             useCase: voiceActivityUseCase
         )
 
+        let sessionID = activeRecordingSessionID
         silenceMonitorTask = Task { [weak self] in
             guard let self else { return }
             var observedSpeechEnd = false
-            while !Task.isCancelled, self.isSessionActive {
+            while RecordingSessionOwnedTaskGate.shouldContinueSilenceMonitor(
+                isTaskCancelled: Task.isCancelled,
+                isSessionActive: self.isSessionActive,
+                ownedSessionID: sessionID,
+                activeSessionID: self.activeRecordingSessionID
+            ) {
                 guard self.overlayState.isRecording else {
+                    guard RecordingSessionOwnedTaskGate.shouldContinueSilenceMonitor(
+                        isTaskCancelled: Task.isCancelled,
+                        isSessionActive: self.isSessionActive,
+                        ownedSessionID: sessionID,
+                        activeSessionID: self.activeRecordingSessionID
+                    ) else { return }
                     self.recordingVoiceActivitySegmenter?.reset()
                     await self.recordingVoiceActivityFrameDecider?.reset()
+                    guard RecordingSessionOwnedTaskGate.shouldContinueSilenceMonitor(
+                        isTaskCancelled: Task.isCancelled,
+                        isSessionActive: self.isSessionActive,
+                        ownedSessionID: sessionID,
+                        activeSessionID: self.activeRecordingSessionID
+                    ) else { return }
                     observedSpeechEnd = false
                     do {
                         try await Task.sleep(for: .milliseconds(200))
@@ -562,10 +615,18 @@ extension AppDelegate {
 
                 let level = self.overlayState.audioLevel
                 let voiceActivityResult = await self.processPendingRecordingVoiceActivityFrames(
+                    sessionID: sessionID,
                     localVADGateActive: localVADGateActive,
                     level: level,
                     logEvents: true
                 )
+                guard RecordingSessionOwnedTaskGate.shouldContinueSilenceMonitor(
+                    isTaskCancelled: Task.isCancelled,
+                    isSessionActive: self.isSessionActive,
+                    ownedSessionID: sessionID,
+                    activeSessionID: self.activeRecordingSessionID
+                ) else { return }
+
                 let vadEvents = voiceActivityResult.events
                 let sawSpeechFrame = voiceActivityResult.sawSpeechFrame
                 let sawVoiceActivityFrame = voiceActivityResult.sawVoiceActivityFrame
@@ -688,7 +749,12 @@ extension AppDelegate {
         )
     }
 
-    func flushPendingRecordingVoiceActivityFramesBeforeStop() async {
+    func flushPendingRecordingVoiceActivityFramesBeforeStop(sessionID: UUID) async {
+        guard RecordingSessionOwnedTaskGate.isStillOwner(
+            isTaskCancelled: Task.isCancelled,
+            ownedSessionID: sessionID,
+            activeSessionID: activeRecordingSessionID
+        ) else { return }
         guard transcriptionEngine == .mlxAudio else { return }
         let localVADMode = LocalVADMode.stored()
         let localVADGatePolicy = ASRVoiceActivityRuntimePolicy.localGatePolicy(
@@ -705,10 +771,16 @@ extension AppDelegate {
         }
 
         let result = await processPendingRecordingVoiceActivityFrames(
+            sessionID: sessionID,
             localVADGateActive: true,
             level: overlayState.audioLevel,
             logEvents: true
         )
+        guard RecordingSessionOwnedTaskGate.isStillOwner(
+            isTaskCancelled: Task.isCancelled,
+            ownedSessionID: sessionID,
+            activeSessionID: activeRecordingSessionID
+        ) else { return }
         if result.sawVoiceActivityFrame {
             VoxtLog.asr(
                 "Recording VAD stop flush processed pending frames. speech=\(result.sawSpeechFrame), events=\(result.events.count)",
@@ -720,10 +792,18 @@ extension AppDelegate {
     }
 
     private func processPendingRecordingVoiceActivityFrames(
+        sessionID: UUID,
         localVADGateActive: Bool,
         level: Float,
         logEvents: Bool
     ) async -> RecordingVoiceActivityDrainResult {
+        guard RecordingSessionOwnedTaskGate.isStillOwner(
+            isTaskCancelled: Task.isCancelled,
+            ownedSessionID: sessionID,
+            activeSessionID: activeRecordingSessionID
+        ) else {
+            return .empty
+        }
         guard localVADGateActive,
               let mlxTranscriber,
               let frameDecider = recordingVoiceActivityFrameDecider
@@ -748,8 +828,22 @@ extension AppDelegate {
         var sawVoiceActivityFrame = false
 
         for frame in frames {
+            guard RecordingSessionOwnedTaskGate.isStillOwner(
+                isTaskCancelled: Task.isCancelled,
+                ownedSessionID: sessionID,
+                activeSessionID: activeRecordingSessionID
+            ) else {
+                break
+            }
             guard let result = await frameDecider.decision(for: frame) else {
                 continue
+            }
+            guard RecordingSessionOwnedTaskGate.isStillOwner(
+                isTaskCancelled: Task.isCancelled,
+                ownedSessionID: sessionID,
+                activeSessionID: activeRecordingSessionID
+            ) else {
+                break
             }
             sawVoiceActivityFrame = true
             let segmenterResult = segmenter.appendWithResolvedSpeechState(result.decision)
@@ -778,6 +872,18 @@ extension AppDelegate {
             events.append(contentsOf: segmenterResult.events)
         }
 
+        guard RecordingSessionOwnedTaskGate.isStillOwner(
+            isTaskCancelled: Task.isCancelled,
+            ownedSessionID: sessionID,
+            activeSessionID: activeRecordingSessionID
+        ) else {
+            return RecordingVoiceActivityDrainResult(
+                events: events,
+                sawSpeechFrame: sawSpeechFrame,
+                sawVoiceActivityFrame: sawVoiceActivityFrame
+            )
+        }
+
         recordingVoiceActivitySegmenter = segmenter
         if sawVoiceActivityFrame {
             localVADObservedFramesInCurrentSession = true
@@ -796,6 +902,32 @@ extension AppDelegate {
         VoxtLog.vad(
             "Recording VAD debug summary. reason=\(reason), \(recordingVoiceActivityDebugStats.telemetrySummary)"
         )
+    }
+
+}
+
+/// Pure gate for session-owned async recording tasks (VAD flush stop / silence monitor).
+enum RecordingSessionOwnedTaskGate {
+    static func isStillOwner(
+        isTaskCancelled: Bool,
+        ownedSessionID: UUID,
+        activeSessionID: UUID
+    ) -> Bool {
+        !isTaskCancelled && ownedSessionID == activeSessionID
+    }
+
+    static func shouldContinueSilenceMonitor(
+        isTaskCancelled: Bool,
+        isSessionActive: Bool,
+        ownedSessionID: UUID,
+        activeSessionID: UUID
+    ) -> Bool {
+        isSessionActive
+            && isStillOwner(
+                isTaskCancelled: isTaskCancelled,
+                ownedSessionID: ownedSessionID,
+                activeSessionID: activeSessionID
+            )
     }
 
 }

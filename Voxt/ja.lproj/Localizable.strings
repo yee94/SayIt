@@ -1047,6 +1047,10 @@
 "Microphone Status In Use (Auto)" = "使用中（自動）";
 "Microphone Status Available" = "利用可能";
 "Microphone Status Disconnected" = "切断済み";
+"Microphone Input Level" = "入力レベル";
+"Speak to compare microphone levels." = "話して各マイクの入力レベルを比較できます。";
+"Allow microphone access to preview input levels." = "入力レベルをプレビューするにはマイクへのアクセスを許可してください。";
+"Microphone preview unavailable" = "プレビューを利用できません";
 "Switched microphone to %@." = "マイクを %@ に切り替えました。";
 "Failed to switch microphone to %@." = "マイクを %@ に切り替えられませんでした。";
 "Guide" = "ガイド";

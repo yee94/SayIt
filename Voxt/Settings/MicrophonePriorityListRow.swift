@@ -9,6 +9,8 @@ private func localized(_ key: String) -> String {
 
 struct MicrophoneSelectionListRow: View {
     let entry: MicrophoneDisplayEntry
+    let previewLevel: Float?
+    let isPreviewUnavailable: Bool
     let onSelect: () -> Void
 
     @State private var isHovered = false
@@ -26,6 +28,14 @@ struct MicrophoneSelectionListRow: View {
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
+
+                if let previewLevel {
+                    MicrophoneInputLevelIndicator(
+                        level: previewLevel,
+                        isActive: entry.isActive,
+                        isUnavailable: isPreviewUnavailable
+                    )
+                }
 
                 Spacer(minLength: 8)
 
@@ -71,6 +81,8 @@ struct MicrophoneSelectionListRow: View {
 struct MicrophonePriorityListRow: View {
     let entry: MicrophoneDisplayEntry
     let index: Int
+    let previewLevel: Float?
+    let isPreviewUnavailable: Bool
     let onBeginDrag: () -> NSItemProvider
     let onMoveToTop: () -> Void
     let onUse: () -> Void
@@ -101,6 +113,14 @@ struct MicrophonePriorityListRow: View {
             }
 
             Spacer(minLength: 8)
+
+            if let previewLevel {
+                MicrophoneInputLevelIndicator(
+                    level: previewLevel,
+                    isActive: entry.isActive,
+                    isUnavailable: isPreviewUnavailable
+                )
+            }
 
             if index > 0 {
                 Button {
@@ -156,6 +176,40 @@ struct MicrophonePriorityListRow: View {
             return .secondary
         case .offline:
             return .red
+        }
+    }
+}
+
+private struct MicrophoneInputLevelIndicator: View {
+    let level: Float
+    let isActive: Bool
+    let isUnavailable: Bool
+
+    private var clampedLevel: CGFloat {
+        CGFloat(min(max(level, 0), 1))
+    }
+
+    var body: some View {
+        if isUnavailable {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.orange)
+                .frame(width: 72, height: 14)
+                .help(localized("Microphone preview unavailable"))
+                .accessibilityLabel(localized("Microphone preview unavailable"))
+        } else {
+            ZStack(alignment: .leading) {
+                Capsule(style: .continuous)
+                    .fill(Color.primary.opacity(0.10))
+
+                Capsule(style: .continuous)
+                    .fill(isActive ? Color.accentColor : Color.green)
+                    .frame(width: max(2, 72 * clampedLevel))
+            }
+            .frame(width: 72, height: 6)
+            .animation(.easeOut(duration: 0.08), value: clampedLevel)
+            .accessibilityLabel(localized("Microphone Input Level"))
+            .accessibilityValue("\(Int((clampedLevel * 100).rounded()))%")
         }
     }
 }

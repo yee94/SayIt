@@ -1083,6 +1083,10 @@
 "Microphone Status In Use (Auto)" = "使用中（自动）";
 "Microphone Status Available" = "可用";
 "Microphone Status Disconnected" = "已断开";
+"Microphone Input Level" = "输入音量";
+"Speak to compare microphone levels." = "说话以比较各麦克风的音量。";
+"Allow microphone access to preview input levels." = "请授予麦克风权限以预览输入音量。";
+"Microphone preview unavailable" = "预览不可用";
 "Switched microphone to %@." = "已切换麦克风到 %@。";
 "Failed to switch microphone to %@." = "切换麦克风到 %@ 失败。";
 "Guide" = "引导";

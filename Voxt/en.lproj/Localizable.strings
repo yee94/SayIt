@@ -1083,6 +1083,10 @@
 "Microphone Status In Use (Auto)" = "In Use (Auto)";
 "Microphone Status Available" = "Available";
 "Microphone Status Disconnected" = "Disconnected";
+"Microphone Input Level" = "Input Level";
+"Speak to compare microphone levels." = "Speak to compare microphone levels.";
+"Allow microphone access to preview input levels." = "Allow microphone access to preview input levels.";
+"Microphone preview unavailable" = "Preview unavailable";
 "Switched microphone to %@." = "Switched microphone to %@.";
 "Failed to switch microphone to %@." = "Failed to switch microphone to %@.";
 "Guide" = "Guide";

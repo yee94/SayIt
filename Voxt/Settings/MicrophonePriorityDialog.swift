@@ -25,6 +25,7 @@ struct MicrophonePriorityDialog: View {
     @Environment(\.dismiss) private var dismiss
     @State private var orderedEntries: [MicrophoneDisplayEntry]
     @State private var draggedUID: String?
+    @StateObject private var microphoneLevelPreview = MicrophoneLevelPreviewController()
 
     init(
         state: MicrophoneResolvedState,
@@ -65,12 +66,16 @@ struct MicrophonePriorityDialog: View {
                             if mode == .selectionOnly {
                                 MicrophoneSelectionListRow(
                                     entry: entry,
+                                    previewLevel: previewLevel(for: entry),
+                                    isPreviewUnavailable: isPreviewUnavailable(for: entry),
                                     onSelect: { onUseNow(entry.uid) }
                                 )
                             } else {
                                 MicrophonePriorityListRow(
                                     entry: entry,
                                     index: index,
+                                    previewLevel: previewLevel(for: entry),
+                                    isPreviewUnavailable: isPreviewUnavailable(for: entry),
                                     onBeginDrag: { beginDrag(for: entry.uid) },
                                     onMoveToTop: { moveEntryToTop(uid: entry.uid) },
                                     onUse: { onUseNow(entry.uid) }
@@ -122,6 +127,13 @@ struct MicrophonePriorityDialog: View {
         )
         .onChange(of: state.entries) { _, newValue in
             orderedEntries = newValue
+            updateMicrophoneLevelPreview()
+        }
+        .onAppear {
+            updateMicrophoneLevelPreview()
+        }
+        .onDisappear {
+            microphoneLevelPreview.stopPreview()
         }
     }
 
@@ -148,6 +160,16 @@ struct MicrophonePriorityDialog: View {
             ))
                 .font(.caption)
                 .foregroundStyle(.secondary)
+
+            if showsMicrophoneLevelPreview {
+                Text(localized(
+                    microphoneLevelPreview.hasMicrophonePermission
+                        ? "Speak to compare microphone levels."
+                        : "Allow microphone access to preview input levels."
+                ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
@@ -165,6 +187,30 @@ struct MicrophonePriorityDialog: View {
         let rowCount = CGFloat(displayedEntries.count)
         let spacingCount = CGFloat(max(displayedEntries.count - 1, 0))
         return min(220, rowCount * rowHeight + spacingCount * rowSpacing + verticalPadding)
+    }
+
+    private var showsMicrophoneLevelPreview: Bool {
+        mode == .managePriority
+    }
+
+    private func previewLevel(for entry: MicrophoneDisplayEntry) -> Float? {
+        guard showsMicrophoneLevelPreview,
+              microphoneLevelPreview.hasMicrophonePermission,
+              entry.isAvailable
+        else {
+            return nil
+        }
+        return microphoneLevelPreview.level(for: entry.uid)
+    }
+
+    private func isPreviewUnavailable(for entry: MicrophoneDisplayEntry) -> Bool {
+        showsMicrophoneLevelPreview
+            && microphoneLevelPreview.isPreviewUnavailable(for: entry.uid)
+    }
+
+    private func updateMicrophoneLevelPreview() {
+        guard showsMicrophoneLevelPreview else { return }
+        microphoneLevelPreview.updatePreview(for: state.entries.compactMap(\.device))
     }
 
     private var autoSwitchBinding: Binding<Bool> {

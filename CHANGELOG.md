@@ -6,6 +6,41 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+## [1.15.3] - 2026-08-02
+
+### English
+
+#### Added
+- Microphone priority management can preview live input levels so you can compare devices before switching.
+
+#### Fixed
+- Fixed ESC shortcut double-handling across CGEvent tap and local/global monitors so cancel/dismiss runs once per physical key press.
+- ESC cancel handling is limited to tap trigger mode and stays ordered against a following tap-start on the main queue.
+- Hardened recording VAD flush and silence-monitor tasks so cancelled or superseded sessions cannot keep draining or stopping the wrong session.
+- Preferred microphone capture can require and verify the selected device instead of silently falling back when previewing levels.
+
+### 简体中文
+
+#### 新增
+- 麦克风优先级管理页支持实时输入音量预览，便于切换前比较不同设备。
+
+#### 修复
+- 修复 ESC 在 CGEvent tap 与本地/全局监听之间的重复触发，使取消/关闭只按一次物理按键执行一次。
+- ESC 取消仅在点按触发模式下生效，并与随后的点按开始保持主线程顺序。
+- 加固录音 VAD 冲刷与静音监控任务，避免已取消或被替换的会话继续处理/停止错误会话。
+- 首选麦克风采集可要求并校验选中设备，预览音量时不再静默回退到系统默认设备。
+
+### 日本語
+
+#### 追加
+- マイク優先度管理画面でリアルタイム入力レベルをプレビューし、切り替え前にデバイスを比較できるようにしました。
+
+#### 修正
+- CGEvent tap とローカル/グローバル監視間での ESC 二重処理を修正し、物理キー 1 回につきキャンセル/閉じるが 1 度だけ実行されるようにしました。
+- ESC キャンセルはタップ起動モードに限定し、続くタップ開始との主スレッド順序を保ちます。
+- 録音の VAD フラッシュと無音監視タスクを強化し、キャンセル済みまたは置き換え済みセッションが誤ったセッションを処理/停止しないようにしました。
+- 優先マイクのキャプチャで選択デバイスを要求・検証でき、レベルプレビュー時にシステム既定へ静かにフォールバックしなくなりました。
+
 ## [1.15.2] - 2026-08-02
 
 ### English

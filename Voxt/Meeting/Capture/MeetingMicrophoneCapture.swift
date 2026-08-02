@@ -6,14 +6,22 @@ import AVFoundation
 import CoreAudio
 
 final class MeetingMicrophoneCapture: @unchecked Sendable {
+    enum PreferredInputDevicePolicy {
+        case fallbackToSystemDefault
+        case requirePreferredDevice
+    }
+
     enum CaptureError: LocalizedError {
         case inputUnavailable
+        case preferredInputUnavailable
         case engineStartFailed(Error)
 
         var errorDescription: String? {
             switch self {
             case .inputUnavailable:
                 return "Microphone input is unavailable."
+            case .preferredInputUnavailable:
+                return "The selected microphone input is unavailable."
             case .engineStartFailed(let error):
                 return "Microphone capture failed to start: \(error.localizedDescription)"
             }
@@ -33,14 +41,30 @@ final class MeetingMicrophoneCapture: @unchecked Sendable {
         preferredInputDeviceID = deviceID
     }
 
-    func start(onBuffer: @escaping (AVAudioPCMBuffer, Float) -> Void) throws {
+    func start(
+        preferredInputDevicePolicy: PreferredInputDevicePolicy = .fallbackToSystemDefault,
+        onBuffer: @escaping (AVAudioPCMBuffer, Float) -> Void
+    ) throws {
         stop()
+        let shouldUsePreferredInputDevice = preferredInputDeviceID != nil
+            && preferredInputDeviceID != AudioDeviceID(kAudioObjectUnknown)
+        if preferredInputDevicePolicy == .requirePreferredDevice,
+           !shouldUsePreferredInputDevice {
+            throw CaptureError.preferredInputUnavailable
+        }
+
         do {
-            try startCaptureEngine(usePreferredInputDevice: true, onBuffer: onBuffer)
+            try startCaptureEngine(
+                usePreferredInputDevice: shouldUsePreferredInputDevice,
+                verifiesPreferredInputDevice: preferredInputDevicePolicy == .requirePreferredDevice,
+                onBuffer: onBuffer
+            )
         } catch {
             let preferredDeviceID = preferredInputDeviceID
             let shouldRetryWithSystemDefault =
-                preferredDeviceID != nil
+                preferredInputDevicePolicy == .fallbackToSystemDefault
+                && shouldUsePreferredInputDevice
+                && preferredDeviceID != nil
                 && preferredDeviceID != AudioDeviceID(kAudioObjectUnknown)
             guard shouldRetryWithSystemDefault else { throw error }
 
@@ -48,7 +72,11 @@ final class MeetingMicrophoneCapture: @unchecked Sendable {
                 "Meeting microphone preferred-input start failed; retrying with system default. deviceID=\(preferredDeviceID.map(String.init(describing:)) ?? "nil"), error=\(error.localizedDescription)"
             )
             stop()
-            try startCaptureEngine(usePreferredInputDevice: false, onBuffer: onBuffer)
+            try startCaptureEngine(
+                usePreferredInputDevice: false,
+                verifiesPreferredInputDevice: false,
+                onBuffer: onBuffer
+            )
         }
     }
 
@@ -70,6 +98,7 @@ final class MeetingMicrophoneCapture: @unchecked Sendable {
 
     private func startCaptureEngine(
         usePreferredInputDevice: Bool,
+        verifiesPreferredInputDevice: Bool,
         onBuffer: @escaping (AVAudioPCMBuffer, Float) -> Void
     ) throws {
         let audioEngine = AVAudioEngine()
@@ -79,8 +108,14 @@ final class MeetingMicrophoneCapture: @unchecked Sendable {
         do {
             let inputNode = audioEngine.inputNode
             let didApplyPreferredInputDevice = usePreferredInputDevice
-                ? applyPreferredInputDeviceIfNeeded(inputNode: inputNode)
+                ? applyPreferredInputDeviceIfNeeded(
+                    inputNode: inputNode,
+                    verifiesAppliedDevice: verifiesPreferredInputDevice
+                )
                 : false
+            if verifiesPreferredInputDevice, !didApplyPreferredInputDevice {
+                throw CaptureError.preferredInputUnavailable
+            }
             let activeInputDeviceID = didApplyPreferredInputDevice
                 ? preferredInputDeviceID
                 : AudioInputDeviceManager.defaultInputDeviceID()
@@ -133,7 +168,10 @@ final class MeetingMicrophoneCapture: @unchecked Sendable {
     }
 
     @discardableResult
-    private func applyPreferredInputDeviceIfNeeded(inputNode: AVAudioInputNode) -> Bool {
+    private func applyPreferredInputDeviceIfNeeded(
+        inputNode: AVAudioInputNode,
+        verifiesAppliedDevice: Bool
+    ) -> Bool {
         guard let preferredInputDeviceID,
               preferredInputDeviceID != AudioDeviceID(kAudioObjectUnknown),
               AudioInputDeviceManager.isAvailableInputDevice(preferredInputDeviceID),
@@ -154,6 +192,25 @@ final class MeetingMicrophoneCapture: @unchecked Sendable {
         if status != noErr {
             VoxtLog.meetingWarning(
                 "Meeting microphone capture could not switch input device. status=\(status), deviceID=\(preferredInputDeviceID)"
+            )
+            return false
+        }
+
+        guard verifiesAppliedDevice else { return true }
+
+        var resolvedDeviceID = AudioDeviceID(0)
+        var dataSize = UInt32(MemoryLayout<AudioDeviceID>.size)
+        let readStatus = AudioUnitGetProperty(
+            audioUnit,
+            kAudioOutputUnitProperty_CurrentDevice,
+            kAudioUnitScope_Global,
+            0,
+            &resolvedDeviceID,
+            &dataSize
+        )
+        guard readStatus == noErr, resolvedDeviceID == preferredInputDeviceID else {
+            VoxtLog.meetingWarning(
+                "Meeting microphone capture device verification failed. setDeviceID=\(preferredInputDeviceID), resolvedDeviceID=\(resolvedDeviceID), status=\(readStatus)"
             )
             return false
         }
