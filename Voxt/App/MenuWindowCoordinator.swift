@@ -123,14 +123,44 @@ extension AppDelegate {
 
         menu.addItem(NSMenuItem.separator())
 
-        let checkUpdatesItem = NSMenuItem(
-            title: AppLocalization.localizedString("Check for Updates…"),
-            action: #selector(checkForUpdates),
-            keyEquivalent: ""
-        )
-        checkUpdatesItem.target = self
-        checkUpdatesItem.isEnabled = !appUpdateManager.shouldDisableInteractiveUpdateTrigger
-        menu.addItem(checkUpdatesItem)
+        if appUpdateManager.hasDownloadedUpdatePendingInstall {
+            let installItem = NSMenuItem(
+                title: AppLocalization.localizedString("Install and Restart"),
+                action: #selector(installDownloadedUpdateAndRelaunch),
+                keyEquivalent: ""
+            )
+            installItem.target = self
+            menu.addItem(installItem)
+
+            if let latestVersion = appUpdateManager.latestVersion {
+                let updateInfoItem = NSMenuItem(
+                    title: AppLocalization.format("New version: %@", latestVersion),
+                    action: nil,
+                    keyEquivalent: ""
+                )
+                updateInfoItem.isEnabled = false
+                menu.addItem(updateInfoItem)
+            }
+        } else {
+            let checkUpdatesItem = NSMenuItem(
+                title: AppLocalization.localizedString("Check for Updates…"),
+                action: #selector(checkForUpdates),
+                keyEquivalent: ""
+            )
+            checkUpdatesItem.target = self
+            checkUpdatesItem.isEnabled = !appUpdateManager.shouldDisableInteractiveUpdateTrigger
+            menu.addItem(checkUpdatesItem)
+
+            if appUpdateManager.hasUpdate, let latestVersion = appUpdateManager.latestVersion {
+                let updateInfoItem = NSMenuItem(
+                    title: AppLocalization.format("New version: %@", latestVersion),
+                    action: nil,
+                    keyEquivalent: ""
+                )
+                updateInfoItem.isEnabled = false
+                menu.addItem(updateInfoItem)
+            }
+        }
 
         let feedbackItem = NSMenuItem(
             title: AppLocalization.localizedString("Feedback"),
@@ -139,16 +169,6 @@ extension AppDelegate {
         )
         feedbackItem.target = self
         menu.addItem(feedbackItem)
-
-        if appUpdateManager.hasUpdate, let latestVersion = appUpdateManager.latestVersion {
-            let updateInfoItem = NSMenuItem(
-                title: AppLocalization.format("New version: %@", latestVersion),
-                action: nil,
-                keyEquivalent: ""
-            )
-            updateInfoItem.isEnabled = false
-            menu.addItem(updateInfoItem)
-        }
 
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: AppLocalization.localizedString("Quit SayIt"), action: #selector(quit), keyEquivalent: "q"))
@@ -297,6 +317,13 @@ extension AppDelegate {
         performAfterStatusMenuDismissal {
             VoxtLog.info("Manual update check triggered from menu.")
             self.appUpdateManager.checkForUpdatesWithUserInterface()
+        }
+    }
+
+    @objc private func installDownloadedUpdateAndRelaunch() {
+        performAfterStatusMenuDismissal {
+            VoxtLog.info("Install-and-relaunch triggered from menu.")
+            self.appUpdateManager.installDownloadedUpdateAndRelaunch()
         }
     }
 

@@ -2,6 +2,8 @@
 // Provides General Settings Sections for settings screens.
 
 import SwiftUI
+import AppKit
+import UniformTypeIdentifiers
 
 private func localized(_ key: String) -> String {
     AppLocalization.localizedString(key)
@@ -903,6 +905,179 @@ struct GeneralAppBehaviorCard: View {
                     .foregroundStyle(.red)
             }
         }
+    }
+}
+
+struct GeneralSyncCard: View {
+    @ObservedObject var syncService: DictionaryCloudSyncService
+    @State private var transferMessage: String?
+    @State private var isTransferring = false
+
+    var body: some View {
+        GeneralSettingsCard(title: localizedKey("Sync")) {
+            Text(localized(
+                "Sync your dictionary, statistics and settings across Macs using a shared folder. API keys stay on this Mac."
+            ))
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(localized("Sync path"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(syncService.isEnabled ? syncService.directoryPath : localized("No folder set"))
+                    .font(.caption)
+                    .lineLimit(2)
+                    .textSelection(.enabled)
+            }
+
+            HStack(spacing: 8) {
+                Button(
+                    syncService.isEnabled
+                        ? localized("Change Folder")
+                        : localized("Choose Sync Folder")
+                ) {
+                    _ = syncService.pickSyncDirectory()
+                }
+                .buttonStyle(SettingsPillButtonStyle())
+
+                if syncService.isEnabled {
+                    Button(localized("Sync Now")) {
+                        syncService.syncNow()
+                    }
+                    .buttonStyle(SettingsPillButtonStyle())
+                    .disabled(syncService.state == .syncing)
+
+                    Button(localized("Clear Path")) {
+                        syncService.clearSyncDirectory()
+                    }
+                    .buttonStyle(SettingsPillButtonStyle(tone: .destructive))
+                }
+            }
+
+            Text(statusText)
+                .font(.caption)
+                .foregroundStyle(statusColor)
+
+            Text(String(format: localized("Device ID: %@"), syncService.deviceId))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+
+            Text(localized(
+                "Export and import dictionary, usage statistics and settings. API keys are never included."
+            ))
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 8) {
+                Button(localized("Export Package")) {
+                    exportSyncPackage()
+                }
+                .buttonStyle(SettingsPillButtonStyle())
+                .disabled(isTransferring)
+
+                Button(localized("Import Package")) {
+                    importSyncPackage()
+                }
+                .buttonStyle(SettingsPillButtonStyle())
+                .disabled(isTransferring)
+            }
+
+            if let transferMessage {
+                Text(transferMessage)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var statusText: String {
+        if case .error(let message) = syncService.state {
+            return message
+        }
+        if let last = syncService.lastSyncAt {
+            let relative = RelativeDateTimeFormatter()
+            relative.unitsStyle = .short
+            let time = relative.localizedString(for: last, relativeTo: Date())
+            return String(format: localized("Last synced: %@"), time)
+        }
+        if syncService.isEnabled {
+            return localized("Not synced yet")
+        }
+        return syncService.state.statusText
+    }
+
+    private var statusColor: Color {
+        if case .error = syncService.state {
+            return .red
+        }
+        return .secondary
+    }
+
+    private func exportSyncPackage() {
+        guard !isTransferring else { return }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.json]
+        panel.nameFieldStringValue = defaultExportFileName()
+        panel.canCreateDirectories = true
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        isTransferring = true
+        defer { isTransferring = false }
+
+        do {
+            let data = try syncService.exportSyncPackage()
+            try data.write(to: url, options: .atomic)
+            transferMessage = localized("Sync package exported successfully.")
+        } catch {
+            transferMessage = AppLocalization.format(
+                "Sync package export failed: %@",
+                error.localizedDescription
+            )
+        }
+    }
+
+    private func importSyncPackage() {
+        guard !isTransferring else { return }
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        isTransferring = true
+        defer { isTransferring = false }
+
+        do {
+            let data = try Data(contentsOf: url)
+            let result = try syncService.importSyncPackage(from: data)
+            transferMessage = AppLocalization.format(
+                "Sync package imported: %d settings, %d usage days, %d dictionary terms.",
+                result.settingsApplied,
+                result.usageDaysImported,
+                result.dictionaryAdded
+            )
+        } catch {
+            transferMessage = AppLocalization.format(
+                "Sync package import failed: %@",
+                error.localizedDescription
+            )
+        }
+    }
+
+    private func defaultExportFileName() -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyyMMdd"
+        let day = formatter.string(from: Date())
+        return "SayIt-Sync-\(day).json"
     }
 }
 

@@ -30,22 +30,30 @@ final class AppUpdateManager: NSObject, ObservableObject, SPUStandardUserDriverD
             userDriverDelegate: self
         )
         configureUpdaterRequestContext(controller.updater, shouldClearLegacyFeedURL: true)
+        // Prefer silent background download; user triggers install/relaunch explicitly.
+        if controller.updater.automaticallyDownloadsUpdates != true {
+            controller.updater.automaticallyDownloadsUpdates = true
+        }
         updaterControllerStorage = controller
         return controller
     }
 
-    static let stableFeedURLString = "https://github.com/yee94/SayIt"
-    static let betaFeedURLString = "https://github.com/yee94/SayIt"
+    // Sparkle requires a real appcast XML feed hosted on EdgeOne Pages.
+    static let stableFeedURLString = "https://sayit-sparkle-update.edgeone.cool/updates/stable/appcast.xml"
+    static let betaFeedURLString = "https://sayit-sparkle-update.edgeone.cool/updates/beta/appcast.xml"
     static let betaFeedEnableEnvKey = "VOXT_ENABLE_BETA_UPDATES"
     private let defaults: UserDefaults
     private let interactiveUIPresentationTimeout: Duration = .seconds(4)
     private var lastCheckSource: CheckSource = .automatic
     private var isPresentingUpdateUI = false
     private var interactiveUIPresentationWatchdogTask: Task<Void, Never>?
+    private var pendingImmediateInstallHandler: (() -> Void)?
     @Published private(set) var hasUpdate = false
     @Published private(set) var latestVersion: String?
     @Published private(set) var updateCheckIssueMessage: String?
     @Published private(set) var isPreparingInteractiveUpdateUI = false
+    /// True when an update was downloaded silently and is ready for user-triggered install/relaunch.
+    @Published private(set) var hasDownloadedUpdatePendingInstall = false
     private var latestDownloadedUpdateURL: URL?
     var onUpdatePresentationWillBegin: (() -> Void)?
     var onUpdatePresentationDidEnd: (() -> Void)?
@@ -81,6 +89,10 @@ final class AppUpdateManager: NSObject, ObservableObject, SPUStandardUserDriverD
         set {
             guard let updaterController else { return }
             updaterController.updater.automaticallyChecksForUpdates = newValue
+            // Keep silent download aligned with automatic checks.
+            if newValue, updaterController.updater.automaticallyDownloadsUpdates != true {
+                updaterController.updater.automaticallyDownloadsUpdates = true
+            }
         }
     }
 
@@ -90,34 +102,86 @@ final class AppUpdateManager: NSObject, ObservableObject, SPUStandardUserDriverD
 
     func syncAutomaticallyChecksForUpdates(_ newValue: Bool) {
         guard newValue || sparkleIsAvailable || updaterControllerStorage != nil else { return }
-        guard automaticallyChecksForUpdates != newValue else { return }
+        guard automaticallyChecksForUpdates != newValue else {
+            if newValue, let updater = updaterController?.updater, !updater.automaticallyDownloadsUpdates {
+                updater.automaticallyDownloadsUpdates = true
+            }
+            return
+        }
         automaticallyChecksForUpdates = newValue
     }
 
     func betaUpdatesPreferenceDidChange() {
-        guard hasUpdate || latestVersion != nil || updateCheckIssueMessage != nil || latestDownloadedUpdateURL != nil else {
+        guard hasUpdate
+            || latestVersion != nil
+            || updateCheckIssueMessage != nil
+            || latestDownloadedUpdateURL != nil
+            || hasDownloadedUpdatePendingInstall
+        else {
             return
         }
 
+        clearPendingInstallHandler()
         setUpdateState(hasUpdate: false, latestVersion: nil, issue: nil, downloadedURL: nil)
         VoxtLog.update("Sparkle update state cleared because update channel preference changed.")
     }
 
     func shutdownForApplicationTermination() {
         cancelInteractiveUpdatePresentationWatchdog()
+        clearPendingInstallHandler()
         onUpdatePresentationWillBegin = nil
         onUpdatePresentationDidEnd = nil
+    }
+
+    /// Install a silently downloaded update immediately and relaunch.
+    /// Safe no-op when no pending install handler is available.
+    func installDownloadedUpdateAndRelaunch() {
+        guard let handler = pendingImmediateInstallHandler else {
+            // Clear any desynced ready flag so UI no longer offers install-and-relaunch.
+            if hasDownloadedUpdatePendingInstall {
+                hasDownloadedUpdatePendingInstall = false
+                NotificationCenter.default.post(name: .voxtUpdateAvailabilityDidChange, object: nil)
+            }
+            VoxtLog.updateWarning("Install-and-relaunch ignored: no pending silent install handler.")
+            // Fall back to interactive Sparkle UI if an update is known but handler is gone.
+            if hasUpdate {
+                checkForUpdatesWithUserInterface()
+            }
+            return
+        }
+
+        pendingImmediateInstallHandler = nil
+        hasDownloadedUpdatePendingInstall = false
+        NotificationCenter.default.post(name: .voxtUpdateAvailabilityDidChange, object: nil)
+        VoxtLog.update(
+            "User triggered install and relaunch for downloaded update. version=\(latestVersion ?? "nil")"
+        )
+        NSApp.activate(ignoringOtherApps: true)
+        handler()
     }
 
     #if DEBUG
     func setUpdateStateForTesting(hasUpdate: Bool, latestVersion: String?, issue: String?) {
         setUpdateState(hasUpdate: hasUpdate, latestVersion: latestVersion, issue: issue, downloadedURL: nil)
     }
+
+    func setPendingInstallHandlerForTesting(_ handler: (() -> Void)?) {
+        pendingImmediateInstallHandler = handler
+        hasDownloadedUpdatePendingInstall = handler != nil
+        NotificationCenter.default.post(name: .voxtUpdateAvailabilityDidChange, object: nil)
+    }
     #endif
 
     func checkForUpdatesWithUserInterface() {
         lastCheckSource = .manual
         reportIssue(nil)
+
+        // Prefer user-triggered install when a silent download is already ready.
+        if hasDownloadedUpdatePendingInstall, pendingImmediateInstallHandler != nil {
+            installDownloadedUpdateAndRelaunch()
+            return
+        }
+
         guard sparkleIsAvailable, let updaterController else {
             reportIssue(AppLocalization.localizedString("Installer service is unavailable."))
             return
@@ -185,11 +249,37 @@ final class AppUpdateManager: NSObject, ObservableObject, SPUStandardUserDriverD
         selectedFeedURLString
     }
 
+    /// Called after a silent automatic download when Sparkle would install on quit.
+    /// Return `true` to stall and let the user explicitly install via `installDownloadedUpdateAndRelaunch()`.
+    func updater(
+        _ updater: SPUUpdater,
+        willInstallUpdateOnQuit item: SUAppcastItem,
+        immediateInstallationBlock immediateInstallHandler: @escaping () -> Void
+    ) -> Bool {
+        pendingImmediateInstallHandler = immediateInstallHandler
+        hasDownloadedUpdatePendingInstall = true
+        setUpdateState(
+            hasUpdate: true,
+            latestVersion: "\(item.displayVersionString) (\(item.versionString))",
+            issue: nil,
+            downloadedURL: item.fileURL
+        )
+        VoxtLog.update(
+            """
+            Sparkle update downloaded and ready for user-initiated install. \
+            version=\(item.displayVersionString), build=\(item.versionString), \
+            fileURL=\(item.fileURL?.absoluteString ?? "nil")
+            """
+        )
+        return true
+    }
+
     func updater(_ updater: SPUUpdater, didAbortWithError error: any Error) {
         cancelInteractiveUpdatePresentationWatchdog()
         let nsError = error as NSError
         if isNoUpdateFoundError(nsError) {
             setPreparingInteractiveUpdateUI(false)
+            clearPendingInstallHandler()
             setUpdateState(hasUpdate: false, latestVersion: nil, issue: nil, downloadedURL: nil)
             VoxtLog.update(
                 """
@@ -238,6 +328,7 @@ final class AppUpdateManager: NSObject, ObservableObject, SPUStandardUserDriverD
     func updaterDidNotFindUpdate(_ updater: SPUUpdater, error: any Error) {
         cancelInteractiveUpdatePresentationWatchdog()
         setPreparingInteractiveUpdateUI(false)
+        clearPendingInstallHandler()
         setUpdateState(hasUpdate: false, latestVersion: nil, issue: nil, downloadedURL: nil)
         let nsError = error as NSError
         VoxtLog.update(
@@ -274,12 +365,17 @@ final class AppUpdateManager: NSObject, ObservableObject, SPUStandardUserDriverD
         if let error {
             let nsError = error as NSError
             if isNoUpdateFoundError(nsError) {
-                setUpdateState(hasUpdate: false, latestVersion: nil, issue: nil, downloadedURL: nil)
+                // Keep a ready-to-install silent download if Sparkle reports "no update"
+                // after we already stalled install via willInstallUpdateOnQuit.
+                if !hasDownloadedUpdatePendingInstall {
+                    setUpdateState(hasUpdate: false, latestVersion: nil, issue: nil, downloadedURL: nil)
+                }
                 VoxtLog.update(
                     """
                     Sparkle finished update cycle with no-update result. source=\(lastCheckSource.description), \
                     check=\(String(describing: updateCheck)), domain=\(nsError.domain), \
-                    code=\(nsError.code), description=\(nsError.localizedDescription)
+                    code=\(nsError.code), description=\(nsError.localizedDescription), \
+                    pendingInstall=\(hasDownloadedUpdatePendingInstall)
                     """
                 )
                 return
@@ -295,7 +391,10 @@ final class AppUpdateManager: NSObject, ObservableObject, SPUStandardUserDriverD
         } else {
             reportIssue(nil)
             VoxtLog.update(
-                "Sparkle finished update cycle successfully. source=\(lastCheckSource.description), check=\(String(describing: updateCheck))"
+                """
+                Sparkle finished update cycle successfully. source=\(lastCheckSource.description), \
+                check=\(String(describing: updateCheck)), pendingInstall=\(hasDownloadedUpdatePendingInstall)
+                """
             )
         }
         finishUpdatePresentationIfNeeded()
@@ -422,7 +521,16 @@ final class AppUpdateManager: NSObject, ObservableObject, SPUStandardUserDriverD
         self.latestVersion = latestVersion
         self.updateCheckIssueMessage = issue
         self.latestDownloadedUpdateURL = downloadedURL
+        if !hasUpdate {
+            clearPendingInstallHandler()
+        }
         NotificationCenter.default.post(name: .voxtUpdateAvailabilityDidChange, object: nil)
+    }
+
+    private func clearPendingInstallHandler() {
+        guard pendingImmediateInstallHandler != nil || hasDownloadedUpdatePendingInstall else { return }
+        pendingImmediateInstallHandler = nil
+        hasDownloadedUpdatePendingInstall = false
     }
 
     private func setPreparingInteractiveUpdateUI(_ isPreparing: Bool) {

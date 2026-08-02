@@ -1,0 +1,9 @@
+{
+  "name": "@sayit/sparkle-update-service",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "write-appcast": "node scripts/write-appcast.mjs"
+  }
+}

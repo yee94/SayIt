@@ -56,6 +56,7 @@ final class DictionaryCloudSyncService: ObservableObject {
     @Published private(set) var isEnabled: Bool = false
 
     private let dictionaryStore: DictionaryStore
+    private let usageSummaryStore: UsageDaySummaryStore?
     private let defaults: UserDefaults
     private var cancellables = Set<AnyCancellable>()
     private var pushTask: Task<Void, Never>?
@@ -66,9 +67,11 @@ final class DictionaryCloudSyncService: ObservableObject {
 
     init(
         dictionaryStore: DictionaryStore,
+        usageSummaryStore: UsageDaySummaryStore? = nil,
         defaults: UserDefaults = .standard
     ) {
         self.dictionaryStore = dictionaryStore
+        self.usageSummaryStore = usageSummaryStore
         self.defaults = defaults
         self.directoryPath = defaults.string(forKey: AppPreferenceKey.dictionarySyncDirectoryPath) ?? ""
         self.isEnabled = !directoryPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -109,6 +112,28 @@ final class DictionaryCloudSyncService: ObservableObject {
         let created = UUID().uuidString.lowercased()
         defaults.set(created, forKey: AppPreferenceKey.dictionarySyncDeviceId)
         return created
+    }
+
+    // MARK: - Manual package transfer
+
+    /// Exports a single JSON package (dictionary + usage + settings metadata; no API keys).
+    func exportSyncPackage() throws -> Data {
+        try AppSyncPackageTransfer.exportPackage(
+            dictionaryStore: dictionaryStore,
+            usageSummaryStore: usageSummaryStore,
+            defaults: defaults,
+            deviceID: deviceId
+        )
+    }
+
+    /// Imports a package and merges into local stores.
+    func importSyncPackage(from data: Data) throws -> AppSyncPackageImportResult {
+        try AppSyncPackageTransfer.importPackage(
+            data: data,
+            dictionaryStore: dictionaryStore,
+            usageSummaryStore: usageSummaryStore,
+            defaults: defaults
+        )
     }
 
     @discardableResult
@@ -287,6 +312,11 @@ final class DictionaryCloudSyncService: ObservableObject {
                 }
             }
 
+            // Usage day summary folder sync is best-effort and independent of dictionary success.
+            syncUsageDaySummaries(directoryURL: directoryURL)
+            // App settings folder sync is best-effort; failures must not fail dictionary sync.
+            syncAppSettings(directoryURL: directoryURL)
+
             let now = Date()
             lastSyncAt = now
             defaults.set(now.timeIntervalSince1970, forKey: AppPreferenceKey.dictionarySyncLastSyncedAt)
@@ -298,6 +328,38 @@ final class DictionaryCloudSyncService: ObservableObject {
             let message = error.localizedDescription
             state = .error(message)
             VoxtLog.dictionaryWarning("Dictionary folder sync failed: \(message)")
+        }
+    }
+
+    /// Writes local usage snapshot and merges remote device files. Failures only log warnings.
+    private func syncUsageDaySummaries(directoryURL: URL) {
+        guard let usageSummaryStore else { return }
+        do {
+            let days = usageSummaryStore.exportedSnapshots()
+            try UsageFolderSnapshotIO.writeSnapshot(
+                days: days,
+                directoryURL: directoryURL,
+                deviceId: deviceId
+            )
+            let remoteSnapshots = try UsageFolderSnapshotIO.listSnapshots(in: directoryURL)
+            for remote in remoteSnapshots where remote.deviceID != deviceId {
+                usageSummaryStore.importSnapshots(remote.days)
+            }
+        } catch {
+            VoxtLog.historyWarning("Usage folder sync failed: \(error.localizedDescription)")
+        }
+    }
+
+    /// Writes local settings snapshot and merges remote device files. Failures only log warnings.
+    private func syncAppSettings(directoryURL: URL) {
+        do {
+            try AppSettingsSyncSnapshotIO.syncAppSettings(
+                directoryURL: directoryURL,
+                deviceId: deviceId,
+                defaults: defaults
+            )
+        } catch {
+            VoxtLog.historyWarning("App settings folder sync failed: \(error.localizedDescription)")
         }
     }
 

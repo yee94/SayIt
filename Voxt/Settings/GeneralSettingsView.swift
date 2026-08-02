@@ -7,6 +7,7 @@ import AppKit
 
 struct GeneralSettingsView: View {
     let appUpdateManager: AppUpdateManager
+    @ObservedObject var dictionaryCloudSyncService: DictionaryCloudSyncService
     let navigationRequest: SettingsNavigationRequest?
     var onRequestScrollToBottom: (() -> Void)?
     @AppStorage(AppPreferenceKey.interactionSoundsEnabled) private var interactionSoundsEnabled = true
@@ -173,6 +174,11 @@ struct GeneralSettingsView: View {
                 launchAtLoginError: launchAtLoginError
             )
             .settingsNavigationAnchor(.generalAppBehavior)
+
+            GeneralSectionDivider()
+
+            GeneralSyncCard(syncService: dictionaryCloudSyncService)
+                .settingsNavigationAnchor(.generalSync)
 
             GeneralSectionDivider()
 

@@ -90,11 +90,18 @@ struct AboutSettingsView: View {
 
                     Spacer(minLength: 0)
 
-                    Button(localized("Check for Updates")) {
+                    if appUpdateManager.hasDownloadedUpdatePendingInstall {
+                        Button(localized("Install and Restart")) {
+                            appUpdateManager.installDownloadedUpdateAndRelaunch()
+                        }
+                        .buttonStyle(SettingsPillButtonStyle())
+                    } else {
+                        Button(localized("Check for Updates")) {
                             appUpdateManager.checkForUpdatesWithUserInterface()
+                        }
+                        .disabled(appUpdateManager.shouldDisableInteractiveUpdateTrigger)
+                        .buttonStyle(SettingsPillButtonStyle())
                     }
-                    .disabled(appUpdateManager.shouldDisableInteractiveUpdateTrigger)
-                    .buttonStyle(SettingsPillButtonStyle())
                 }
 
                 GeneralToggleRow(

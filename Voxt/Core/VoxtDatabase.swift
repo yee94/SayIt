@@ -243,6 +243,22 @@ final class VoxtDatabase: @unchecked Sendable {
                 """)
         }
 
+        migrator.registerMigration("v7_usage_daily") { db in
+            try db.execute(sql: """
+                CREATE TABLE IF NOT EXISTS usage_daily (
+                    day TEXT NOT NULL,
+                    device_id TEXT NOT NULL,
+                    dictation_seconds REAL NOT NULL DEFAULT 0,
+                    characters INTEGER NOT NULL DEFAULT 0,
+                    translation_characters INTEGER NOT NULL DEFAULT 0,
+                    session_count INTEGER NOT NULL DEFAULT 0,
+                    apps_json TEXT NOT NULL DEFAULT '{}',
+                    updated_at REAL NOT NULL,
+                    PRIMARY KEY (day, device_id)
+                );
+                """)
+        }
+
         return migrator
     }
 }

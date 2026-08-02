@@ -1,0 +1,20 @@
+{
+  "buildCommand": "node scripts/build.mjs",
+  "installCommand": "echo 'no package dependencies'",
+  "outputDirectory": "dist",
+  "headers": [
+    {
+      "source": "/updates/*/appcast.xml",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=60, stale-while-revalidate=300" },
+        { "key": "Content-Type", "value": "application/xml; charset=utf-8" }
+      ]
+    },
+    {
+      "source": "/health.json",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=30" }
+      ]
+    }
+  ]
+}

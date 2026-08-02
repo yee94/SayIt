@@ -197,6 +197,8 @@ enum AppPreferenceKey {
     static let dictionarySyncDirectoryBookmark = "dictionarySyncDirectoryBookmark"
     /// Stable per-device id used in snapshot filenames.
     static let dictionarySyncDeviceId = "dictionarySyncDeviceId"
+    /// Stable per-device id for usage daily summaries (fallback when dictionary sync id is absent).
+    static let usageSyncDeviceId = "usageSyncDeviceId"
     /// Last successful folder sync timestamp (timeIntervalSince1970).
     static let dictionarySyncLastSyncedAt = "dictionarySyncLastSyncedAt"
     static let autoCheckForUpdates = "autoCheckForUpdates"

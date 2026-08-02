@@ -1,0 +1,17 @@
+{
+  "channel": "stable",
+  "updatedAt": "2026-08-02T02:00:00.000Z",
+  "items": [
+    {
+      "title": "Version 1.15.1",
+      "shortVersionString": "1.15.1",
+      "version": "101500199",
+      "url": "https://github.com/yee94/SayIt/releases/download/v1.15.1/SayIt-1.15.1-macOS.zip",
+      "length": "0",
+      "edSignature": "",
+      "releaseURL": "https://github.com/yee94/SayIt/releases/tag/v1.15.1",
+      "publishedAt": "2026-08-02T02:00:00Z",
+      "releaseNotesHtml": "<p>SayIt 1.15.1</p><ul><li>Silent Sparkle download with install-and-restart</li><li>EdgeOne Sparkle appcast feed + release CI</li><li>New Sparkle EdDSA public key for update signing</li></ul>"
+    }
+  ]
+}

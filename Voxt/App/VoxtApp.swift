@@ -125,13 +125,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let sherpaOnnxModelManager: SherpaOnnxModelManager
     let customLLMManager: CustomLLMModelManager
     let ggufTranslationModelManager: GGUFTranslationModelManager
-    let historyStore = TranscriptionHistoryStore()
+    let usageSummaryStore = UsageDaySummaryStore()
+    let historyStore: TranscriptionHistoryStore
     lazy var noteStore = VoxtNoteStore(inMemory: VoxtRuntimeEnvironment.isRunningUnitTests)
     let noteObsidianExportStore = VoxtNoteObsidianExportStore()
     let noteRemindersExportStore = VoxtNoteRemindersExportStore()
     let dictionaryStore = DictionaryStore()
     let dictionarySuggestionStore = DictionarySuggestionStore()
-    lazy var dictionaryCloudSyncService = DictionaryCloudSyncService(dictionaryStore: dictionaryStore)
+    lazy var dictionaryCloudSyncService = DictionaryCloudSyncService(
+        dictionaryStore: dictionaryStore,
+        usageSummaryStore: usageSummaryStore
+    )
     let appUpdateManager = AppUpdateManager()
     let interactionSoundPlayer = InteractionSoundPlayer()
     let systemAudioMuteController = SystemAudioMuteController()
@@ -394,6 +398,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
            let systemProxy = VoxtNetworkSession.currentSystemProxyStatus.preferredSummary {
             VoxtLog.warning("SayIt direct proxy mode is enabled while macOS system proxy remains active. systemProxy=\(systemProxy)")
         }
+        historyStore = TranscriptionHistoryStore(usageRecorder: usageSummaryStore)
         super.init()
         AppDelegate.shared = self
         mlxModelManager.onModelUnloaded = { [weak self] in

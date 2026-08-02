@@ -8,7 +8,6 @@ struct DictionaryAdvancedSettingsDialog: View {
     @Binding var automaticLearningPromptDraft: String
     @Binding var dictionaryHighConfidenceCorrectionEnabled: Bool
     @Binding var isPresented: Bool
-    @ObservedObject var dictionaryCloudSyncService: DictionaryCloudSyncService
     let onRestoreDefaultAutomaticLearningPrompt: () -> Void
     let onSave: () -> Void
 
@@ -27,8 +26,6 @@ struct DictionaryAdvancedSettingsDialog: View {
                         dictionaryHighConfidenceCorrectionEnabled: $dictionaryHighConfidenceCorrectionEnabled,
                         dictionaryAutoLearningEnabled: $dictionaryAutoLearningEnabled
                     )
-
-                    DictionaryFolderSyncSection(syncService: dictionaryCloudSyncService)
 
                     DictionaryAutomaticLearningPromptSection(
                         automaticLearningPromptDraft: $automaticLearningPromptDraft,
@@ -51,94 +48,6 @@ struct DictionaryAdvancedSettingsDialog: View {
         .settingsDialogChrome(width: dialogWidth, maxHeight: dialogMaxHeight, onClose: {
             isPresented = false
         })
-    }
-}
-
-private struct DictionaryFolderSyncSection: View {
-    @ObservedObject var syncService: DictionaryCloudSyncService
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(AppLocalization.localizedString("iCloud Dictionary Sync"))
-                .font(.system(size: 13, weight: .semibold))
-
-            Text(AppLocalization.localizedString(
-                "Pick a shared folder to enable automatic dictionary sync. Each device writes its own snapshot file and merges with others."
-            ))
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(AppLocalization.localizedString("Sync path"))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text(syncService.isEnabled ? syncService.directoryPath : AppLocalization.localizedString("No folder set"))
-                    .font(.caption)
-                    .lineLimit(2)
-                    .textSelection(.enabled)
-            }
-
-            HStack(spacing: 8) {
-                Button(
-                    syncService.isEnabled
-                        ? AppLocalization.localizedString("Change Folder")
-                        : AppLocalization.localizedString("Choose Sync Folder")
-                ) {
-                    if syncService.pickSyncDirectory() {
-                        // Path saved; sync starts automatically.
-                    }
-                }
-                .buttonStyle(SettingsPillButtonStyle())
-
-                if syncService.isEnabled {
-                    Button(AppLocalization.localizedString("Sync Now")) {
-                        syncService.syncNow()
-                    }
-                    .buttonStyle(SettingsPillButtonStyle())
-                    .disabled(syncService.state == .syncing)
-
-                    Button(AppLocalization.localizedString("Clear Path")) {
-                        syncService.clearSyncDirectory()
-                    }
-                    .buttonStyle(SettingsPillButtonStyle(tone: .destructive))
-                }
-            }
-
-            Text(statusText)
-                .font(.caption)
-                .foregroundStyle(statusColor)
-
-            Text(AppLocalization.localizedString(
-                "Tip: prefer a dedicated folder under iCloud Drive, such as SayIt Dictionary."
-            ))
-            .font(.caption2)
-            .foregroundStyle(.tertiary)
-        }
-        .padding(.vertical, 4)
-    }
-
-    private var statusText: String {
-        if case .error(let message) = syncService.state {
-            return message
-        }
-        if let last = syncService.lastSyncAt {
-            let relative = RelativeDateTimeFormatter()
-            relative.unitsStyle = .short
-            let time = relative.localizedString(for: last, relativeTo: Date())
-            return AppLocalization.format("Last synced: %@", time)
-        }
-        if syncService.isEnabled {
-            return AppLocalization.localizedString("Not synced yet")
-        }
-        return syncService.state.statusText
-    }
-
-    private var statusColor: Color {
-        if case .error = syncService.state {
-            return .red
-        }
-        return .secondary
     }
 }
 

@@ -44,9 +44,15 @@
 	<string>SayIt uses speech recognition for direct dictation.</string>
     <key>SUEnableInstallerLauncherService</key>
     <true/>
+    <!-- Silent background download; user explicitly installs via in-app "Install and Restart". -->
+    <key>SUAutomaticallyUpdate</key>
+    <true/>
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
 	<key>SUFeedURL</key>
-	<string>https://github.com/yee94/SayIt</string>
+	<string>https://sayit-sparkle-update.edgeone.cool/updates/stable/appcast.xml</string>
     <key>SUPublicEDKey</key>
-    <string>iMt1voRdgfUUpKxdY7DliGLaOl17gJFB8Jhlo5ox2eE=</string>
+    <!-- Must match GitHub secret SPARKLE_PRIVATE_KEY / local Keychain ed25519 seed. -->
+    <string>1jLVHTAcmIr8zHAv8z91XK0/OFRat4n74n6fDgQC8C4=</string>
 </dict>
 </plist>

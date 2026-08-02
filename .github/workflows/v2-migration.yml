@@ -197,6 +197,8 @@ jobs:
     outputs:
       version: ${{ needs.build.outputs.version }}
       tag: ${{ needs.build.outputs.tag }}
+      release_build_number: ${{ steps.sparkle_meta.outputs.release_build_number }}
+      sparkle_signed: ${{ steps.sparkle_sign.outputs.sparkle_signed }}
     env:
       DEVELOPER_ID_APP_IDENTITY: "Developer ID Application: yee wang (6W97S9B7CZ)"
       APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -206,6 +208,7 @@ jobs:
       APP_STORE_CONNECT_PRIVATE_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY_BASE64 }}
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
     steps:
       - uses: actions/checkout@v5
 
@@ -338,6 +341,26 @@ jobs:
           rm -f "$ZIP_PATH"
           ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ZIP_PATH"
 
+      - name: Resolve Sparkle version metadata
+        id: sparkle_meta
+        run: |
+          set -euo pipefail
+          APP_PATH="build/unsigned/SayIt.app"
+          VERSION="${{ needs.build.outputs.version }}"
+          BUILD_NUMBER="$(
+            /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP_PATH/Contents/Info.plist" 2>/dev/null || true
+          )"
+          if ! [[ "${BUILD_NUMBER:-}" =~ ^[0-9]+$ ]]; then
+            if [[ "$VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+              BUILD_NUMBER=$((BASH_REMATCH[1] * 100000000 + BASH_REMATCH[2] * 100000 + BASH_REMATCH[3] * 100 + 99))
+            else
+              echo "::error::Unable to resolve Sparkle build number for version $VERSION"
+              exit 1
+            fi
+          fi
+          echo "release_build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "Sparkle sparkle:version=$BUILD_NUMBER shortVersion=$VERSION"
+
       - name: Build Tauri migration payload
         run: |
           set -euo pipefail
@@ -385,6 +408,78 @@ jobs:
             lipo -info "$APP_PATH/Contents/MacOS/SayIt" | tee build/arch-info.txt
           fi
 
+      - name: Generate Sparkle edSignature for macOS zip
+        id: sparkle_sign
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.build.outputs.version }}"
+          ZIP_PATH="build/SayIt-${VERSION}-macOS.zip"
+          SIG_ENV_FILE="build/sparkle-signature.env"
+          KEY_FILE="$RUNNER_TEMP/sparkle-private-key.pem"
+          test -f "$ZIP_PATH"
+
+          if [ -z "${SPARKLE_PRIVATE_KEY:-}" ]; then
+            echo "sparkle_signed=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::SPARKLE_PRIVATE_KEY is missing; EdgeOne appcast will publish without edSignature."
+            {
+              echo "SPARKLE_ED_SIGNATURE="
+              echo "SPARKLE_ED_LENGTH=$(stat -f%z "$ZIP_PATH")"
+            } > "$SIG_ENV_FILE"
+            exit 0
+          fi
+
+          printf '%s' "$SPARKLE_PRIVATE_KEY" > "$KEY_FILE"
+          chmod 600 "$KEY_FILE"
+
+          # Prefer Sparkle tooling from the app bundle SourcePackages if present;
+          # fall back to resolving via xcodebuild package cache in DerivedData.
+          SIGN_UPDATE_BIN="$(
+            find "$HOME/Library/Developer/Xcode/DerivedData" \
+              -path '*/Sparkle/bin/sign_update' -type f 2>/dev/null | head -n 1 || true
+          )"
+          if [ -z "$SIGN_UPDATE_BIN" ]; then
+            # Last resort: use swift package plugin binary if checkout exists under workspace.
+            SIGN_UPDATE_BIN="$(find . -path '*/Sparkle/bin/sign_update' -type f 2>/dev/null | head -n 1 || true)"
+          fi
+          if [ -z "$SIGN_UPDATE_BIN" ]; then
+            echo "sparkle_signed=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Unable to locate Sparkle sign_update; publishing length only."
+            {
+              echo "SPARKLE_ED_SIGNATURE="
+              echo "SPARKLE_ED_LENGTH=$(stat -f%z "$ZIP_PATH")"
+            } > "$SIG_ENV_FILE"
+            rm -f "$KEY_FILE"
+            exit 0
+          fi
+
+          SIGN_OUTPUT="$("$SIGN_UPDATE_BIN" "$ZIP_PATH" --ed-key-file "$KEY_FILE" 2>/tmp/sign_update.err || true)"
+          if [ -z "$SIGN_OUTPUT" ]; then
+            SIGN_OUTPUT="$("$SIGN_UPDATE_BIN" "$ZIP_PATH" "$KEY_FILE" 2>>/tmp/sign_update.err || true)"
+          fi
+          SPARKLE_ED_SIGNATURE="$(printf '%s\n' "$SIGN_OUTPUT" | grep -Eo 'sparkle:edSignature="[^"]+"' | head -n 1 | sed -E 's/^[^"]*"([^"]+)".*$/\1/' || true)"
+          SPARKLE_ED_LENGTH="$(printf '%s\n' "$SIGN_OUTPUT" | grep -Eo 'length="[0-9]+"' | head -n 1 | sed -E 's/^[^"]*"([0-9]+)".*$/\1/' || true)"
+          if [ -z "${SPARKLE_ED_LENGTH:-}" ]; then
+            SPARKLE_ED_LENGTH="$(stat -f%z "$ZIP_PATH")"
+          fi
+
+          if [ -z "${SPARKLE_ED_SIGNATURE:-}" ]; then
+            echo "sparkle_signed=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Failed to parse sparkle:edSignature; publishing length only."
+            cat /tmp/sign_update.err || true
+            {
+              echo "SPARKLE_ED_SIGNATURE="
+              echo "SPARKLE_ED_LENGTH=$SPARKLE_ED_LENGTH"
+            } > "$SIG_ENV_FILE"
+          else
+            echo "sparkle_signed=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "SPARKLE_ED_SIGNATURE=$SPARKLE_ED_SIGNATURE"
+              echo "SPARKLE_ED_LENGTH=$SPARKLE_ED_LENGTH"
+            } > "$SIG_ENV_FILE"
+            echo "Sparkle signature generated length=$SPARKLE_ED_LENGTH"
+          fi
+          rm -f "$KEY_FILE"
+
       - uses: actions/upload-artifact@v4
         with:
           name: sayit-v2-signed-migration-${{ github.sha }}
@@ -395,14 +490,15 @@ jobs:
             build/SayIt-*-aarch64.app.tar.gz.sig
             build/SayIt-*-aarch64.app.tar.gz.sha256
             build/latest.json
+            build/sparkle-signature.env
             build/codesign.txt
             build/arch-info.txt
 
   # ---------------------------------------------------------------------------
-  # Job 3: publish release + updater feed (linux; no compile).
+  # Job 3: publish release + updater feeds (Vercel Tauri + EdgeOne Sparkle).
   # ---------------------------------------------------------------------------
   publish-release:
-    name: Publish GitHub Release + Vercel Updater
+    name: Publish GitHub Release + Updater Feeds
     runs-on: ubuntu-latest
     needs: sign-notarize
     permissions:
@@ -410,10 +506,15 @@ jobs:
     env:
       TAG: ${{ needs.sign-notarize.outputs.tag }}
       VERSION: ${{ needs.sign-notarize.outputs.version }}
+      RELEASE_BUILD_NUMBER: ${{ needs.sign-notarize.outputs.release_build_number }}
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      EDGEONE_API_TOKEN: ${{ secrets.EDGEONE_API_TOKEN }}
+      EDGEONE_PROJECT_NAME: sayit-sparkle-update
     steps:
+      - uses: actions/checkout@v5
+
       - uses: actions/download-artifact@v4
         with:
           name: sayit-v2-signed-migration-${{ github.sha }}
@@ -438,7 +539,11 @@ jobs:
             gh release create "$TAG" "$ZIP_PATH" "$PAYLOAD_PATH" "$PAYLOAD_PATH.sig" "$PAYLOAD_PATH.sha256" build/latest.json \
               --target "$GITHUB_SHA" \
               --title "SayIt $TAG" \
-              --notes "SayIt has migrated to Voxt. Updater feed: https://sayit-update.vercel.app/latest.json" \
+              --notes "SayIt ${VERSION}
+
+          Updater feeds:
+          - Tauri: https://sayit-update.vercel.app/latest.json
+          - Sparkle: https://sayit-sparkle-update.edgeone.cool/updates/stable/appcast.xml" \
               -R "$GITHUB_REPOSITORY"
           fi
 
@@ -545,3 +650,59 @@ jobs:
               )
           print("latest.json live for version", expected["version"])
           PY
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Publish Sparkle appcast to EdgeOne
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ -z "${EDGEONE_API_TOKEN:-}" ]; then
+            echo "::warning::EDGEONE_API_TOKEN missing; skipping EdgeOne Sparkle appcast deploy."
+            exit 0
+          fi
+
+          SIG_ENV_FILE="build/sparkle-signature.env"
+          if [ -f "$SIG_ENV_FILE" ]; then
+            set -a
+            # shellcheck disable=SC1090
+            . "$SIG_ENV_FILE"
+            set +a
+          fi
+
+          CHANNEL="stable"
+          if [[ "$VERSION" == *-* ]]; then
+            CHANNEL="beta"
+          fi
+
+          ZIP_PATH="build/SayIt-${VERSION}-macOS.zip"
+          if [ -z "${SPARKLE_ED_LENGTH:-}" ] && [ -f "$ZIP_PATH" ]; then
+            SPARKLE_ED_LENGTH="$(wc -c <"$ZIP_PATH" | tr -d ' ')"
+          fi
+
+          PUBLISHED_AT="$(
+            gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json publishedAt --jq '.publishedAt // empty' 2>/dev/null || true
+          )"
+          if [ -z "$PUBLISHED_AT" ]; then
+            PUBLISHED_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          fi
+          RELEASE_URL="$(
+            gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json url --jq '.url // empty' 2>/dev/null || true
+          )"
+          if [ -z "$RELEASE_URL" ]; then
+            RELEASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
+          fi
+
+          export VERSION TAG CHANNEL RELEASE_BUILD_NUMBER
+          export SPARKLE_ED_SIGNATURE="${SPARKLE_ED_SIGNATURE:-}"
+          export SPARKLE_ED_LENGTH="${SPARKLE_ED_LENGTH:-0}"
+          export ZIP_PATH
+          export PUBLISHED_AT RELEASE_URL
+          export EDGEONE_API_TOKEN EDGEONE_PROJECT_NAME
+          export EDGEONE_ENV=production
+          export RELEASE_NOTES_HTML="<p>SayIt ${VERSION}</p>"
+
+          bash .github/scripts/publish_sparkle_edgeone.sh

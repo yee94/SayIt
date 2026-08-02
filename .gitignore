@@ -32,9 +32,15 @@ build.log
 build2.log
 ThirdParty/sherpa-onnx/
 
+# EdgeOne Sparkle update service build output / local CLI state
+deploy/sparkle-update-service/dist/
+deploy/sparkle-update-service/public/
+deploy/sparkle-update-service/.edgeone/
+
 # Local release/agent workflow folders (keep local only)
 .codex/
-scripts/
+# Only ignore root-level local scripts/, not package/deploy scripts.
+/scripts/
 .repos/
 .slim/deepwork/
 

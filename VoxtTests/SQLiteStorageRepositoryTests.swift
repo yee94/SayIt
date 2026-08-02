@@ -26,6 +26,7 @@ final class SQLiteStorageRepositoryTests: XCTestCase {
         XCTAssertTrue(tables.contains("dictionary_replacement_terms"))
         XCTAssertTrue(tables.contains("dictionary_observed_variants"))
         XCTAssertTrue(tables.contains("history_entries"))
+        XCTAssertTrue(tables.contains("usage_daily"))
         XCTAssertTrue(tables.contains("dictionary_search"))
         XCTAssertTrue(tables.contains("history_search"))
 

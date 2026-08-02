@@ -319,7 +319,11 @@ struct SettingsView: View {
                     selectedTab = .model
                 },
                 onTapUpdateBadge: {
-                    appUpdateManager.checkForUpdatesWithUserInterface()
+                    if appUpdateManager.hasDownloadedUpdatePendingInstall {
+                        appUpdateManager.installDownloadedUpdateAndRelaunch()
+                    } else {
+                        appUpdateManager.checkForUpdatesWithUserInterface()
+                    }
                 },
                 onTapNotification: {
                     isHomeNotificationDialogPresented = true
@@ -478,6 +482,9 @@ struct SettingsView: View {
            !issue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return .checkFailed(issue)
         }
+        if appUpdateManager.hasDownloadedUpdatePendingInstall {
+            return .readyToInstall(appUpdateManager.latestVersion)
+        }
         if appUpdateManager.hasUpdate {
             return .newVersion(appUpdateManager.latestVersion)
         }
@@ -545,7 +552,6 @@ struct SettingsView: View {
                         historyStore: historyStore,
                         dictionaryStore: dictionaryStore,
                         dictionarySuggestionStore: dictionarySuggestionStore,
-                        dictionaryCloudSyncService: dictionaryCloudSyncService,
                         availableHistoryScanModels: availableDictionaryHistoryScanModels,
                         onIngestSuggestionsFromHistory: onIngestDictionarySuggestionsFromHistory,
                         onCancelIngestSuggestionsFromHistory: onCancelDictionarySuggestionsFromHistory,
@@ -609,6 +615,7 @@ struct SettingsView: View {
                         case .general:
                             GeneralSettingsView(
                                 appUpdateManager: appUpdateManager,
+                                dictionaryCloudSyncService: dictionaryCloudSyncService,
                                 navigationRequest: navigationRequest,
                                 onRequestScrollToBottom: {
                                     withAnimation(.easeInOut(duration: 0.18)) {
@@ -1668,10 +1675,12 @@ private struct SettingsSidebarHeader: View {
     }
 
     private var showsNewVersionTag: Bool {
-        if case .newVersion = updateBadgeState {
+        switch updateBadgeState {
+        case .newVersion, .readyToInstall:
             return true
+        case .none, .checkFailed, .openingWindow:
+            return false
         }
-        return false
     }
 
     private var headerBadgeHeight: CGFloat {
@@ -1716,7 +1725,7 @@ private struct SettingsSidebarHeader: View {
     private var badgeContent: some View {
         HStack(spacing: 4) {
             if showsNewVersionTag {
-                Text(settingsLocalized("New"))
+                Text(newVersionTagText)
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(Color.green)
                     .lineLimit(1)
@@ -1741,6 +1750,13 @@ private struct SettingsSidebarHeader: View {
                 )
         }
         .contentShape(Capsule(style: .continuous))
+    }
+
+    private var newVersionTagText: String {
+        if case .readyToInstall = updateBadgeState {
+            return settingsLocalized("Install and Restart")
+        }
+        return settingsLocalized("New")
     }
 }
 
@@ -1957,6 +1973,7 @@ private enum UpdateBadgeState: Equatable {
     case none
     case checkFailed(String)
     case newVersion(String?)
+    case readyToInstall(String?)
     case openingWindow(String?)
 
     var iconName: String {
@@ -1967,6 +1984,8 @@ private enum UpdateBadgeState: Equatable {
             return "exclamationmark.triangle.fill"
         case .newVersion:
             return "arrow.down.circle.fill"
+        case .readyToInstall:
+            return "arrow.clockwise.circle.fill"
         case .openingWindow:
             return "arrow.down.circle.fill"
         }
@@ -1980,6 +1999,8 @@ private enum UpdateBadgeState: Equatable {
             return .orange
         case .newVersion:
             return .green
+        case .readyToInstall:
+            return .green
         case .openingWindow:
             return .green
         }
@@ -1989,7 +2010,7 @@ private enum UpdateBadgeState: Equatable {
         switch self {
         case .openingWindow:
             return true
-        case .none, .checkFailed, .newVersion:
+        case .none, .checkFailed, .newVersion, .readyToInstall:
             return false
         }
     }
@@ -1998,7 +2019,7 @@ private enum UpdateBadgeState: Equatable {
         switch self {
         case .openingWindow:
             return true
-        case .none, .checkFailed, .newVersion:
+        case .none, .checkFailed, .newVersion, .readyToInstall:
             return false
         }
     }
@@ -2011,6 +2032,8 @@ private enum UpdateBadgeState: Equatable {
             return settingsLocalized("Update Check Failed")
         case .newVersion:
             return settingsLocalized("New Update")
+        case .readyToInstall:
+            return settingsLocalized("Install and Restart")
         case .openingWindow:
             return settingsLocalized("Opening…")
         }

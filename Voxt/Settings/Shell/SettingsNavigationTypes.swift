@@ -11,6 +11,7 @@ enum SettingsNavigationSection: String, Hashable {
     case generalAppBehavior
     case generalAdvanced
     case generalProxy
+    case generalSync
     case modelEngine
     case modelTextEnhancement
     case modelTranslation
@@ -38,7 +39,8 @@ enum SettingsNavigationSection: String, Hashable {
              .generalLogging,
              .generalAppBehavior,
              .generalAdvanced,
-             .generalProxy:
+             .generalProxy,
+             .generalSync:
             return .general
         case .modelEngine,
              .modelTextEnhancement,
@@ -76,6 +78,7 @@ enum SettingsNavigationSection: String, Hashable {
         case .generalAppBehavior: return "App Behavior"
         case .generalAdvanced: return "Advanced"
         case .generalProxy: return "Proxy"
+        case .generalSync: return "Sync"
         case .modelEngine: return "Engine"
         case .modelTextEnhancement: return "Text Enhancement"
         case .modelTranslation: return "Translation"

@@ -376,13 +376,16 @@ final class TranscriptionHistoryStore: ObservableObject {
     private let defaults = UserDefaults.standard
     private let repository: HistoryRepositoryProtocol
     private let audioArchive: HistoryAudioArchiveManaging
+    private let usageRecorder: UsageDaySummaryRecording?
 
     init(
         repository: HistoryRepositoryProtocol? = nil,
-        audioArchive: HistoryAudioArchiveManaging? = nil
+        audioArchive: HistoryAudioArchiveManaging? = nil,
+        usageRecorder: UsageDaySummaryRecording? = nil
     ) {
         self.repository = repository ?? HistoryRepository()
         self.audioArchive = audioArchive ?? HistoryAudioArchiveService()
+        self.usageRecorder = usageRecorder
         if repository == nil {
             reloadAsync()
         } else {
@@ -666,6 +669,17 @@ final class TranscriptionHistoryStore: ObservableObject {
         )
 
         guard persistEntry(entry) else { return nil }
+
+        usageRecorder?.recordSession(
+            createdAt: entry.createdAt,
+            text: entry.text,
+            isTranslation: entry.isTranslation,
+            kind: entry.kind,
+            duration: entry.audioDurationSeconds,
+            appName: entry.focusedAppName,
+            appBundleID: entry.focusedAppBundleID,
+            browserURLHost: entry.browserURLHost
+        )
 
         totalEntryCount += 1
         cacheUpdatedEntry(entry)
@@ -1032,7 +1046,18 @@ final class TranscriptionHistoryStore: ObservableObject {
         cacheUpdatedEntry(updatedEntry)
         refreshEntryIndexes()
         publishVisibleEntries()
-        persistEntry(updatedEntry)
+        if persistEntry(updatedEntry) {
+            usageRecorder?.recordRewriteDelta(
+                updatedAt: existingEntry.createdAt,
+                oldText: existingEntry.text,
+                newText: trimmed,
+                oldDuration: existingEntry.audioDurationSeconds,
+                newDuration: audioDurationSeconds,
+                appName: existingEntry.focusedAppName,
+                appBundleID: existingEntry.focusedAppBundleID,
+                browserURLHost: existingEntry.browserURLHost
+            )
+        }
         return updatedEntry
     }
 

@@ -1,0 +1,79 @@
+name: Deploy Sparkle Feed (EdgeOne)
+
+# Redeploy the static Sparkle appcast site from repository channel manifests.
+# Full release pipeline also publishes new items via the main Release workflow.
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "EdgeOne deploy environment"
+        required: true
+        default: production
+        type: choice
+        options:
+          - production
+          - preview
+  push:
+    branches:
+      - main
+    paths:
+      - "deploy/sparkle-update-service/**"
+      - ".github/workflows/deploy-sparkle-feed.yml"
+
+concurrency:
+  group: sparkle-feed-${{ github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Build And Deploy EdgeOne Appcast
+    runs-on: ubuntu-latest
+    env:
+      EDGEONE_API_TOKEN: ${{ secrets.EDGEONE_API_TOKEN }}
+      EDGEONE_PROJECT_NAME: sayit-sparkle-update
+      EDGEONE_ENV: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || 'production' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Gate on EdgeOne token
+        id: gate
+        run: |
+          set -euo pipefail
+          if [ -z "${EDGEONE_API_TOKEN:-}" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::EDGEONE_API_TOKEN is not configured; skipping EdgeOne deploy."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.skip != 'true'
+        with:
+          node-version: "22"
+
+      - name: Build static appcast site
+        if: steps.gate.outputs.skip != 'true'
+        working-directory: deploy/sparkle-update-service
+        run: |
+          set -euo pipefail
+          node scripts/build.mjs
+          test -f dist/updates/stable/appcast.xml
+          test -f dist/updates/beta/appcast.xml
+          test -f dist/health.json
+          head -n 20 dist/updates/stable/appcast.xml
+
+      - name: Deploy to EdgeOne Pages
+        if: steps.gate.outputs.skip != 'true'
+        working-directory: deploy/sparkle-update-service
+        run: |
+          set -euo pipefail
+          npx --yes edgeone@1.6.19 pages deploy ./dist \
+            -n "$EDGEONE_PROJECT_NAME" \
+            -t "$EDGEONE_API_TOKEN" \
+            -e "$EDGEONE_ENV"
+          echo "Deployed project=$EDGEONE_PROJECT_NAME env=$EDGEONE_ENV"
+          echo "Stable feed (project domain may require custom domain for public access):"
+          echo "  https://${EDGEONE_PROJECT_NAME}.edgeone.cool/updates/stable/appcast.xml"
