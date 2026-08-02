@@ -1961,9 +1961,10 @@ private struct SettingsSidebarInfoTextButtonBody: View {
             return SettingsUIStyle.sidebarItemPressedFillColor
         }
         if isHovered {
-            return SettingsUIStyle.sidebarItemPressedFillColor
+            return SettingsUIStyle.sidebarItemFillColor
         }
-        return SettingsUIStyle.sidebarItemFillColor
+        // Keep the brand control quiet by default; only react on hover/press.
+        return .clear
     }
 }
 

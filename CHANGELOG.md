@@ -6,6 +6,23 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+## [1.15.4] - 2026-08-02
+
+### English
+
+#### Fixed
+- The bottom-left SayIt brand control no longer looks selected by default; it stays quiet until hover or press.
+
+### 简体中文
+
+#### 修复
+- 左下角 SayIt 品牌按钮默认不再呈现选中态，仅在悬停或按下时显示反馈。
+
+### 日本語
+
+#### 修正
+- 左下の SayIt ブランドボタンが既定で選択状態に見えなくなり、ホバーまたは押下時のみ反応するようにしました。
+
 ## [1.15.3] - 2026-08-02
 
 ### English
