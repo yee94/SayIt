@@ -51,6 +51,18 @@ final class UsageDaySummaryStore: UsageDaySummaryRecording, ObservableObject {
     private let database: VoxtDatabase
     private let defaults: UserDefaults
     private let deviceID: String
+    private let changeSubject = PassthroughSubject<Void, Never>()
+    private let localChangeSubject = PassthroughSubject<Void, Never>()
+
+    /// Emits after local accumulate or remote import writes. Callers use this to refresh UI.
+    var didChangePublisher: AnyPublisher<Void, Never> {
+        changeSubject.eraseToAnyPublisher()
+    }
+
+    /// Emits only after local accumulate (not remote import). Folder sync uses this for debounced push.
+    var didLocalChangePublisher: AnyPublisher<Void, Never> {
+        localChangeSubject.eraseToAnyPublisher()
+    }
 
     private static let dayFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -69,22 +81,139 @@ final class UsageDaySummaryStore: UsageDaySummaryRecording, ObservableObject {
         self.database = database
         self.defaults = defaults
         self.deviceID = deviceID ?? Self.resolvedSyncDeviceID(defaults: defaults)
+        Self.migrateLegacyUsageDeviceRowsIfNeeded(
+            database: database,
+            defaults: defaults,
+            currentDeviceID: self.deviceID
+        )
     }
 
     static func resolvedSyncDeviceID(defaults: UserDefaults) -> String {
-        if let existing = defaults.string(forKey: AppPreferenceKey.dictionarySyncDeviceId)?
-            .trimmingCharacters(in: .whitespacesAndNewlines),
-           !existing.isEmpty {
-            return existing
+        AppSyncDeviceID.resolved(defaults: defaults)
+    }
+
+    /// When unified sync device id differs from historical `usageSyncDeviceId`, merge local rows
+    /// written under the legacy id into the unified id so aggregation does not double-count.
+    /// Only the UserDefaults-stored legacy usage id is a migration candidate (not imported peers).
+    private static func migrateLegacyUsageDeviceRowsIfNeeded(
+        database: VoxtDatabase,
+        defaults: UserDefaults,
+        currentDeviceID: String
+    ) {
+        guard let legacyDeviceID = AppSyncDeviceID.legacyUsageMigrationSourceID(
+            defaults: defaults,
+            currentDeviceID: currentDeviceID
+        ) else {
+            return
         }
-        if let existing = defaults.string(forKey: AppPreferenceKey.usageSyncDeviceId)?
-            .trimmingCharacters(in: .whitespacesAndNewlines),
-           !existing.isEmpty {
-            return existing
+
+        do {
+            try database.dbQueue.write { db in
+                let legacyRows = try Row.fetchAll(
+                    db,
+                    sql: """
+                        SELECT day, device_id, dictation_seconds, characters, translation_characters,
+                               session_count, apps_json, updated_at
+                        FROM usage_daily
+                        WHERE device_id = ?
+                        """,
+                    arguments: [legacyDeviceID]
+                )
+                guard !legacyRows.isEmpty else { return }
+
+                for row in legacyRows {
+                    let legacySnapshot = try snapshot(from: row)
+                    let day = legacySnapshot.day
+                    let currentRow = try Row.fetchOne(
+                        db,
+                        sql: """
+                            SELECT day, device_id, dictation_seconds, characters, translation_characters,
+                                   session_count, apps_json, updated_at
+                            FROM usage_daily
+                            WHERE day = ? AND device_id = ?
+                            """,
+                        arguments: [day, currentDeviceID]
+                    )
+
+                    let merged: UsageDailySnapshot
+                    if let currentRow {
+                        let currentSnapshot = try snapshot(from: currentRow)
+                        merged = mergeDeviceRows(
+                            current: currentSnapshot,
+                            legacy: legacySnapshot,
+                            deviceID: currentDeviceID
+                        )
+                    } else {
+                        merged = UsageDailySnapshot(
+                            day: day,
+                            deviceID: currentDeviceID,
+                            dictationSeconds: max(legacySnapshot.dictationSeconds, 0),
+                            characters: max(legacySnapshot.characters, 0),
+                            translationCharacters: max(legacySnapshot.translationCharacters, 0),
+                            sessionCount: max(legacySnapshot.sessionCount, 0),
+                            apps: legacySnapshot.apps,
+                            updatedAt: legacySnapshot.updatedAt
+                        )
+                    }
+
+                    let appsJSON = try VoxtPersistenceCoding.encodeJSONString(merged.apps)
+                    try db.execute(
+                        sql: """
+                            INSERT INTO usage_daily (
+                                day, device_id, dictation_seconds, characters, translation_characters,
+                                session_count, apps_json, updated_at
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            ON CONFLICT(day, device_id) DO UPDATE SET
+                                dictation_seconds = excluded.dictation_seconds,
+                                characters = excluded.characters,
+                                translation_characters = excluded.translation_characters,
+                                session_count = excluded.session_count,
+                                apps_json = excluded.apps_json,
+                                updated_at = excluded.updated_at
+                            """,
+                        arguments: [
+                            merged.day,
+                            merged.deviceID,
+                            merged.dictationSeconds,
+                            merged.characters,
+                            merged.translationCharacters,
+                            merged.sessionCount,
+                            appsJSON,
+                            merged.updatedAt.timeIntervalSince1970
+                        ]
+                    )
+                    try db.execute(
+                        sql: """
+                            DELETE FROM usage_daily
+                            WHERE day = ? AND device_id = ?
+                            """,
+                        arguments: [day, legacyDeviceID]
+                    )
+                }
+            }
+        } catch {
+            VoxtLog.historyWarning(
+                "Usage legacy device migration failed from=\(legacyDeviceID) to=\(currentDeviceID): \(error.localizedDescription)"
+            )
         }
-        let generated = UUID().uuidString
-        defaults.set(generated, forKey: AppPreferenceKey.usageSyncDeviceId)
-        return generated
+    }
+
+    /// Sums numeric fields and apps; keeps the newer `updatedAt`.
+    private static func mergeDeviceRows(
+        current: UsageDailySnapshot,
+        legacy: UsageDailySnapshot,
+        deviceID: String
+    ) -> UsageDailySnapshot {
+        UsageDailySnapshot(
+            day: current.day,
+            deviceID: deviceID,
+            dictationSeconds: max(current.dictationSeconds, 0) + max(legacy.dictationSeconds, 0),
+            characters: max(current.characters, 0) + max(legacy.characters, 0),
+            translationCharacters: max(current.translationCharacters, 0) + max(legacy.translationCharacters, 0),
+            sessionCount: max(current.sessionCount, 0) + max(legacy.sessionCount, 0),
+            apps: mergeApps(current.apps, legacy.apps),
+            updatedAt: max(current.updatedAt, legacy.updatedAt)
+        )
     }
 
     static func dayString(for date: Date) -> String {
@@ -226,6 +355,68 @@ final class UsageDaySummaryStore: UsageDaySummaryRecording, ObservableObject {
         }
     }
 
+    /// Cross-device daily totals: SUM duration/characters/translation/sessionCount; apps merged by key.
+    /// `deviceID` on the returned snapshot is empty. Newest-first limited window by distinct day.
+    func aggregatedDailyTotals(lastDays: Int = 90) -> [String: UsageDailySnapshot] {
+        let limit = max(lastDays, 1)
+        do {
+            return try database.dbQueue.read { db in
+                let rows = try Row.fetchAll(
+                    db,
+                    sql: """
+                        SELECT day, device_id, dictation_seconds, characters, translation_characters,
+                               session_count, apps_json, updated_at
+                        FROM usage_daily
+                        ORDER BY day DESC
+                        """
+                )
+                var byDay: [String: [UsageDailySnapshot]] = [:]
+                byDay.reserveCapacity(min(rows.count, limit))
+                for row in rows {
+                    let snapshot = try Self.snapshot(from: row)
+                    byDay[snapshot.day, default: []].append(snapshot)
+                }
+                let orderedDays = byDay.keys.sorted(by: >).prefix(limit)
+                var result: [String: UsageDailySnapshot] = [:]
+                result.reserveCapacity(orderedDays.count)
+                for day in orderedDays {
+                    guard let snapshots = byDay[day],
+                          let aggregated = Self.aggregate(snapshots: snapshots, day: day) else {
+                        continue
+                    }
+                    result[day] = aggregated
+                }
+                return result
+            }
+        } catch {
+            VoxtLog.historyWarning("Usage aggregated daily totals read failed: \(error.localizedDescription)")
+            return [:]
+        }
+    }
+
+    /// Cross-device SUM for a single day. Apps merged by app key (name kept when present; characters/seconds summed).
+    func aggregatedSnapshot(day: String) -> UsageDailySnapshot? {
+        do {
+            return try database.dbQueue.read { db in
+                let rows = try Row.fetchAll(
+                    db,
+                    sql: """
+                        SELECT day, device_id, dictation_seconds, characters, translation_characters,
+                               session_count, apps_json, updated_at
+                        FROM usage_daily
+                        WHERE day = ?
+                        """,
+                    arguments: [day]
+                )
+                let snapshots = try rows.map { try Self.snapshot(from: $0) }
+                return Self.aggregate(snapshots: snapshots, day: day)
+            }
+        } catch {
+            VoxtLog.historyWarning("Usage aggregated snapshot read failed: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
     /// Local-device day summaries for folder sync export (newest-first, limited window).
     func exportedSnapshots(limit: Int = 400) -> [UsageDailySnapshot] {
         let capped = max(limit, 1)
@@ -251,13 +442,40 @@ final class UsageDaySummaryStore: UsageDaySummaryRecording, ObservableObject {
         }
     }
 
+    /// All `(day, deviceID)` rows for backup package export (newest day first, stable deviceID order).
+    /// Unlike `exportedSnapshots()`, includes imported peer devices so a full backup is not local-only.
+    func exportedSnapshotsForAllDevices(limit: Int = 2000) -> [UsageDailySnapshot] {
+        let capped = max(limit, 1)
+        do {
+            return try database.dbQueue.read { db in
+                let rows = try Row.fetchAll(
+                    db,
+                    sql: """
+                        SELECT day, device_id, dictation_seconds, characters, translation_characters,
+                               session_count, apps_json, updated_at
+                        FROM usage_daily
+                        ORDER BY day DESC, device_id ASC
+                        LIMIT ?
+                        """,
+                    arguments: [capped]
+                )
+                return try rows.map { try Self.snapshot(from: $0) }
+            }
+        } catch {
+            VoxtLog.historyWarning("Usage all-device export failed: \(error.localizedDescription)")
+            return []
+        }
+    }
+
     /// Merge remote per-device day summaries into `usage_daily`.
     /// Skips a remote row when local `(day, deviceID)` exists with `updatedAt >= remote.updatedAt`.
+    /// Publishes `didChangePublisher` when at least one row is written.
     func importSnapshots(_ snapshots: [UsageDailySnapshot]) {
         guard !snapshots.isEmpty else { return }
+        var didImport = false
         for snapshot in snapshots {
             do {
-                try database.dbQueue.write { db in
+                let imported = try database.dbQueue.write { db -> Bool in
                     if let existing = try Row.fetchOne(
                         db,
                         sql: """
@@ -270,7 +488,7 @@ final class UsageDaySummaryStore: UsageDaySummaryRecording, ObservableObject {
                         let existingInterval: Double = existing["updated_at"] ?? 0
                         let existingUpdatedAt = Date(timeIntervalSince1970: existingInterval)
                         if existingUpdatedAt >= snapshot.updatedAt {
-                            return
+                            return false
                         }
                     }
 
@@ -300,12 +518,19 @@ final class UsageDaySummaryStore: UsageDaySummaryRecording, ObservableObject {
                             snapshot.updatedAt.timeIntervalSince1970
                         ]
                     )
+                    return true
+                }
+                if imported {
+                    didImport = true
                 }
             } catch {
                 VoxtLog.historyWarning(
                     "Usage daily import failed for day=\(snapshot.day) device=\(snapshot.deviceID): \(error.localizedDescription)"
                 )
             }
+        }
+        if didImport {
+            changeSubject.send()
         }
     }
 
@@ -386,9 +611,63 @@ final class UsageDaySummaryStore: UsageDaySummaryRecording, ObservableObject {
                     ]
                 )
             }
+            changeSubject.send()
+            localChangeSubject.send()
         } catch {
             VoxtLog.historyWarning("Usage daily accumulate failed: \(error.localizedDescription)")
         }
+    }
+
+    private static func aggregate(snapshots: [UsageDailySnapshot], day: String) -> UsageDailySnapshot? {
+        guard !snapshots.isEmpty else { return nil }
+        var dictationSeconds: Double = 0
+        var characters = 0
+        var translationCharacters = 0
+        var sessionCount = 0
+        var apps: [String: UsageDailyAppValue] = [:]
+        var updatedAt = Date(timeIntervalSince1970: 0)
+        for snapshot in snapshots {
+            dictationSeconds += max(snapshot.dictationSeconds, 0)
+            characters += max(snapshot.characters, 0)
+            translationCharacters += max(snapshot.translationCharacters, 0)
+            sessionCount += max(snapshot.sessionCount, 0)
+            apps = mergeApps(apps, snapshot.apps)
+            if snapshot.updatedAt > updatedAt {
+                updatedAt = snapshot.updatedAt
+            }
+        }
+        return UsageDailySnapshot(
+            day: day,
+            deviceID: "",
+            dictationSeconds: dictationSeconds,
+            characters: characters,
+            translationCharacters: translationCharacters,
+            sessionCount: sessionCount,
+            apps: apps,
+            updatedAt: updatedAt
+        )
+    }
+
+    private static func mergeApps(
+        _ lhs: [String: UsageDailyAppValue],
+        _ rhs: [String: UsageDailyAppValue]
+    ) -> [String: UsageDailyAppValue] {
+        var result = lhs
+        for (key, value) in rhs {
+            if var existing = result[key] {
+                let existingName = existing.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                let incomingName = value.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                if existingName.isEmpty, !incomingName.isEmpty {
+                    existing.name = value.name
+                }
+                existing.characters = max(existing.characters + value.characters, 0)
+                existing.dictationSeconds = max(existing.dictationSeconds + value.dictationSeconds, 0)
+                result[key] = existing
+            } else {
+                result[key] = value
+            }
+        }
+        return result
     }
 
     private static func snapshot(from row: Row) throws -> UsageDailySnapshot {

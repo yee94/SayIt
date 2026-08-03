@@ -914,16 +914,29 @@ struct GeneralSyncCard: View {
     @State private var isTransferring = false
 
     var body: some View {
-        GeneralSettingsCard(title: localizedKey("Sync")) {
-            Text(localized(
-                "Sync your dictionary, statistics and settings across Macs using a shared folder. API keys stay on this Mac."
-            ))
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
+        GeneralSettingsCard(title: localizedKey("SayIt Sync")) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "person.crop.circle.badge.checkmark")
+                    .font(.system(size: 22, weight: .medium))
+                    .foregroundStyle(Color.accentColor)
+                    .frame(width: 28, height: 28)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(localized("Your SayIt profile"))
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.primary.opacity(0.92))
+
+                    Text(localized(
+                        "Keep one SayIt profile up to date across your Macs through a shared folder. It includes Settings, Dictionary, and Usage."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+            }
 
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(localized("Sync path"))
+                Text(localized("Sync folder"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Text(syncService.isEnabled ? syncService.directoryPath : localized("No folder set"))
@@ -936,7 +949,7 @@ struct GeneralSyncCard: View {
                 Button(
                     syncService.isEnabled
                         ? localized("Change Folder")
-                        : localized("Choose Sync Folder")
+                        : localized("Choose Folder")
                 ) {
                     _ = syncService.pickSyncDirectory()
                 }
@@ -949,7 +962,7 @@ struct GeneralSyncCard: View {
                     .buttonStyle(SettingsPillButtonStyle())
                     .disabled(syncService.state == .syncing)
 
-                    Button(localized("Clear Path")) {
+                    Button(localized("Disconnect Folder")) {
                         syncService.clearSyncDirectory()
                     }
                     .buttonStyle(SettingsPillButtonStyle(tone: .destructive))
@@ -960,26 +973,30 @@ struct GeneralSyncCard: View {
                 .font(.caption)
                 .foregroundStyle(statusColor)
 
-            Text(String(format: localized("Device ID: %@"), syncService.deviceId))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .textSelection(.enabled)
+            Text(localized(
+                "Sync folder access, microphone selection, and API keys are configured separately on each Mac."
+            ))
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+
+            Divider()
 
             Text(localized(
-                "Export and import dictionary, usage statistics and settings. API keys are never included."
+                "Export or import the unified SayIt profile for backup and transfer. The profile contains Settings, Dictionary, and Usage."
             ))
             .font(.caption)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
 
             HStack(spacing: 8) {
-                Button(localized("Export Package")) {
+                Button(localized("Export Profile")) {
                     exportSyncPackage()
                 }
                 .buttonStyle(SettingsPillButtonStyle())
                 .disabled(isTransferring)
 
-                Button(localized("Import Package")) {
+                Button(localized("Import Profile")) {
                     importSyncPackage()
                 }
                 .buttonStyle(SettingsPillButtonStyle())
@@ -1033,10 +1050,10 @@ struct GeneralSyncCard: View {
         do {
             let data = try syncService.exportSyncPackage()
             try data.write(to: url, options: .atomic)
-            transferMessage = localized("Sync package exported successfully.")
+            transferMessage = localized("SayIt profile exported successfully.")
         } catch {
             transferMessage = AppLocalization.format(
-                "Sync package export failed: %@",
+                "SayIt profile export failed: %@",
                 error.localizedDescription
             )
         }
@@ -1059,14 +1076,14 @@ struct GeneralSyncCard: View {
             let data = try Data(contentsOf: url)
             let result = try syncService.importSyncPackage(from: data)
             transferMessage = AppLocalization.format(
-                "Sync package imported: %d settings, %d usage days, %d dictionary terms.",
+                "SayIt profile imported: %d settings, %d Usage days, %d Dictionary terms.",
                 result.settingsApplied,
                 result.usageDaysImported,
                 result.dictionaryAdded
             )
         } catch {
             transferMessage = AppLocalization.format(
-                "Sync package import failed: %@",
+                "SayIt profile import failed: %@",
                 error.localizedDescription
             )
         }
@@ -1077,7 +1094,7 @@ struct GeneralSyncCard: View {
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyyMMdd"
         let day = formatter.string(from: Date())
-        return "SayIt-Sync-\(day).json"
+        return "SayIt-Profile-\(day).json"
     }
 }
 

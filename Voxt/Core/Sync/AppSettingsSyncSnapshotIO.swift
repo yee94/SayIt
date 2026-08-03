@@ -1,6 +1,7 @@
 // AppSettingsSyncSnapshotIO.swift
 // Folder-based app settings snapshot IO (shared directory / iCloud Drive).
 // Syncs whitelisted preferences and remote provider metadata; never syncs API keys.
+// v2: per-logical-field revision + updatedAt baselines; featureSettings split into five groups.
 
 import Foundation
 
@@ -8,13 +9,30 @@ import Foundation
 enum AppSettingsSyncSnapshotIO {
     nonisolated static let filePrefix = "sayit-settings-"
     nonisolated static let fileSuffix = ".json"
-    nonisolated static let envelopeVersion = 1
+    /// Current on-disk envelope version (v2 adds per-field revision + split feature groups).
+    nonisolated static let envelopeVersion = 2
+    /// Legacy envelope version still accepted for read/merge.
+    nonisolated static let legacyEnvelopeVersion = 1
 
-    /// Preference keys included in folder sync (whitelist).
-    nonisolated static let syncedPreferenceKeys: [String] = [
-        // Feature settings blob
-        AppPreferenceKey.featureSettings,
+    /// Preference / logical keys included in folder sync (whitelist).
+    /// Monolithic `featureSettings` is replaced by five group keys; v1 snapshots still decode.
+    nonisolated static let syncedPreferenceKeys: [String] = {
+        var keys = baseSyncedPreferenceKeys
+        keys.append(contentsOf: featureSettingsGroupKeys)
+        return keys
+    }()
 
+    /// Keys written into new snapshots (excludes legacy monolithic featureSettings).
+    nonisolated static let featureSettingsGroupKeys: [String] = [
+        AppPreferenceKey.featureSettingsTranscription,
+        AppPreferenceKey.featureSettingsTranslation,
+        AppPreferenceKey.featureSettingsRewrite,
+        AppPreferenceKey.featureSettingsMeeting,
+        AppPreferenceKey.featureSettingsAvailability,
+    ]
+
+    /// Whitelist without feature settings (monolithic or split).
+    nonisolated private static let baseSyncedPreferenceKeys: [String] = [
         // Hotkeys
         AppPreferenceKey.hotkeyInputType,
         AppPreferenceKey.hotkeyKeyCode,
@@ -156,6 +174,14 @@ enum AppSettingsSyncSnapshotIO {
         AppPreferenceKey.meetingRealtimeTranslationTargetLanguage,
     ]
 
+    /// Keys accepted when applying merged snapshots (includes legacy monolithic blob).
+    nonisolated static let applyablePreferenceKeys: [String] = {
+        var keys = baseSyncedPreferenceKeys
+        keys.append(AppPreferenceKey.featureSettings)
+        keys.append(contentsOf: featureSettingsGroupKeys)
+        return keys
+    }()
+
     struct Envelope: Codable, Sendable {
         var version: Int
         var deviceID: String
@@ -168,6 +194,39 @@ enum AppSettingsSyncSnapshotIO {
         /// JSON-encoded `StoredPreferenceValue`.
         var value: String
         var updatedAt: Date
+        /// Monotonic revision for this logical field on the exporting device.
+        /// Defaults to 0 when decoding legacy v1 snapshots that omit the field.
+        var revision: Int
+
+        init(key: String, value: String, updatedAt: Date, revision: Int = 0) {
+            self.key = key
+            self.value = value
+            self.updatedAt = updatedAt
+            self.revision = revision
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case key
+            case value
+            case updatedAt
+            case revision
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            key = try container.decode(String.self, forKey: .key)
+            value = try container.decode(String.self, forKey: .value)
+            updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+            revision = try container.decodeIfPresent(Int.self, forKey: .revision) ?? 0
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(key, forKey: .key)
+            try container.encode(value, forKey: .value)
+            try container.encode(updatedAt, forKey: .updatedAt)
+            try container.encode(revision, forKey: .revision)
+        }
     }
 
     /// Typed UserDefaults value for stable round-trip across devices.
@@ -237,20 +296,106 @@ enum AppSettingsSyncSnapshotIO {
     // MARK: - Export
 
     /// Collects whitelisted preference values for snapshot export.
+    /// Uses local baseline so unchanged values keep the same revision and updatedAt.
+    /// Persists an updated baseline after collect so consecutive no-change collects are stable.
     nonisolated static func collectFields(
         defaults: UserDefaults,
-        exportedAt: Date = Date()
+        exportedAt: Date = Date(),
+        baselineStore: AppSettingsSyncBaselineStore? = nil
     ) -> [AppSettingsSyncField] {
+        var baseline = baselineStore ?? AppSettingsSyncBaselineStore.load(defaults: defaults)
         var fields: [AppSettingsSyncField] = []
         fields.reserveCapacity(syncedPreferenceKeys.count)
 
         for key in syncedPreferenceKeys {
-            guard let stored = readStoredValue(forKey: key, defaults: defaults) else { continue }
+            guard let stored = readLogicalStoredValue(forKey: key, defaults: defaults) else { continue }
             let sanitized = sanitizeExportedValue(stored, key: key, defaults: defaults)
             guard let encoded = encodeStoredValue(sanitized) else { continue }
-            fields.append(
-                AppSettingsSyncField(key: key, value: encoded, updatedAt: exportedAt)
+
+            let field: AppSettingsSyncField
+            if let previous = baseline.baseline(forKey: key), previous.value == encoded {
+                // Unchanged: keep revision and updatedAt (no local mutation).
+                field = AppSettingsSyncField(
+                    key: key,
+                    value: encoded,
+                    updatedAt: previous.updatedAt,
+                    revision: previous.revision
+                )
+            } else {
+                let nextRevision = (baseline.baseline(forKey: key)?.revision ?? 0) + 1
+                field = AppSettingsSyncField(
+                    key: key,
+                    value: encoded,
+                    updatedAt: exportedAt,
+                    revision: nextRevision
+                )
+            }
+            fields.append(field)
+            baseline.setBaseline(
+                AppSettingsSyncFieldBaseline(
+                    value: field.value,
+                    revision: field.revision,
+                    updatedAt: field.updatedAt
+                ),
+                forKey: key
             )
+        }
+
+        // Drop legacy monolithic baseline entry once split groups are used.
+        baseline.entries.removeValue(forKey: AppPreferenceKey.featureSettings)
+        baseline.save(to: defaults)
+        return fields
+    }
+
+    /// Collects local fields for LWW merge without mutating baseline.
+    /// - Unchanged vs baseline: keep baseline revision/updatedAt.
+    /// - Diverged from baseline (unexported local edit): in-memory only, revision+1 and `now`
+    ///   so LWW can prefer the local change over older package fields; baseline stays intact.
+    /// - Never baselined: epoch + revision 0 so package fields with real timestamps win.
+    nonisolated static func collectFieldsForMerge(
+        defaults: UserDefaults,
+        baselineStore: AppSettingsSyncBaselineStore? = nil,
+        now: Date = Date()
+    ) -> [AppSettingsSyncField] {
+        let baseline = baselineStore ?? AppSettingsSyncBaselineStore.load(defaults: defaults)
+        var fields: [AppSettingsSyncField] = []
+        fields.reserveCapacity(syncedPreferenceKeys.count)
+
+        for key in syncedPreferenceKeys {
+            guard let stored = readLogicalStoredValue(forKey: key, defaults: defaults) else { continue }
+            let sanitized = sanitizeExportedValue(stored, key: key, defaults: defaults)
+            guard let encoded = encodeStoredValue(sanitized) else { continue }
+
+            if let previous = baseline.baseline(forKey: key), previous.value == encoded {
+                fields.append(
+                    AppSettingsSyncField(
+                        key: key,
+                        value: encoded,
+                        updatedAt: previous.updatedAt,
+                        revision: previous.revision
+                    )
+                )
+            } else if let previous = baseline.baseline(forKey: key) {
+                // Local value diverged from baseline; claim current time for LWW only (no baseline write).
+                fields.append(
+                    AppSettingsSyncField(
+                        key: key,
+                        value: encoded,
+                        updatedAt: now,
+                        revision: previous.revision + 1
+                    )
+                )
+            } else {
+                // Never baselined: do not claim "now" or package fields always lose.
+                fields.append(
+                    AppSettingsSyncField(
+                        key: key,
+                        value: encoded,
+                        updatedAt: Date(timeIntervalSince1970: 0),
+                        revision: 0
+                    )
+                )
+            }
         }
         return fields
     }
@@ -267,9 +412,7 @@ enum AppSettingsSyncSnapshotIO {
             exportedAt: exportedAt,
             fields: fields
         )
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = [.sortedKeys]
+        let encoder = AppSyncJSONCoding.makeEncoder(outputFormatting: [.sortedKeys])
         let data = try encoder.encode(envelope)
 
         let fileName = snapshotFileName(deviceId: deviceId)
@@ -286,6 +429,7 @@ enum AppSettingsSyncSnapshotIO {
     }
 
     /// Lists and parses `sayit-settings-*.json` snapshots. Bad/version-mismatched files are skipped.
+    /// Accepts both v1 (legacy) and v2 envelopes; normalizes v1 monolithic featureSettings into groups.
     nonisolated static func listSnapshots(
         in directoryURL: URL
     ) throws -> [Envelope] {
@@ -294,8 +438,7 @@ enum AppSettingsSyncSnapshotIO {
             includingPropertiesForKeys: nil,
             options: [.skipsHiddenFiles]
         )
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = AppSyncJSONCoding.makeDecoder()
 
         var snapshots: [Envelope] = []
         for fileURL in contents {
@@ -311,7 +454,8 @@ enum AppSettingsSyncSnapshotIO {
             do {
                 let data = try Data(contentsOf: fileURL)
                 var envelope = try decoder.decode(Envelope.self, from: data)
-                guard envelope.version == envelopeVersion else {
+                guard envelope.version == envelopeVersion
+                        || envelope.version == legacyEnvelopeVersion else {
                     VoxtLog.historyWarning(
                         "Settings snapshot skipped (version mismatch). file=\(name) version=\(envelope.version)"
                     )
@@ -320,6 +464,7 @@ enum AppSettingsSyncSnapshotIO {
                 if envelope.deviceID.isEmpty {
                     envelope.deviceID = devicePart
                 }
+                envelope.fields = normalizeFieldsFromLegacyIfNeeded(envelope.fields)
                 snapshots.append(envelope)
             } catch {
                 VoxtLog.historyWarning(
@@ -369,23 +514,89 @@ enum AppSettingsSyncSnapshotIO {
 
     /// Applies merged fields into `defaults`. Provider secrets stay in Keychain (UD write only).
     /// FeatureSettings local path/bookmark/list identifiers are preserved.
+    /// After apply, baselines for applied keys are updated to the current defaults encoding
+    /// (using the winner field's revision/updatedAt) so the next collect does not echo.
     nonisolated static func applyMergedFields(
         _ fields: [String: AppSettingsSyncField],
-        to defaults: UserDefaults
+        to defaults: UserDefaults,
+        updateBaseline: Bool = true
     ) {
-        for key in syncedPreferenceKeys {
+        for key in applyablePreferenceKeys {
             guard let field = fields[key],
                   let stored = decodeStoredValue(field.value) else { continue }
             applyStoredValue(stored, forKey: key, defaults: defaults)
         }
+
+        guard updateBaseline else { return }
+
+        // Record baselines from post-apply defaults so local re-export matches applied values
+        // without bumping revision/updatedAt (echo suppression).
+        var baseline = AppSettingsSyncBaselineStore.load(defaults: defaults)
+        var currentEncoded: [String: String] = [:]
+        currentEncoded.reserveCapacity(featureSettingsGroupKeys.count + fields.count)
+
+        for key in Set(fields.keys).union(Set(featureSettingsGroupKeys)) {
+            // Only baseline keys we actually care about for export.
+            guard syncedPreferenceKeys.contains(key) || featureSettingsGroupKeys.contains(key) else {
+                continue
+            }
+            guard let stored = readLogicalStoredValue(forKey: key, defaults: defaults) else { continue }
+            let sanitized = sanitizeExportedValue(stored, key: key, defaults: defaults)
+            guard let encoded = encodeStoredValue(sanitized) else { continue }
+            currentEncoded[key] = encoded
+        }
+
+        // For applied keys that have a winner field, use that field's revision/updatedAt.
+        var appliedForBaseline: [String: AppSettingsSyncField] = [:]
+        for (key, field) in fields {
+            guard let encoded = currentEncoded[key] else { continue }
+            // Prefer split group keys; skip legacy monolithic after normalize.
+            if key == AppPreferenceKey.featureSettings { continue }
+            appliedForBaseline[key] = field
+            // Ensure encoded map entry exists (already set).
+            _ = encoded
+        }
+
+        // When only legacy monolithic was applied, baselines for the five groups must update.
+        if fields[AppPreferenceKey.featureSettings] != nil {
+            let mono = fields[AppPreferenceKey.featureSettings]!
+            for groupKey in featureSettingsGroupKeys {
+                if appliedForBaseline[groupKey] == nil, currentEncoded[groupKey] != nil {
+                    appliedForBaseline[groupKey] = AppSettingsSyncField(
+                        key: groupKey,
+                        value: currentEncoded[groupKey]!,
+                        updatedAt: mono.updatedAt,
+                        revision: mono.revision
+                    )
+                }
+            }
+        }
+
+        baseline.recordAppliedFields(appliedForBaseline, currentEncodedValues: currentEncoded)
+        baseline.entries.removeValue(forKey: AppPreferenceKey.featureSettings)
+        baseline.save(to: defaults)
     }
 
     /// Full export → write → list → merge → apply cycle used by folder sync.
+    ///
+    /// When the local baseline store is empty (first sync after upgrade / new device),
+    /// seed from existing directory snapshots first so stale local values are not stamped
+    /// with "now" and overwrite newer remote v1/v2 fields. If the directory has no
+    /// snapshots yet, fall through and initialize from local settings as before.
     nonisolated static func syncAppSettings(
         directoryURL: URL,
         deviceId: String,
         defaults: UserDefaults = .standard
     ) throws {
+        let baseline = AppSettingsSyncBaselineStore.load(defaults: defaults)
+        if baseline.entries.isEmpty {
+            let existingSnapshots = try listSnapshots(in: directoryURL)
+            if !existingSnapshots.isEmpty {
+                let seeded = mergeFields(snapshots: existingSnapshots)
+                applyMergedFields(seeded, to: defaults)
+            }
+        }
+
         let exportedAt = Date()
         let localFields = collectFields(defaults: defaults, exportedAt: exportedAt)
         try writeSnapshot(
@@ -415,6 +626,55 @@ enum AppSettingsSyncSnapshotIO {
     nonisolated static func decodeStoredValue(_ raw: String) -> StoredPreferenceValue? {
         guard let data = raw.data(using: .utf8) else { return nil }
         return try? JSONDecoder().decode(StoredPreferenceValue.self, from: data)
+    }
+
+    // MARK: - Logical field reads
+
+    /// Reads a logical sync field (preference key or feature group).
+    nonisolated static func readLogicalStoredValue(
+        forKey key: String,
+        defaults: UserDefaults
+    ) -> StoredPreferenceValue? {
+        switch key {
+        case AppPreferenceKey.featureSettingsTranscription,
+             AppPreferenceKey.featureSettingsTranslation,
+             AppPreferenceKey.featureSettingsRewrite,
+             AppPreferenceKey.featureSettingsMeeting,
+             AppPreferenceKey.featureSettingsAvailability:
+            return readFeatureSettingsGroupValue(forKey: key, defaults: defaults)
+        case AppPreferenceKey.featureSettings:
+            // Legacy monolithic path still used when applying v1 remote fields.
+            return readStoredValue(forKey: key, defaults: defaults)
+        default:
+            return readStoredValue(forKey: key, defaults: defaults)
+        }
+    }
+
+    nonisolated private static func readFeatureSettingsGroupValue(
+        forKey key: String,
+        defaults: UserDefaults
+    ) -> StoredPreferenceValue? {
+        let settings = FeatureSettingsStore.load(defaults: defaults)
+        let sanitized = strippingDeviceLocalNotePaths(from: settings)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let data: Data?
+        switch key {
+        case AppPreferenceKey.featureSettingsTranscription:
+            data = try? encoder.encode(sanitized.transcription)
+        case AppPreferenceKey.featureSettingsTranslation:
+            data = try? encoder.encode(sanitized.translation)
+        case AppPreferenceKey.featureSettingsRewrite:
+            data = try? encoder.encode(sanitized.rewrite)
+        case AppPreferenceKey.featureSettingsMeeting:
+            data = try? encoder.encode(sanitized.meeting)
+        case AppPreferenceKey.featureSettingsAvailability:
+            data = try? encoder.encode(sanitized.availability)
+        default:
+            return nil
+        }
+        guard let data, let raw = String(data: data, encoding: .utf8) else { return nil }
+        return .string(raw)
     }
 
     nonisolated private static func readStoredValue(
@@ -452,6 +712,12 @@ enum AppSettingsSyncSnapshotIO {
         switch key {
         case AppPreferenceKey.featureSettings:
             applyFeatureSettingsValue(value, defaults: defaults)
+        case AppPreferenceKey.featureSettingsTranscription,
+             AppPreferenceKey.featureSettingsTranslation,
+             AppPreferenceKey.featureSettingsRewrite,
+             AppPreferenceKey.featureSettingsMeeting,
+             AppPreferenceKey.featureSettingsAvailability:
+            applyFeatureSettingsGroupValue(value, forKey: key, defaults: defaults)
         case AppPreferenceKey.remoteASRProviderConfigurations,
              AppPreferenceKey.remoteLLMProviderConfigurations:
             applyProviderConfigurationsValue(value, forKey: key, defaults: defaults)
@@ -489,6 +755,9 @@ enum AppSettingsSyncSnapshotIO {
         switch key {
         case AppPreferenceKey.featureSettings:
             return sanitizeFeatureSettingsForExport(value, defaults: defaults)
+        case AppPreferenceKey.featureSettingsTranscription:
+            // Group read already strips device-local note paths.
+            return value
         case AppPreferenceKey.remoteASRProviderConfigurations,
              AppPreferenceKey.remoteLLMProviderConfigurations:
             return sanitizeProviderConfigurationsForExport(value)
@@ -562,6 +831,8 @@ enum AppSettingsSyncSnapshotIO {
         return result
     }
 
+    // MARK: - Feature settings apply
+
     nonisolated private static func applyFeatureSettingsValue(
         _ value: StoredPreferenceValue,
         defaults: UserDefaults
@@ -572,19 +843,86 @@ enum AppSettingsSyncSnapshotIO {
             return
         }
         let local = FeatureSettingsStore.load(defaults: defaults)
-        // Preserve device-local note paths / bookmarks / list selection.
-        remote.transcription.notes.obsidianSync.vaultPath = local.transcription.notes.obsidianSync.vaultPath
-        remote.transcription.notes.obsidianSync.vaultBookmarkData =
+        remote = preservingDeviceLocalNotePaths(remote: remote, local: local)
+        FeatureSettingsStore.save(remote, defaults: defaults)
+    }
+
+    nonisolated private static func applyFeatureSettingsGroupValue(
+        _ value: StoredPreferenceValue,
+        forKey key: String,
+        defaults: UserDefaults
+    ) {
+        guard case .string(let raw) = value,
+              let data = raw.data(using: .utf8) else {
+            return
+        }
+        var local = FeatureSettingsStore.load(defaults: defaults)
+        switch key {
+        case AppPreferenceKey.featureSettingsTranscription:
+            guard var remote = try? JSONDecoder().decode(
+                TranscriptionFeatureSettings.self,
+                from: data
+            ) else { return }
+            // Preserve device-local note paths / bookmarks / list selection.
+            remote.notes.obsidianSync.vaultPath = local.transcription.notes.obsidianSync.vaultPath
+            remote.notes.obsidianSync.vaultBookmarkData =
+                local.transcription.notes.obsidianSync.vaultBookmarkData
+            remote.notes.remindersSync.selectedListIdentifier =
+                local.transcription.notes.remindersSync.selectedListIdentifier
+            if remote.notes.remindersSync.selectedListTitle.isEmpty,
+               !local.transcription.notes.remindersSync.selectedListTitle.isEmpty {
+                remote.notes.remindersSync.selectedListTitle =
+                    local.transcription.notes.remindersSync.selectedListTitle
+            }
+            local.transcription = remote
+        case AppPreferenceKey.featureSettingsTranslation:
+            guard let remote = try? JSONDecoder().decode(
+                TranslationFeatureSettings.self,
+                from: data
+            ) else { return }
+            local.translation = remote
+        case AppPreferenceKey.featureSettingsRewrite:
+            guard let remote = try? JSONDecoder().decode(
+                RewriteFeatureSettings.self,
+                from: data
+            ) else { return }
+            local.rewrite = remote
+        case AppPreferenceKey.featureSettingsMeeting:
+            guard let remote = try? JSONDecoder().decode(
+                MeetingFeatureSettings.self,
+                from: data
+            ) else { return }
+            local.meeting = remote
+        case AppPreferenceKey.featureSettingsAvailability:
+            guard let remote = try? JSONDecoder().decode(
+                FeatureAvailabilitySettings.self,
+                from: data
+            ) else { return }
+            local.availability = remote
+        default:
+            return
+        }
+        FeatureSettingsStore.save(local, defaults: defaults)
+    }
+
+    nonisolated private static func preservingDeviceLocalNotePaths(
+        remote: FeatureSettings,
+        local: FeatureSettings
+    ) -> FeatureSettings {
+        var result = remote
+        result.transcription.notes.obsidianSync.vaultPath =
+            local.transcription.notes.obsidianSync.vaultPath
+        result.transcription.notes.obsidianSync.vaultBookmarkData =
             local.transcription.notes.obsidianSync.vaultBookmarkData
-        remote.transcription.notes.remindersSync.selectedListIdentifier =
+        result.transcription.notes.remindersSync.selectedListIdentifier =
             local.transcription.notes.remindersSync.selectedListIdentifier
         // Keep local list title when identifier is preserved and remote cleared it.
-        if remote.transcription.notes.remindersSync.selectedListTitle.isEmpty,
+        if result.transcription.notes.remindersSync.selectedListTitle.isEmpty,
            !local.transcription.notes.remindersSync.selectedListTitle.isEmpty {
-            remote.transcription.notes.remindersSync.selectedListTitle =
+            result.transcription.notes.remindersSync.selectedListTitle =
                 local.transcription.notes.remindersSync.selectedListTitle
         }
-        FeatureSettingsStore.save(remote, defaults: defaults)
+        return result
     }
 
     nonisolated private static func applyProviderConfigurationsValue(
@@ -629,5 +967,59 @@ enum AppSettingsSyncSnapshotIO {
             return
         }
         defaults.set(encoded, forKey: key)
+    }
+
+    // MARK: - Legacy v1 normalization
+
+    /// Expands a monolithic `featureSettings` field into five group fields when present.
+    /// Existing group fields take precedence over the split result for the same key.
+    nonisolated static func normalizeFieldsFromLegacyIfNeeded(
+        _ fields: [AppSettingsSyncField]
+    ) -> [AppSettingsSyncField] {
+        var byKey: [String: AppSettingsSyncField] = [:]
+        byKey.reserveCapacity(fields.count + featureSettingsGroupKeys.count)
+        for field in fields {
+            byKey[field.key] = field
+        }
+
+        guard let mono = byKey[AppPreferenceKey.featureSettings],
+              let stored = decodeStoredValue(mono.value),
+              case .string(let raw) = stored,
+              let data = raw.data(using: .utf8),
+              let settings = try? JSONDecoder().decode(FeatureSettings.self, from: data) else {
+            // Still drop monolithic key from export map when groups already exist.
+            if byKey.keys.contains(where: { featureSettingsGroupKeys.contains($0) }) {
+                byKey.removeValue(forKey: AppPreferenceKey.featureSettings)
+            }
+            return Array(byKey.values)
+        }
+
+        let sanitized = strippingDeviceLocalNotePaths(from: settings)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+
+        func encodeGroup<T: Encodable>(_ value: T, key: String) {
+            guard byKey[key] == nil,
+                  let data = try? encoder.encode(value),
+                  let string = String(data: data, encoding: .utf8),
+                  let encoded = encodeStoredValue(.string(string)) else {
+                return
+            }
+            byKey[key] = AppSettingsSyncField(
+                key: key,
+                value: encoded,
+                updatedAt: mono.updatedAt,
+                revision: mono.revision
+            )
+        }
+
+        encodeGroup(sanitized.transcription, key: AppPreferenceKey.featureSettingsTranscription)
+        encodeGroup(sanitized.translation, key: AppPreferenceKey.featureSettingsTranslation)
+        encodeGroup(sanitized.rewrite, key: AppPreferenceKey.featureSettingsRewrite)
+        encodeGroup(sanitized.meeting, key: AppPreferenceKey.featureSettingsMeeting)
+        encodeGroup(sanitized.availability, key: AppPreferenceKey.featureSettingsAvailability)
+
+        byKey.removeValue(forKey: AppPreferenceKey.featureSettings)
+        return Array(byKey.values)
     }
 }

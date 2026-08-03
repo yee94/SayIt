@@ -199,21 +199,51 @@ final class UsageDaySummaryStoreTests: XCTestCase {
         XCTAssertEqual(snapshot.apps["com.y"]?.dictationSeconds ?? 0, 0, accuracy: 0.001)
     }
 
-    func testResolvedSyncDeviceIDPrefersDictionaryThenUsageThenGenerates() {
+    func testResolvedSyncDeviceIDPrefersUnifiedThenDictionaryThenUsageThenGenerates() {
         let suite = UserDefaults(suiteName: "usage-device-\(UUID().uuidString)")!
 
+        suite.set("unified-device", forKey: AppPreferenceKey.syncDeviceId)
         suite.set("dict-device", forKey: AppPreferenceKey.dictionarySyncDeviceId)
-        XCTAssertEqual(UsageDaySummaryStore.resolvedSyncDeviceID(defaults: suite), "dict-device")
-
-        suite.removeObject(forKey: AppPreferenceKey.dictionarySyncDeviceId)
         suite.set("usage-device", forKey: AppPreferenceKey.usageSyncDeviceId)
-        XCTAssertEqual(UsageDaySummaryStore.resolvedSyncDeviceID(defaults: suite), "usage-device")
+        XCTAssertEqual(UsageDaySummaryStore.resolvedSyncDeviceID(defaults: suite), "unified-device")
 
+        suite.removeObject(forKey: AppPreferenceKey.syncDeviceId)
+        XCTAssertEqual(UsageDaySummaryStore.resolvedSyncDeviceID(defaults: suite), "dict-device")
+        // Legacy dictionary id is migrated into the unified key; legacy key remains.
+        XCTAssertEqual(suite.string(forKey: AppPreferenceKey.syncDeviceId), "dict-device")
+        XCTAssertEqual(suite.string(forKey: AppPreferenceKey.dictionarySyncDeviceId), "dict-device")
+
+        suite.removeObject(forKey: AppPreferenceKey.syncDeviceId)
+        suite.removeObject(forKey: AppPreferenceKey.dictionarySyncDeviceId)
+        XCTAssertEqual(UsageDaySummaryStore.resolvedSyncDeviceID(defaults: suite), "usage-device")
+        XCTAssertEqual(suite.string(forKey: AppPreferenceKey.syncDeviceId), "usage-device")
+        XCTAssertEqual(suite.string(forKey: AppPreferenceKey.usageSyncDeviceId), "usage-device")
+
+        suite.removeObject(forKey: AppPreferenceKey.syncDeviceId)
         suite.removeObject(forKey: AppPreferenceKey.usageSyncDeviceId)
         let generated = UsageDaySummaryStore.resolvedSyncDeviceID(defaults: suite)
         XCTAssertFalse(generated.isEmpty)
-        XCTAssertEqual(suite.string(forKey: AppPreferenceKey.usageSyncDeviceId), generated)
+        XCTAssertEqual(suite.string(forKey: AppPreferenceKey.syncDeviceId), generated)
+        XCTAssertNil(suite.string(forKey: AppPreferenceKey.usageSyncDeviceId))
         XCTAssertEqual(UsageDaySummaryStore.resolvedSyncDeviceID(defaults: suite), generated)
+    }
+
+    func testDictionaryAndUsageShareResolvedSyncDeviceID() {
+        let suite = UserDefaults(suiteName: "usage-shared-device-\(UUID().uuidString)")!
+        suite.set("shared-device", forKey: AppPreferenceKey.dictionarySyncDeviceId)
+        let usageID = UsageDaySummaryStore.resolvedSyncDeviceID(defaults: suite)
+        let dictionaryService = DictionaryCloudSyncService(
+            dictionaryStore: DictionaryStore(
+                defaults: suite,
+                fileManager: .default,
+                initialEntries: [],
+                persistenceEnabled: false
+            ),
+            defaults: suite
+        )
+        XCTAssertEqual(usageID, "shared-device")
+        XCTAssertEqual(dictionaryService.deviceId, usageID)
+        XCTAssertEqual(suite.string(forKey: AppPreferenceKey.syncDeviceId), "shared-device")
     }
 
     func testHistoryAppendInvokesUsageRecorder() throws {
@@ -264,6 +294,324 @@ final class UsageDaySummaryStoreTests: XCTestCase {
         XCTAssertEqual(call.kind, .normal)
         XCTAssertEqual(call.appBundleID, "com.apple.Notes")
         XCTAssertEqual(spy.rewriteCalls.count, 0)
+    }
+
+    func testAggregatedSnapshotSumsTwoDevicesSameDayAndMergesSameApp() throws {
+        let database = try makeDatabase()
+        let storeA = retain(UsageDaySummaryStore(database: database, deviceID: "device-A"))
+        let storeB = retain(UsageDaySummaryStore(database: database, deviceID: "device-B"))
+        let day = Date(timeIntervalSince1970: 1_700_400_000)
+        let dayKey = UsageDaySummaryStore.dayString(for: day)
+
+        storeA.recordSession(
+            createdAt: day,
+            text: "hello",
+            isTranslation: false,
+            kind: .normal,
+            duration: 10,
+            appName: "Notes",
+            appBundleID: "com.apple.Notes",
+            browserURLHost: nil
+        )
+        storeB.recordSession(
+            createdAt: day,
+            text: "world!",
+            isTranslation: true,
+            kind: .translation,
+            duration: 5,
+            appName: "备忘录",
+            appBundleID: "com.apple.Notes",
+            browserURLHost: nil
+        )
+        storeB.recordSession(
+            createdAt: day.addingTimeInterval(30),
+            text: "web",
+            isTranslation: false,
+            kind: .normal,
+            duration: 3,
+            appName: "Safari",
+            appBundleID: nil,
+            browserURLHost: "example.com"
+        )
+
+        // Current-device APIs remain device-scoped.
+        let localA = try XCTUnwrap(storeA.snapshot(day: dayKey))
+        XCTAssertEqual(localA.deviceID, "device-A")
+        XCTAssertEqual(localA.sessionCount, 1)
+        XCTAssertEqual(localA.characters, "hello".count)
+        XCTAssertEqual(localA.dictationSeconds, 10, accuracy: 0.001)
+
+        let aggregated = try XCTUnwrap(storeA.aggregatedSnapshot(day: dayKey))
+        XCTAssertEqual(aggregated.day, dayKey)
+        XCTAssertEqual(aggregated.deviceID, "")
+        XCTAssertEqual(aggregated.sessionCount, 3)
+        XCTAssertEqual(aggregated.characters, "hello".count + "world!".count + "web".count)
+        XCTAssertEqual(aggregated.translationCharacters, "world!".count)
+        XCTAssertEqual(aggregated.dictationSeconds, 18, accuracy: 0.001)
+
+        let notesApp = try XCTUnwrap(aggregated.apps["com.apple.Notes"])
+        XCTAssertEqual(notesApp.name, "Notes")
+        XCTAssertEqual(notesApp.characters, "hello".count + "world!".count)
+        XCTAssertEqual(notesApp.dictationSeconds, 15, accuracy: 0.001)
+
+        let webApp = try XCTUnwrap(aggregated.apps["web:example.com"])
+        XCTAssertEqual(webApp.name, "Safari")
+        XCTAssertEqual(webApp.characters, "web".count)
+        XCTAssertEqual(webApp.dictationSeconds, 3, accuracy: 0.001)
+
+        let totals = storeA.aggregatedDailyTotals(lastDays: 30)
+        XCTAssertEqual(totals.count, 1)
+        XCTAssertEqual(totals[dayKey]?.sessionCount, 3)
+        XCTAssertEqual(totals[dayKey]?.characters, aggregated.characters)
+    }
+
+    func testExportedSnapshotsForAllDevicesIncludesPeersInStableOrder() throws {
+        let database = try makeDatabase()
+        let storeA = retain(UsageDaySummaryStore(database: database, deviceID: "device-A"))
+        let storeB = retain(UsageDaySummaryStore(database: database, deviceID: "device-B"))
+        let day = Date(timeIntervalSince1970: 1_700_400_000)
+        let dayKey = UsageDaySummaryStore.dayString(for: day)
+        let olderDay = day.addingTimeInterval(-86_400)
+        let olderDayKey = UsageDaySummaryStore.dayString(for: olderDay)
+
+        storeA.recordSession(
+            createdAt: day,
+            text: "local-a",
+            isTranslation: false,
+            kind: .normal,
+            duration: 4,
+            appName: "Notes",
+            appBundleID: "com.apple.Notes",
+            browserURLHost: nil
+        )
+        storeB.recordSession(
+            createdAt: day,
+            text: "peer-b",
+            isTranslation: false,
+            kind: .normal,
+            duration: 6,
+            appName: "Safari",
+            appBundleID: "com.apple.Safari",
+            browserURLHost: nil
+        )
+        storeA.recordSession(
+            createdAt: olderDay,
+            text: "older-a",
+            isTranslation: false,
+            kind: .normal,
+            duration: 2,
+            appName: "Notes",
+            appBundleID: "com.apple.Notes",
+            browserURLHost: nil
+        )
+
+        // Local-only export stays device-scoped (folder sync).
+        let localOnly = storeA.exportedSnapshots()
+        XCTAssertEqual(localOnly.count, 2)
+        XCTAssertTrue(localOnly.allSatisfy { $0.deviceID == "device-A" })
+
+        // Package export includes every (day, deviceID) with stable day DESC, deviceID ASC.
+        let allDevices = storeA.exportedSnapshotsForAllDevices()
+        XCTAssertEqual(allDevices.count, 3)
+        XCTAssertEqual(allDevices.map(\.day), [dayKey, dayKey, olderDayKey])
+        XCTAssertEqual(allDevices.map(\.deviceID), ["device-A", "device-B", "device-A"])
+        XCTAssertEqual(allDevices[0].characters, "local-a".count)
+        XCTAssertEqual(allDevices[1].characters, "peer-b".count)
+        XCTAssertEqual(allDevices[2].characters, "older-a".count)
+    }
+
+    func testLocalRecordAndImportPublishDidChange() throws {
+        let database = try makeDatabase()
+        let store = retain(UsageDaySummaryStore(database: database, deviceID: "device-E"))
+        let day = Date(timeIntervalSince1970: 1_700_500_000)
+        let dayKey = UsageDaySummaryStore.dayString(for: day)
+
+        var changeCount = 0
+        var localChangeCount = 0
+        let cancellable = store.didChangePublisher.sink { changeCount += 1 }
+        let localCancellable = store.didLocalChangePublisher.sink { localChangeCount += 1 }
+        defer {
+            _ = cancellable
+            _ = localCancellable
+        }
+
+        store.recordSession(
+            createdAt: day,
+            text: "local",
+            isTranslation: false,
+            kind: .normal,
+            duration: 2,
+            appName: "Notes",
+            appBundleID: "com.apple.Notes",
+            browserURLHost: nil
+        )
+        XCTAssertEqual(changeCount, 1)
+        XCTAssertEqual(localChangeCount, 1)
+
+        let remote = UsageDailySnapshot(
+            day: dayKey,
+            deviceID: "device-remote",
+            dictationSeconds: 7,
+            characters: 11,
+            translationCharacters: 4,
+            sessionCount: 1,
+            apps: [
+                "com.apple.Notes": UsageDailyAppValue(
+                    name: "Notes",
+                    characters: 11,
+                    dictationSeconds: 7
+                )
+            ],
+            updatedAt: Date(timeIntervalSince1970: 1_700_500_100)
+        )
+        store.importSnapshots([remote])
+        XCTAssertEqual(changeCount, 2)
+        // Remote import must not schedule local-change push.
+        XCTAssertEqual(localChangeCount, 1)
+
+        // Idempotent import (same or older updatedAt) must not publish.
+        store.importSnapshots([remote])
+        XCTAssertEqual(changeCount, 2)
+        XCTAssertEqual(localChangeCount, 1)
+
+        let aggregated = try XCTUnwrap(store.aggregatedSnapshot(day: dayKey))
+        XCTAssertEqual(aggregated.sessionCount, 2)
+        XCTAssertEqual(aggregated.characters, "local".count + 11)
+        XCTAssertEqual(aggregated.dictationSeconds, 9, accuracy: 0.001)
+        XCTAssertEqual(aggregated.apps["com.apple.Notes"]?.characters, "local".count + 11)
+    }
+
+    func testLegacyUsageDeviceRowsMergeIntoUnifiedIDWithoutDoubleCounting() throws {
+        let database = try makeDatabase()
+        // Seed without a mismatched legacy key so init migration does not run early.
+        let seedDefaults = UserDefaults(suiteName: "usage-migrate-seed-\(UUID().uuidString)")!
+        let day = Date(timeIntervalSince1970: 1_700_600_000)
+        let dayKey = UsageDaySummaryStore.dayString(for: day)
+        let older = Date(timeIntervalSince1970: 1_700_600_010)
+        let newer = Date(timeIntervalSince1970: 1_700_600_050)
+
+        let seeder = retain(UsageDaySummaryStore(database: database, defaults: seedDefaults, deviceID: "seeder"))
+        seeder.importSnapshots([
+            UsageDailySnapshot(
+                day: dayKey,
+                deviceID: "legacy-usage-device",
+                dictationSeconds: 10,
+                characters: 20,
+                translationCharacters: 5,
+                sessionCount: 2,
+                apps: [
+                    "com.apple.Notes": UsageDailyAppValue(
+                        name: "Notes",
+                        characters: 20,
+                        dictationSeconds: 10
+                    )
+                ],
+                updatedAt: older
+            ),
+            UsageDailySnapshot(
+                day: dayKey,
+                deviceID: "unified-device",
+                dictationSeconds: 4,
+                characters: 8,
+                translationCharacters: 3,
+                sessionCount: 1,
+                apps: [
+                    "com.apple.Notes": UsageDailyAppValue(
+                        name: nil,
+                        characters: 5,
+                        dictationSeconds: 2
+                    ),
+                    "web:example.com": UsageDailyAppValue(
+                        name: "Safari",
+                        characters: 3,
+                        dictationSeconds: 2
+                    )
+                ],
+                updatedAt: newer
+            ),
+            // Imported peer must not be treated as local legacy history.
+            UsageDailySnapshot(
+                day: dayKey,
+                deviceID: "other-physical-device",
+                dictationSeconds: 100,
+                characters: 200,
+                translationCharacters: 0,
+                sessionCount: 9,
+                apps: [
+                    "com.other.App": UsageDailyAppValue(
+                        name: "Other",
+                        characters: 200,
+                        dictationSeconds: 100
+                    )
+                ],
+                updatedAt: newer
+            )
+        ])
+
+        // Now expose the mismatch: unified sync id + historical usage id → migrate on init.
+        let defaults = UserDefaults(suiteName: "usage-migrate-\(UUID().uuidString)")!
+        defaults.set("unified-device", forKey: AppPreferenceKey.syncDeviceId)
+        defaults.set("legacy-usage-device", forKey: AppPreferenceKey.usageSyncDeviceId)
+        let store = retain(UsageDaySummaryStore(database: database, defaults: defaults, deviceID: "unified-device"))
+
+        let legacyProbe = retain(UsageDaySummaryStore(database: database, deviceID: "legacy-usage-device"))
+        XCTAssertNil(legacyProbe.snapshot(day: dayKey))
+
+        let local = try XCTUnwrap(store.snapshot(day: dayKey))
+        XCTAssertEqual(local.deviceID, "unified-device")
+        XCTAssertEqual(local.sessionCount, 3)
+        XCTAssertEqual(local.characters, 28)
+        XCTAssertEqual(local.translationCharacters, 8)
+        XCTAssertEqual(local.dictationSeconds, 14, accuracy: 0.001)
+        XCTAssertEqual(local.updatedAt, newer)
+
+        let notes = try XCTUnwrap(local.apps["com.apple.Notes"])
+        XCTAssertEqual(notes.name, "Notes")
+        XCTAssertEqual(notes.characters, 25)
+        XCTAssertEqual(notes.dictationSeconds, 12, accuracy: 0.001)
+        XCTAssertEqual(local.apps["web:example.com"]?.characters, 3)
+
+        // Aggregation: unified local (merged once) + peer; no double-count of legacy.
+        let aggregated = try XCTUnwrap(store.aggregatedSnapshot(day: dayKey))
+        XCTAssertEqual(aggregated.sessionCount, 3 + 9)
+        XCTAssertEqual(aggregated.characters, 28 + 200)
+        XCTAssertEqual(aggregated.dictationSeconds, 14 + 100, accuracy: 0.001)
+        XCTAssertEqual(aggregated.apps["com.other.App"]?.characters, 200)
+
+        // Peer row must remain under its own device id.
+        let peerProbe = retain(UsageDaySummaryStore(database: database, deviceID: "other-physical-device"))
+        let peer = try XCTUnwrap(peerProbe.snapshot(day: dayKey))
+        XCTAssertEqual(peer.sessionCount, 9)
+        XCTAssertEqual(peer.characters, 200)
+    }
+
+    func testLegacyUsageMigrationNoopsWhenLegacyKeyMatchesCurrent() throws {
+        let database = try makeDatabase()
+        let defaults = UserDefaults(suiteName: "usage-migrate-same-\(UUID().uuidString)")!
+        defaults.set("same-device", forKey: AppPreferenceKey.syncDeviceId)
+        defaults.set("same-device", forKey: AppPreferenceKey.usageSyncDeviceId)
+
+        let day = Date(timeIntervalSince1970: 1_700_700_000)
+        let dayKey = UsageDaySummaryStore.dayString(for: day)
+        let seed = retain(UsageDaySummaryStore(database: database, defaults: defaults, deviceID: "same-device"))
+        seed.importSnapshots([
+            UsageDailySnapshot(
+                day: dayKey,
+                deviceID: "same-device",
+                dictationSeconds: 3,
+                characters: 6,
+                translationCharacters: 0,
+                sessionCount: 1,
+                apps: [:],
+                updatedAt: Date(timeIntervalSince1970: 1_700_700_010)
+            )
+        ])
+
+        let store = retain(UsageDaySummaryStore(database: database, defaults: defaults, deviceID: "same-device"))
+        let snapshot = try XCTUnwrap(store.snapshot(day: dayKey))
+        XCTAssertEqual(snapshot.sessionCount, 1)
+        XCTAssertEqual(snapshot.characters, 6)
+        XCTAssertEqual(store.aggregatedSnapshot(day: dayKey)?.sessionCount, 1)
     }
 }
 

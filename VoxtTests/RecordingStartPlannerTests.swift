@@ -124,8 +124,6 @@ final class RecordingStartPlannerTests: XCTestCase {
     }
 
     func testSherpaOnnxRuntimeUnavailableBlocksRecordingStart() {
-        #if SHERPA_ONNX_AVAILABLE
-        #else
         let decision = RecordingStartPlanner.resolve(
             selectedEngine: .sherpaOnnx,
             mlxModelState: .downloaded,
@@ -133,11 +131,14 @@ final class RecordingStartPlannerTests: XCTestCase {
             isSelectedSherpaModelDownloaded: true,
             sherpaModelState: .downloaded
         )
-        let expected: RecordingStartDecision = .blocked(
-            .sherpaModelUnavailable(detail: "Sherpa ONNX runtime is not bundled in this build.")
-        )
 
-        XCTAssertEqual(decision, expected)
+        #if SHERPA_ONNX_AVAILABLE
+        XCTAssertEqual(decision, .start(.sherpaOnnx))
+        #else
+        XCTAssertEqual(
+            decision,
+            .blocked(.sherpaModelUnavailable(detail: SherpaOnnxRuntimeSupport.unavailableDetail))
+        )
         #endif
     }
 

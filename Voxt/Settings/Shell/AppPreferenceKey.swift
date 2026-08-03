@@ -124,6 +124,14 @@ enum AppPreferenceKey {
     static let appBranchURLs = "appBranchURLs"
     static let appBranchCustomBrowsers = "appBranchCustomBrowsers"
     static let featureSettings = "featureSettings"
+    /// Logical sync field keys for settings snapshot v2 (split from monolithic `featureSettings`).
+    static let featureSettingsTranscription = "featureSettings.transcription"
+    static let featureSettingsTranslation = "featureSettings.translation"
+    static let featureSettingsRewrite = "featureSettings.rewrite"
+    static let featureSettingsMeeting = "featureSettings.meeting"
+    static let featureSettingsAvailability = "featureSettings.availability"
+    /// Local baseline map for settings sync revision / updatedAt stability (device-local, not synced).
+    static let appSettingsSyncBaseline = "appSettingsSyncBaseline"
     static let mlxRemoteSizeCache = "mlxRemoteSizeCache"
     static let customLLMRemoteSizeCache = "customLLMRemoteSizeCache"
     static let launchAtLogin = "launchAtLogin"
@@ -195,9 +203,11 @@ enum AppPreferenceKey {
     static let dictionarySyncDirectoryPath = "dictionarySyncDirectoryPath"
     /// Security-scoped bookmark for the dictionary sync folder.
     static let dictionarySyncDirectoryBookmark = "dictionarySyncDirectoryBookmark"
-    /// Stable per-device id used in snapshot filenames.
+    /// Unified stable per-device id for folder/package sync (dictionary + usage + settings).
+    static let syncDeviceId = "syncDeviceId"
+    /// Legacy dictionary snapshot device id (read-only fallback when `syncDeviceId` is absent).
     static let dictionarySyncDeviceId = "dictionarySyncDeviceId"
-    /// Stable per-device id for usage daily summaries (fallback when dictionary sync id is absent).
+    /// Legacy usage daily summary device id (read-only fallback when newer ids are absent).
     static let usageSyncDeviceId = "usageSyncDeviceId"
     /// Last successful folder sync timestamp (timeIntervalSince1970).
     static let dictionarySyncLastSyncedAt = "dictionarySyncLastSyncedAt"

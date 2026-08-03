@@ -31,9 +31,7 @@ enum UsageFolderSnapshotIO {
             exportedAt: Date(),
             days: days
         )
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = [.sortedKeys]
+        let encoder = AppSyncJSONCoding.makeEncoder(outputFormatting: [.sortedKeys])
         let data = try encoder.encode(envelope)
 
         let fileName = snapshotFileName(deviceId: deviceId)
@@ -58,8 +56,7 @@ enum UsageFolderSnapshotIO {
             includingPropertiesForKeys: nil,
             options: [.skipsHiddenFiles]
         )
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = AppSyncJSONCoding.makeDecoder()
 
         var snapshots: [(deviceID: String, days: [UsageDailySnapshot])] = []
         for fileURL in contents {

@@ -104,14 +104,7 @@ final class DictionaryCloudSyncService: ObservableObject {
     }
 
     var deviceId: String {
-        if let existing = defaults.string(forKey: AppPreferenceKey.dictionarySyncDeviceId)?
-            .trimmingCharacters(in: .whitespacesAndNewlines),
-           !existing.isEmpty {
-            return existing
-        }
-        let created = UUID().uuidString.lowercased()
-        defaults.set(created, forKey: AppPreferenceKey.dictionarySyncDeviceId)
-        return created
+        AppSyncDeviceID.resolved(defaults: defaults)
     }
 
     // MARK: - Manual package transfer
@@ -224,6 +217,14 @@ final class DictionaryCloudSyncService: ObservableObject {
             .sink { [weak self] _ in
                 guard let self else { return }
                 guard !self.dictionaryStore.isApplyingRemoteSync else { return }
+                self.schedulePushAfterLocalChange()
+            }
+            .store(in: &cancellables)
+
+        // Local usage accumulate schedules a 30s debounced push; remote import only refreshes state.
+        usageSummaryStore?.didLocalChangePublisher
+            .sink { [weak self] in
+                guard let self else { return }
                 self.schedulePushAfterLocalChange()
             }
             .store(in: &cancellables)

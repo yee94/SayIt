@@ -55,9 +55,13 @@ final class AppSyncPackageTransferTests: XCTestCase {
 
         let payloadString = try XCTUnwrap(String(data: data, encoding: .utf8))
         XCTAssertFalse(payloadString.contains(secretKey), "Package must not contain apiKey plaintext")
+        // Fractional-second ISO-8601 on write.
+        XCTAssertTrue(
+            payloadString.contains("."),
+            "Expected fractional seconds in exported ISO8601 dates"
+        )
 
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = AppSyncJSONCoding.makeDecoder()
         let envelope = try decoder.decode(AppSyncPackageEnvelope.self, from: data)
 
         XCTAssertEqual(envelope.version, AppSyncPackageTransfer.packageVersion)
@@ -104,14 +108,16 @@ final class AppSyncPackageTransferTests: XCTestCase {
                 value: try XCTUnwrap(
                     AppSettingsSyncSnapshotIO.encodeStoredValue(.string("zh-Hans"))
                 ),
-                updatedAt: importExportedAt
+                updatedAt: importExportedAt,
+                revision: 3
             ),
             AppSettingsSyncSnapshotIO.AppSettingsSyncField(
                 key: AppPreferenceKey.launchAtLogin,
                 value: try XCTUnwrap(
                     AppSettingsSyncSnapshotIO.encodeStoredValue(.bool(true))
                 ),
-                updatedAt: importExportedAt
+                updatedAt: importExportedAt,
+                revision: 3
             ),
         ]
 
@@ -123,8 +129,7 @@ final class AppSyncPackageTransferTests: XCTestCase {
             usageDays: [],
             dictionaryTransferJSON: nil
         )
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = AppSyncJSONCoding.makeEncoder()
         let data = try encoder.encode(envelope)
 
         let result = try AppSyncPackageTransfer.importPackage(
@@ -139,6 +144,252 @@ final class AppSyncPackageTransferTests: XCTestCase {
         XCTAssertEqual(defaults.bool(forKey: AppPreferenceKey.launchAtLogin), true)
         // Local-only key not in package remains.
         XCTAssertEqual(defaults.bool(forKey: AppPreferenceKey.showInDock), true)
+
+        // Winner baseline: re-export keeps package revision/updatedAt (no echo).
+        let postAt = Date(timeIntervalSince1970: 1_700_800_000)
+        let collected = AppSettingsSyncSnapshotIO.collectFields(
+            defaults: defaults,
+            exportedAt: postAt
+        )
+        let language = try XCTUnwrap(
+            collected.first { $0.key == AppPreferenceKey.interfaceLanguage }
+        )
+        XCTAssertEqual(language.revision, 3)
+        XCTAssertEqual(
+            language.updatedAt.timeIntervalSince1970,
+            importExportedAt.timeIntervalSince1970,
+            accuracy: 0.001
+        )
+    }
+
+    func testImportSettingsLWWKeepsNewerLocalField() throws {
+        let defaults = makeEphemeralDefaults()
+        defaults.set("zh-Hans", forKey: AppPreferenceKey.interfaceLanguage)
+
+        let newerLocalAt = Date(timeIntervalSince1970: 1_701_000_000)
+        _ = AppSettingsSyncSnapshotIO.collectFields(defaults: defaults, exportedAt: newerLocalAt)
+
+        let olderPackageAt = Date(timeIntervalSince1970: 1_700_000_000)
+        let importFields = [
+            AppSettingsSyncSnapshotIO.AppSettingsSyncField(
+                key: AppPreferenceKey.interfaceLanguage,
+                value: try XCTUnwrap(
+                    AppSettingsSyncSnapshotIO.encodeStoredValue(.string("en"))
+                ),
+                updatedAt: olderPackageAt,
+                revision: 9
+            ),
+        ]
+        let envelope = AppSyncPackageEnvelope(
+            version: AppSyncPackageTransfer.packageVersion,
+            exportedAt: olderPackageAt,
+            deviceID: "older-package",
+            settingsFields: importFields,
+            usageDays: [],
+            dictionaryTransferJSON: nil
+        )
+        let data = try AppSyncJSONCoding.makeEncoder().encode(envelope)
+        let dictionaryStore = makeDictionaryStore(defaults: defaults)
+        let result = try AppSyncPackageTransfer.importPackage(
+            data: data,
+            dictionaryStore: dictionaryStore,
+            usageSummaryStore: nil,
+            defaults: defaults
+        )
+
+        XCTAssertEqual(result.settingsApplied, 0)
+        XCTAssertEqual(defaults.string(forKey: AppPreferenceKey.interfaceLanguage), "zh-Hans")
+    }
+
+    func testImportUnexportedLocalEditBeatsOlderPackageField() throws {
+        let defaults = makeEphemeralDefaults()
+        defaults.set("en", forKey: AppPreferenceKey.interfaceLanguage)
+        let baselinedAt = Date(timeIntervalSince1970: 1_703_000_000)
+        _ = AppSettingsSyncSnapshotIO.collectFields(defaults: defaults, exportedAt: baselinedAt)
+
+        // Local edit after last collect/export (no second collect to bump baseline).
+        defaults.set("zh-Hans", forKey: AppPreferenceKey.interfaceLanguage)
+
+        let olderPackageAt = Date(timeIntervalSince1970: 1_703_050_000)
+        let importFields = [
+            AppSettingsSyncSnapshotIO.AppSettingsSyncField(
+                key: AppPreferenceKey.interfaceLanguage,
+                value: try XCTUnwrap(
+                    AppSettingsSyncSnapshotIO.encodeStoredValue(.string("ja"))
+                ),
+                updatedAt: olderPackageAt,
+                revision: 50
+            ),
+        ]
+        let envelope = AppSyncPackageEnvelope(
+            version: AppSyncPackageTransfer.packageVersion,
+            exportedAt: olderPackageAt,
+            deviceID: "stale-package",
+            settingsFields: importFields,
+            usageDays: [],
+            dictionaryTransferJSON: nil
+        )
+        let data = try AppSyncJSONCoding.makeEncoder().encode(envelope)
+        let dictionaryStore = makeDictionaryStore(defaults: defaults)
+        let result = try AppSyncPackageTransfer.importPackage(
+            data: data,
+            dictionaryStore: dictionaryStore,
+            usageSummaryStore: nil,
+            defaults: defaults
+        )
+
+        XCTAssertEqual(result.settingsApplied, 0)
+        XCTAssertEqual(defaults.string(forKey: AppPreferenceKey.interfaceLanguage), "zh-Hans")
+
+        // Baseline still reflects pre-edit export (revision 1 / baselinedAt), not package.
+        let baseline = AppSettingsSyncBaselineStore.load(defaults: defaults)
+        let languageBaseline = try XCTUnwrap(
+            baseline.baseline(forKey: AppPreferenceKey.interfaceLanguage)
+        )
+        XCTAssertEqual(languageBaseline.revision, 1)
+        XCTAssertEqual(
+            languageBaseline.updatedAt.timeIntervalSince1970,
+            baselinedAt.timeIntervalSince1970,
+            accuracy: 0.001
+        )
+    }
+
+    func testImportDoesNotWriteEpochBaselineForLocalOnlyWinnerKeys() throws {
+        let defaults = makeEphemeralDefaults()
+        // Local key present but never baselined / not in package.
+        defaults.set(true, forKey: AppPreferenceKey.showInDock)
+        defaults.set("en", forKey: AppPreferenceKey.interfaceLanguage)
+
+        let packageAt = Date(timeIntervalSince1970: 1_703_100_000)
+        let importFields = [
+            AppSettingsSyncSnapshotIO.AppSettingsSyncField(
+                key: AppPreferenceKey.interfaceLanguage,
+                value: try XCTUnwrap(
+                    AppSettingsSyncSnapshotIO.encodeStoredValue(.string("zh-Hans"))
+                ),
+                updatedAt: packageAt,
+                revision: 4
+            ),
+        ]
+        let envelope = AppSyncPackageEnvelope(
+            version: AppSyncPackageTransfer.packageVersion,
+            exportedAt: packageAt,
+            deviceID: "pkg-partial",
+            settingsFields: importFields,
+            usageDays: [],
+            dictionaryTransferJSON: nil
+        )
+        let data = try AppSyncJSONCoding.makeEncoder().encode(envelope)
+        let dictionaryStore = makeDictionaryStore(defaults: defaults)
+        let result = try AppSyncPackageTransfer.importPackage(
+            data: data,
+            dictionaryStore: dictionaryStore,
+            usageSummaryStore: nil,
+            defaults: defaults
+        )
+
+        XCTAssertEqual(result.settingsApplied, 1)
+        XCTAssertEqual(defaults.string(forKey: AppPreferenceKey.interfaceLanguage), "zh-Hans")
+        XCTAssertEqual(defaults.bool(forKey: AppPreferenceKey.showInDock), true)
+
+        let baseline = AppSettingsSyncBaselineStore.load(defaults: defaults)
+        // Package winner baselined for echo suppression.
+        let languageBaseline = try XCTUnwrap(
+            baseline.baseline(forKey: AppPreferenceKey.interfaceLanguage)
+        )
+        XCTAssertEqual(languageBaseline.revision, 4)
+        XCTAssertEqual(
+            languageBaseline.updatedAt.timeIntervalSince1970,
+            packageAt.timeIntervalSince1970,
+            accuracy: 0.001
+        )
+        // Local-only key must not get epoch baseline pollution.
+        XCTAssertNil(baseline.baseline(forKey: AppPreferenceKey.showInDock))
+    }
+
+    func testImportPackageWinnerStillSuppressesEcho() throws {
+        let defaults = makeEphemeralDefaults()
+        defaults.set("en", forKey: AppPreferenceKey.interfaceLanguage)
+
+        let packageAt = Date(timeIntervalSince1970: 1_703_200_000)
+        let importFields = [
+            AppSettingsSyncSnapshotIO.AppSettingsSyncField(
+                key: AppPreferenceKey.interfaceLanguage,
+                value: try XCTUnwrap(
+                    AppSettingsSyncSnapshotIO.encodeStoredValue(.string("zh-Hans"))
+                ),
+                updatedAt: packageAt,
+                revision: 7
+            ),
+        ]
+        let envelope = AppSyncPackageEnvelope(
+            version: AppSyncPackageTransfer.packageVersion,
+            exportedAt: packageAt,
+            deviceID: "pkg-echo",
+            settingsFields: importFields,
+            usageDays: [],
+            dictionaryTransferJSON: nil
+        )
+        let data = try AppSyncJSONCoding.makeEncoder().encode(envelope)
+        let dictionaryStore = makeDictionaryStore(defaults: defaults)
+        _ = try AppSyncPackageTransfer.importPackage(
+            data: data,
+            dictionaryStore: dictionaryStore,
+            usageSummaryStore: nil,
+            defaults: defaults
+        )
+
+        let postAt = Date(timeIntervalSince1970: 1_703_300_000)
+        let collected = AppSettingsSyncSnapshotIO.collectFields(
+            defaults: defaults,
+            exportedAt: postAt
+        )
+        let language = try XCTUnwrap(
+            collected.first { $0.key == AppPreferenceKey.interfaceLanguage }
+        )
+        XCTAssertEqual(
+            AppSettingsSyncSnapshotIO.decodeStoredValue(language.value),
+            .string("zh-Hans")
+        )
+        XCTAssertEqual(language.revision, 7)
+        XCTAssertEqual(
+            language.updatedAt.timeIntervalSince1970,
+            packageAt.timeIntervalSince1970,
+            accuracy: 0.001
+        )
+    }
+
+    func testImportAcceptsV1SettingsFieldsWithoutRevision() throws {
+        let defaults = makeEphemeralDefaults()
+        defaults.set("en", forKey: AppPreferenceKey.interfaceLanguage)
+
+        let dictionaryStore = makeDictionaryStore(defaults: defaults)
+        // Hand-built v1-style package field JSON (no revision key).
+        let packageJSON = """
+        {
+          "version": 1,
+          "exportedAt": "2023-11-20T12:00:00.000Z",
+          "deviceID": "v1-pkg",
+          "settingsFields": [
+            {
+              "key": "interfaceLanguage",
+              "value": "{\\"type\\":\\"string\\",\\"value\\":\\"ja\\"}",
+              "updatedAt": "2023-11-20T12:00:00.000Z"
+            }
+          ],
+          "usageDays": [],
+          "dictionaryTransferJSON": null
+        }
+        """
+        let data = Data(packageJSON.utf8)
+        let result = try AppSyncPackageTransfer.importPackage(
+            data: data,
+            dictionaryStore: dictionaryStore,
+            usageSummaryStore: nil,
+            defaults: defaults
+        )
+        XCTAssertEqual(result.settingsApplied, 1)
+        XCTAssertEqual(defaults.string(forKey: AppPreferenceKey.interfaceLanguage), "ja")
     }
 
     // MARK: - Import dictionary
@@ -167,9 +418,7 @@ final class AppSyncPackageTransferTests: XCTestCase {
             usageDays: nil,
             dictionaryTransferJSON: transferJSON
         )
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        let data = try encoder.encode(envelope)
+        let data = try AppSyncJSONCoding.makeEncoder().encode(envelope)
 
         let result = try AppSyncPackageTransfer.importPackage(
             data: data,
@@ -182,6 +431,116 @@ final class AppSyncPackageTransferTests: XCTestCase {
         XCTAssertEqual(result.dictionarySkipped, 0)
         XCTAssertTrue(dictionaryStore.entries.contains { $0.term == "NewPackageTerm" })
         XCTAssertTrue(dictionaryStore.entries.contains { $0.term == "ExistingTerm" })
+    }
+
+    // MARK: - Export usage (all devices)
+
+    func testExportPackageIncludesUsageFromAllDevicesAndImportKeepsLWW() throws {
+        let defaults = makeEphemeralDefaults()
+        let database = try makeDatabase()
+        let storeA = retain(UsageDaySummaryStore(database: database, defaults: defaults, deviceID: "device-A"))
+        let storeB = retain(UsageDaySummaryStore(database: database, defaults: defaults, deviceID: "device-B"))
+        let dictionaryStore = makeDictionaryStore(defaults: defaults)
+
+        let day = Date(timeIntervalSince1970: 1_700_900_000)
+        let dayKey = UsageDaySummaryStore.dayString(for: day)
+
+        storeA.recordSession(
+            createdAt: day,
+            text: "from-A",
+            isTranslation: false,
+            kind: .normal,
+            duration: 5,
+            appName: "Notes",
+            appBundleID: "com.apple.Notes",
+            browserURLHost: nil
+        )
+        storeB.recordSession(
+            createdAt: day,
+            text: "from-B-device",
+            isTranslation: false,
+            kind: .normal,
+            duration: 8,
+            appName: "Safari",
+            appBundleID: "com.apple.Safari",
+            browserURLHost: nil
+        )
+
+        let exportedAt = Date(timeIntervalSince1970: 1_700_900_100)
+        let data = try AppSyncPackageTransfer.exportPackage(
+            dictionaryStore: dictionaryStore,
+            usageSummaryStore: storeA,
+            defaults: defaults,
+            deviceID: "device-A",
+            exportedAt: exportedAt
+        )
+
+        let envelope = try AppSyncJSONCoding.makeDecoder().decode(AppSyncPackageEnvelope.self, from: data)
+        let usageDays = try XCTUnwrap(envelope.usageDays)
+        XCTAssertEqual(usageDays.count, 2)
+        let deviceIDs = Set(usageDays.map(\.deviceID))
+        XCTAssertEqual(deviceIDs, Set(["device-A", "device-B"]))
+        XCTAssertTrue(usageDays.allSatisfy { $0.day == dayKey })
+
+        // Manual import into a fresh store: both device rows land; later re-import keeps LWW.
+        let targetDefaults = makeEphemeralDefaults()
+        let targetDatabase = try makeDatabase()
+        let targetStore = retain(
+            UsageDaySummaryStore(database: targetDatabase, defaults: targetDefaults, deviceID: "target-device")
+        )
+        let targetDictionary = makeDictionaryStore(defaults: targetDefaults)
+
+        let importResult = try AppSyncPackageTransfer.importPackage(
+            data: data,
+            dictionaryStore: targetDictionary,
+            usageSummaryStore: targetStore,
+            defaults: targetDefaults
+        )
+        XCTAssertEqual(importResult.usageDaysImported, 2)
+
+        let importedA = retain(
+            UsageDaySummaryStore(database: targetDatabase, defaults: targetDefaults, deviceID: "device-A")
+        )
+        let importedB = retain(
+            UsageDaySummaryStore(database: targetDatabase, defaults: targetDefaults, deviceID: "device-B")
+        )
+        let snapA = try XCTUnwrap(importedA.snapshot(day: dayKey))
+        let snapB = try XCTUnwrap(importedB.snapshot(day: dayKey))
+        XCTAssertEqual(snapA.characters, "from-A".count)
+        XCTAssertEqual(snapB.characters, "from-B-device".count)
+
+        // Newer local for device-A must win LWW over re-import of the same package.
+        // recordSession stamps updatedAt with wall-clock Date(), so local must be strictly later.
+        let packageAUpdatedAt = try XCTUnwrap(usageDays.first { $0.deviceID == "device-A" }?.updatedAt)
+        let newerLocal = UsageDailySnapshot(
+            day: dayKey,
+            deviceID: "device-A",
+            dictationSeconds: 99,
+            characters: 999,
+            translationCharacters: 0,
+            sessionCount: 9,
+            apps: [:],
+            updatedAt: packageAUpdatedAt.addingTimeInterval(60)
+        )
+        targetStore.importSnapshots([newerLocal])
+        // Re-import original package (older updatedAt for device-A).
+        _ = try AppSyncPackageTransfer.importPackage(
+            data: data,
+            dictionaryStore: targetDictionary,
+            usageSummaryStore: targetStore,
+            defaults: targetDefaults
+        )
+        let afterLWW = try XCTUnwrap(importedA.snapshot(day: dayKey))
+        XCTAssertEqual(afterLWW.characters, 999)
+        XCTAssertEqual(afterLWW.sessionCount, 9)
+        XCTAssertEqual(
+            afterLWW.updatedAt.timeIntervalSince1970,
+            newerLocal.updatedAt.timeIntervalSince1970,
+            accuracy: 0.001
+        )
+        // Peer device-B from package remains intact.
+        let afterB = try XCTUnwrap(importedB.snapshot(day: dayKey))
+        XCTAssertEqual(afterB.characters, "from-B-device".count)
     }
 
     // MARK: - Import usage
@@ -218,9 +577,7 @@ final class AppSyncPackageTransferTests: XCTestCase {
             usageDays: [remoteDay],
             dictionaryTransferJSON: nil
         )
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        let data = try encoder.encode(envelope)
+        let data = try AppSyncJSONCoding.makeEncoder().encode(envelope)
 
         let result = try AppSyncPackageTransfer.importPackage(
             data: data,
@@ -254,9 +611,7 @@ final class AppSyncPackageTransferTests: XCTestCase {
             usageDays: [],
             dictionaryTransferJSON: nil
         )
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        let data = try encoder.encode(envelope)
+        let data = try AppSyncJSONCoding.makeEncoder().encode(envelope)
 
         XCTAssertThrowsError(
             try AppSyncPackageTransfer.importPackage(
@@ -325,8 +680,7 @@ final class AppSyncPackageTransferTests: XCTestCase {
         )
 
         let exported = try service.exportSyncPackage()
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = AppSyncJSONCoding.makeDecoder()
         let envelope = try decoder.decode(AppSyncPackageEnvelope.self, from: exported)
         XCTAssertEqual(envelope.version, 1)
         XCTAssertFalse(try XCTUnwrap(String(data: exported, encoding: .utf8)).contains("sk-"))

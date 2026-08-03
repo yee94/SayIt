@@ -6,6 +6,35 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+## [1.15.5] - 2026-08-03
+
+### English
+
+#### Added
+- Unified cross-device sync for settings, dictionary, and Usage so multiple Macs stay consistent through the shared sync folder.
+- Full backup packages now include Usage data from every device, not only the current machine.
+
+#### Changed
+- Settings sync merges at field level with per-field revisions, and migrates legacy v1 snapshots so upgrades keep existing remote data.
+
+### 简体中文
+
+#### 新增
+- 统一跨设备设置、词典与 Usage 同步，多台 Mac 通过共享同步文件夹保持一致。
+- 完整备份包现包含全部设备的 Usage 数据，而不再仅限本机。
+
+#### 改进
+- 设置同步按字段级合并并带修订号，同时迁移旧版 v1 快照，升级后仍能正确保留远端数据。
+
+### 日本語
+
+#### 追加
+- 設定・辞書・Usage のクロスデバイス同期を統一し、共有同期フォルダ経由で複数 Mac を一致させます。
+- 完全バックアップパッケージに、現在のマシンだけでなく全デバイスの Usage データを含めるようにしました。
+
+#### 変更
+- 設定同期をフィールド単位のマージとリビジョンに対応し、旧 v1 スナップショットを移行してアップグレード後もリモートデータを保持します。
+
 ## [1.15.4] - 2026-08-02
 
 ### English
