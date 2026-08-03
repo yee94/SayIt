@@ -367,6 +367,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             AppPreferenceKey.historyEnabled: true,
             AppPreferenceKey.historyCleanupEnabled: true,
             AppPreferenceKey.historyRetentionPeriod: HistoryRetentionPeriod.ninetyDays.rawValue,
+            AppPreferenceKey.historyRetentionCount: HistoryRetentionCount.unlimited.rawValue,
             AppPreferenceKey.historyAudioStorageEnabled: false,
             AppPreferenceKey.dictionaryRecognitionEnabled: true,
             AppPreferenceKey.dictionaryAutoLearningEnabled: true,
@@ -523,6 +524,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             VoxtLog.info("SayIt launch entering LLM smoke mode.")
             return
         }
+
+        SystemNotificationSupport.configure()
 
         SileroVADModelProvisioner.prefetchIfNeeded(for: LocalVADMode.stored())
         RemoteModelConfigurationStore.migrateLegacyStoredSecrets()
