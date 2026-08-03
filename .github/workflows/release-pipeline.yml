@@ -1,6 +1,6 @@
 name: Release
 
-# Official SayIt release pipeline (the proven v2 build/sign/notarize flow).
+# Official SayIt release pipeline (build / sign / notarize / publish).
 # Triggered only by version tags; workflow_dispatch remains for manual re-runs.
 on:
   push:
@@ -59,9 +59,9 @@ jobs:
           XCODE_VERSION="$(xcodebuild -version | tr '\n' '-' | sed -E 's/[^A-Za-z0-9._-]+/-/g; s/-+$//')"
           SHERPA_SCRIPT_HASH="$(shasum -a 256 tools/build_sherpa_onnx_macos.sh | awk '{print $1}')"
           PACKAGE_HASH="$(shasum -a 256 Voxt.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved | awk '{print $1}')"
-          # Bump cache version suffix when cache layout changes (v2 adds SourcePackages + ModuleCache).
-          COMPILE_PREFIX="xcode-compile-${RUNNER_OS}-${RUNNER_ARCH}-${XCODE_VERSION}-release-arm64-v2"
-          SPM_PREFIX="spm-source-${RUNNER_OS}-${RUNNER_ARCH}-${XCODE_VERSION}-v2"
+          # Bump cache version suffix when cache layout changes (adds SourcePackages + ModuleCache).
+          COMPILE_PREFIX="xcode-compile-${RUNNER_OS}-${RUNNER_ARCH}-${XCODE_VERSION}-release-arm64"
+          SPM_PREFIX="spm-source-${RUNNER_OS}-${RUNNER_ARCH}-${XCODE_VERSION}"
           echo "xcode_version=$XCODE_VERSION" >> "$GITHUB_OUTPUT"
           echo "package_hash=$PACKAGE_HASH" >> "$GITHUB_OUTPUT"
           echo "sherpa_key=sherpa-onnx-${RUNNER_OS}-${RUNNER_ARCH}-${XCODE_VERSION}-142807252687d81b40d6315f23470a1512a00de3-${SHERPA_SCRIPT_HASH}" >> "$GITHUB_OUTPUT"
@@ -181,7 +181,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: sayit-v2-unsigned-app-${{ github.sha }}
+          name: sayit-unsigned-app-${{ github.sha }}
           if-no-files-found: error
           retention-days: 3
           path: |
@@ -215,7 +215,7 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: sayit-v2-unsigned-app-${{ github.sha }}
+          name: sayit-unsigned-app-${{ github.sha }}
           path: build/unsigned
 
       - name: Resolve cache keys for Sparkle tooling
@@ -224,7 +224,7 @@ jobs:
           set -euo pipefail
           XCODE_VERSION="$(xcodebuild -version | tr '\n' '-' | sed -E 's/[^A-Za-z0-9._-]+/-/g; s/-+$//')"
           PACKAGE_HASH="$(shasum -a 256 Voxt.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved | awk '{print $1}')"
-          SPM_PREFIX="spm-source-${RUNNER_OS}-${RUNNER_ARCH}-${XCODE_VERSION}-v2"
+          SPM_PREFIX="spm-source-${RUNNER_OS}-${RUNNER_ARCH}-${XCODE_VERSION}"
           echo "spm_key=${SPM_PREFIX}-${PACKAGE_HASH}" >> "$GITHUB_OUTPUT"
           echo "spm_restore_prefix=${SPM_PREFIX}-" >> "$GITHUB_OUTPUT"
 
@@ -273,7 +273,7 @@ jobs:
         run: |
           set -euo pipefail
           CERTIFICATE_PATH="$RUNNER_TEMP/sayit-developer-id.p12"
-          KEYCHAIN_PATH="$RUNNER_TEMP/v2-build.keychain-db"
+          KEYCHAIN_PATH="$RUNNER_TEMP/release-build.keychain-db"
           KEYCHAIN_PASSWORD="$(uuidgen)"
           printf '%s' "$APPLE_CERTIFICATE" | base64 --decode > "$CERTIFICATE_PATH"
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
@@ -509,7 +509,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: sayit-v2-signed-migration-${{ github.sha }}
+          name: sayit-signed-release-${{ github.sha }}
           if-no-files-found: error
           path: |
             build/SayIt-*-macOS.zip
@@ -542,11 +542,16 @@ jobs:
       EDGEONE_PROJECT_NAME: sayit-sparkle-update
       EDGEONE_PUBLIC_FEED_BASE: https://sayit-update.xiaobe.top
     steps:
+      # Need credentials + main ref so publish_sparkle_edgeone.sh can push channel
+      # manifests to origin/main for the GitHub-connected EdgeOne feed.
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: true
 
       - uses: actions/download-artifact@v4
         with:
-          name: sayit-v2-signed-migration-${{ github.sha }}
+          name: sayit-signed-release-${{ github.sha }}
           path: build
 
       - name: Create release and publish updater metadata
@@ -733,9 +738,93 @@ jobs:
           export EDGEONE_API_TOKEN EDGEONE_PROJECT_NAME
           export EDGEONE_ENV=production
           export EDGEONE_PUBLIC_FEED_BASE="${EDGEONE_PUBLIC_FEED_BASE:-https://sayit-update.xiaobe.top}"
-          # makers-2gtkiwcbcdiw is GitHub-connected; commit manifests then trigger GitHub redeploy.
+          # makers-2gtkiwcbcdiw is GitHub-connected; commit manifests to main then trigger GitHub redeploy.
           export EDGEONE_DEPLOY_MODE=github
           export EDGEONE_PROJECT_ID=makers-2gtkiwcbcdiw
+          export EDGEONE_REPO_BRANCH=main
           export RELEASE_NOTES_HTML="<p>SayIt ${VERSION}</p>"
 
           bash .github/scripts/publish_sparkle_edgeone.sh
+
+      - name: Verify live Sparkle appcast
+        env:
+          EDGEONE_PUBLIC_FEED_BASE: ${{ env.EDGEONE_PUBLIC_FEED_BASE }}
+        run: |
+          set -euo pipefail
+          if [ -z "${EDGEONE_API_TOKEN:-}" ]; then
+            echo "::warning::EDGEONE_API_TOKEN missing; skipping live appcast verification."
+            exit 0
+          fi
+
+          CHANNEL="stable"
+          if [[ "$VERSION" == *-* ]]; then
+            CHANNEL="beta"
+          fi
+
+          FEED_BASE="${EDGEONE_PUBLIC_FEED_BASE:-https://sayit-update.xiaobe.top}"
+          APPCAST_URL="${FEED_BASE}/updates/${CHANNEL}/appcast.xml"
+          EXPECTED_SHORT="$VERSION"
+          EXPECTED_BUILD="$RELEASE_BUILD_NUMBER"
+
+          echo "Polling live appcast: $APPCAST_URL"
+          echo "Expect shortVersionString=$EXPECTED_SHORT sparkle:version=$EXPECTED_BUILD"
+
+          # EdgeOne GitHub redeploy can take a few minutes after push.
+          MAX_ATTEMPTS=24
+          SLEEP_SECS=15
+          attempt=1
+          while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
+            TMP_XML="$(mktemp)"
+            if curl -fsSL --max-time 30 "$APPCAST_URL" -o "$TMP_XML"; then
+              MATCH="$(
+                python3 - "$TMP_XML" "$EXPECTED_SHORT" "$EXPECTED_BUILD" <<'PY'
+          import re, sys
+          path, short, build = sys.argv[1], sys.argv[2], sys.argv[3]
+          text = open(path, encoding="utf-8", errors="replace").read()
+          # Match enclosure or item that carries both sparkle version attrs.
+          # shortVersionString may appear as sparkle:shortVersionString or shortVersionString.
+          short_re = re.compile(
+              r'(?:sparkle:)?shortVersionString\s*=\s*"([^"]+)"',
+              re.I,
+          )
+          build_re = re.compile(
+              r'sparkle:version\s*=\s*"([^"]+)"',
+              re.I,
+          )
+          shorts = short_re.findall(text)
+          builds = build_re.findall(text)
+          # Also accept <sparkle:version>N</sparkle:version> form if present.
+          builds += re.findall(r'<sparkle:version>\s*([^<\s]+)\s*</sparkle:version>', text, re.I)
+          shorts += re.findall(
+              r'<sparkle:shortVersionString>\s*([^<\s]+)\s*</sparkle:shortVersionString>',
+              text,
+              re.I,
+          )
+          ok_short = short in shorts
+          ok_build = build in builds
+          if ok_short and ok_build:
+              print("match")
+          else:
+              print(f"miss shorts={sorted(set(shorts))[:8]} builds={sorted(set(builds))[:8]}")
+          PY
+              )"
+              if [ "$MATCH" = "match" ]; then
+                echo "Live appcast verified: shortVersionString=$EXPECTED_SHORT sparkle:version=$EXPECTED_BUILD (attempt $attempt)"
+                rm -f "$TMP_XML"
+                exit 0
+              fi
+              echo "Attempt $attempt/$MAX_ATTEMPTS: appcast present but version not yet live ($MATCH)"
+            else
+              echo "Attempt $attempt/$MAX_ATTEMPTS: failed to fetch $APPCAST_URL"
+            fi
+            rm -f "$TMP_XML"
+            if [ "$attempt" -eq "$MAX_ATTEMPTS" ]; then
+              break
+            fi
+            sleep "$SLEEP_SECS"
+            attempt=$((attempt + 1))
+          done
+
+          echo "::error::Live Sparkle appcast did not contain shortVersionString=$EXPECTED_SHORT and sparkle:version=$EXPECTED_BUILD after $MAX_ATTEMPTS attempts ($APPCAST_URL)"
+          curl -fsSL --max-time 30 "$APPCAST_URL" | head -n 80 || true
+          exit 1

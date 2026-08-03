@@ -2,16 +2,16 @@ name: Deploy Sparkle Feed (EdgeOne)
 
 # Rebuild + redeploy the static Sparkle appcast for the GitHub-connected
 # EdgeOne project makers-2gtkiwcbcdiw (custom domain: sayit-update.xiaobe.top).
+# Feed source branch is always main.
 on:
   workflow_dispatch:
     inputs:
       branch:
-        description: "Repo branch EdgeOne should build"
+        description: "Repo branch EdgeOne should build (must be main for production feed)"
         required: true
-        default: v2
+        default: main
   push:
     branches:
-      - v2
       - main
     paths:
       - "deploy/sparkle-update-service/**"
@@ -35,6 +35,8 @@ jobs:
       EDGEONE_PROJECT_ID: makers-2gtkiwcbcdiw
       EDGEONE_PUBLIC_FEED_BASE: https://sayit-update.xiaobe.top
       EDGEONE_API_BASE: https://pages-api.edgeone.ai/v1
+      # Production Sparkle feed is always built from main.
+      EDGEONE_REPO_BRANCH: main
     steps:
       - uses: actions/checkout@v5
 
@@ -69,7 +71,14 @@ jobs:
         if: steps.gate.outputs.skip != 'true'
         run: |
           set -euo pipefail
-          BRANCH="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.branch || github.ref_name }}"
+          BRANCH="${EDGEONE_REPO_BRANCH}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            INPUT_BRANCH="${{ github.event.inputs.branch }}"
+            if [ -n "$INPUT_BRANCH" ] && [ "$INPUT_BRANCH" != "main" ]; then
+              echo "::error::Production Sparkle feed must deploy from main (got: ${INPUT_BRANCH})"
+              exit 1
+            fi
+          fi
           RESP="$(
             python3 - <<PY
           import json, urllib.request

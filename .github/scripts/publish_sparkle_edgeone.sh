@@ -13,6 +13,7 @@
 #   EDGEONE_PUBLIC_FEED_BASE (default https://sayit-update.xiaobe.top)
 #   EDGEONE_ENV (default production)
 #   RELEASE_BUILD_NUMBER, RELEASE_NOTES_HTML, PUBLISHED_AT, RELEASE_URL
+#   EDGEONE_REPO_BRANCH (default main; GitHub-connected feed branch — do not change)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -36,6 +37,8 @@ EDGEONE_DEPLOY_MODE="${EDGEONE_DEPLOY_MODE:-github}"
 EDGEONE_ENV="${EDGEONE_ENV:-production}"
 EDGEONE_PUBLIC_FEED_BASE="${EDGEONE_PUBLIC_FEED_BASE:-https://sayit-update.xiaobe.top}"
 EDGEONE_API_BASE="${EDGEONE_API_BASE:-https://pages-api.edgeone.ai/v1}"
+# GitHub-connected EdgeOne feed is always built from main.
+EDGEONE_REPO_BRANCH="${EDGEONE_REPO_BRANCH:-main}"
 
 ZIP_NAME="SayIt-${VERSION}-macOS.zip"
 ZIP_URL="${ZIP_URL:-https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${ZIP_NAME}}"
@@ -67,6 +70,15 @@ fi
 ED_SIGNATURE="${SPARKLE_ED_SIGNATURE:-}"
 if [[ -z "$ED_SIGNATURE" ]]; then
   echo "::warning::SPARKLE_ED_SIGNATURE missing; publishing appcast without edSignature."
+fi
+
+# For GitHub-connected deploy: land channel manifests on main before writing them.
+if [[ "$EDGEONE_DEPLOY_MODE" != "upload" ]]; then
+  cd "$ROOT"
+  git fetch origin main
+  # Detached or dirty worktrees are fine for CI; hard-reset tracked tree to origin/main.
+  git checkout -B main origin/main
+  echo "Checked out origin/main for Sparkle channel manifests (branch=${EDGEONE_REPO_BRANCH})."
 fi
 
 cd "$SERVICE_DIR"
@@ -118,7 +130,7 @@ if [[ "$EDGEONE_DEPLOY_MODE" == "upload" ]]; then
     -t "$EDGEONE_API_TOKEN" \
     -e "$EDGEONE_ENV"
 else
-  # GitHub-connected project: commit channel manifests (if dirty) then trigger redeploy.
+  # GitHub-connected project: commit channel manifests on main, then trigger redeploy from main.
   cd "$ROOT"
   if [[ -n "$(git status --porcelain deploy/sparkle-update-service/channels || true)" ]]; then
     git add deploy/sparkle-update-service/channels
@@ -127,19 +139,16 @@ else
     else
       git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
         commit -m "chore: publish Sparkle appcast ${VERSION} (${CHANNEL})"
-      # Push only when we have write credentials in CI.
-      if git push origin "HEAD:${GITHUB_REF_NAME:-v2}" 2>/dev/null; then
-        echo "Pushed channel manifests for EdgeOne GitHub redeploy."
-      else
-        echo "::warning::Committed channel manifests locally but push failed; will still request EdgeOne redeploy."
+      # Must land on main so EdgeOne GitHub build picks up the new appcast.
+      if ! git push origin "HEAD:main"; then
+        echo "::error::Failed to push channel manifests to origin/main; EdgeOne feed will not update."
+        exit 1
       fi
+      echo "Pushed channel manifests to origin/main for EdgeOne GitHub redeploy."
     fi
   fi
 
-  BRANCH="${GITHUB_REF_NAME:-v2}"
-  if [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
-    BRANCH="v2"
-  fi
+  BRANCH="$EDGEONE_REPO_BRANCH"
   RESP="$(
     edgeone_api CreatePagesDeployment "$(
       jq -n \

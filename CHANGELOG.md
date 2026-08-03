@@ -6,6 +6,35 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+## [1.15.7] - 2026-08-03
+
+### English
+
+#### Added
+- Import supports JSON, ZIP, and legacy sync-snapshot folders; export can produce JSON or ZIP backups.
+- ZIP extraction is hardened against path traversal and symbolic links.
+
+#### Fixed
+- Release pipeline and Sparkle feed publishing stability improvements for more reliable app updates.
+
+### 简体中文
+
+#### 新增
+- 导入支持 JSON、ZIP 以及 legacy 同步快照文件夹；导出可生成 JSON 或 ZIP 备份。
+- ZIP 解压具备路径穿越与符号链接防护。
+
+#### 修复
+- 发布流水线与 Sparkle feed 发布稳定性修复，应用更新更可靠。
+
+### 日本語
+
+#### 追加
+- インポートは JSON、ZIP、および legacy 同期スナップショットフォルダに対応；エクスポートで JSON または ZIP バックアップを生成できます。
+- ZIP 展開にパストラバーサルとシンボリックリンクへの防護を追加しました。
+
+#### 修正
+- リリースパイプラインと Sparkle feed の公開安定性を改善し、アプリ更新をより確実にしました。
+
 ## [1.15.6] - 2026-08-03
 
 ### English
