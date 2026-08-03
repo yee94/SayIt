@@ -1,7 +1,18 @@
 {
   "channel": "stable",
-  "updatedAt": "2026-08-03T07:51:17.718Z",
+  "updatedAt": "2026-08-03T08:34:52.965Z",
   "items": [
+    {
+      "title": "Version 1.15.8",
+      "shortVersionString": "1.15.8",
+      "version": "101500899",
+      "url": "https://github.com/yee94/SayIt/releases/download/v1.15.8/SayIt-1.15.8-macOS.zip",
+      "length": "49704168",
+      "edSignature": "zYZN1UyFOdI2bsDxtzWn/0BXkG3yyhJynTZtqf4WT2k0cxExbi7l2k3+BOYtutKBzmgOHamSHGTmbKjWQkzcDA==",
+      "releaseURL": "https://github.com/yee94/SayIt/releases/tag/v1.15.8",
+      "publishedAt": "2026-08-03T08:34:27Z",
+      "releaseNotesHtml": "<h3>English</h3>\n<h4>Improved</h4>\n<ul>\n<li>Model download progress updates are throttled so large local model downloads no longer thrash the model settings UI.</li>\n<li>Automatic dictionary learning uses a clearer edit-distance ratio (longer normalized string as denominator, alphanumeric sanitize) for more consistent correction candidates.</li>\n</ul>\n<h4>Fixed</h4>\n<ul>\n<li>Editing a dictionary term to a normalized duplicate (case, spacing, or punctuation only) now shows a friendly error instead of a raw SQLite constraint failure.</li>\n</ul>\n<h3>简体中文</h3>\n<h4>改进</h4>\n<ul>\n<li>模型下载进度发布已节流，大型本地模型下载时不再频繁刷新模型设置界面。</li>\n<li>自动词典学习的编辑距离比例更清晰（以归一化后较长串为分母，并做字母数字清洗），纠正候选更一致。</li>\n</ul>\n<h4>修复</h4>\n<ul>\n<li>编辑词典词条为仅大小写、空格或标点不同的重复词时，显示友好错误提示，而不再暴露原始 SQLite 约束失败。</li>\n</ul>\n<h3>日本語</h3>\n<h4>改善</h4>\n<ul>\n<li>モデルダウンロード進捗の公開を抑制し、大きなローカルモデルのダウンロード中にモデル設定 UI が頻繁に再描画されないようにしました。</li>\n<li>自動辞書学習の編集距離比率をより明確にし（正規化後の長い方を分母、英数字サニタイズ）、訂正候補の一貫性を高めました。</li>\n</ul>\n<h4>修正</h4>\n<ul>\n<li>辞書用語を大文字小文字・空白・句読点のみが異なる重複へ編集した場合、生の SQLite 制約エラーではなく分かりやすいメッセージを表示するようにしました。</li>\n</ul>"
+    },
     {
       "title": "Version 1.15.7",
       "shortVersionString": "1.15.7",
