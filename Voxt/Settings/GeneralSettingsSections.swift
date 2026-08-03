@@ -911,6 +911,7 @@ struct GeneralAppBehaviorCard: View {
 struct GeneralSyncCard: View {
     @ObservedObject var syncService: DictionaryCloudSyncService
     @State private var transferMessage: String?
+    @State private var transferMessageIsError = false
     @State private var isTransferring = false
 
     var body: some View {
@@ -983,15 +984,21 @@ struct GeneralSyncCard: View {
             Divider()
 
             Text(localized(
-                "Export or import the unified SayIt profile for backup and transfer. The profile contains Settings, Dictionary, and Usage."
+                "Create a JSON or ZIP backup. Import a JSON backup, ZIP backup, or legacy sync snapshot folder as a one-time transfer. The profile contains Settings, Dictionary, and Usage."
             ))
             .font(.caption)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
 
             HStack(spacing: 8) {
-                Button(localized("Export Profile")) {
-                    exportSyncPackage()
+                Button(localized("Export JSON Backup")) {
+                    exportJSONBackup()
+                }
+                .buttonStyle(SettingsPillButtonStyle())
+                .disabled(isTransferring)
+
+                Button(localized("Export ZIP Backup")) {
+                    exportZIPBackup()
                 }
                 .buttonStyle(SettingsPillButtonStyle())
                 .disabled(isTransferring)
@@ -1006,7 +1013,7 @@ struct GeneralSyncCard: View {
             if let transferMessage {
                 Text(transferMessage)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(transferMessageIsError ? Color.red : Color.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -1035,11 +1042,11 @@ struct GeneralSyncCard: View {
         return .secondary
     }
 
-    private func exportSyncPackage() {
+    private func exportJSONBackup() {
         guard !isTransferring else { return }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.json]
-        panel.nameFieldStringValue = defaultExportFileName()
+        panel.nameFieldStringValue = defaultExportFileName(fileExtension: "json")
         panel.canCreateDirectories = true
 
         guard panel.runModal() == .OK, let url = panel.url else { return }
@@ -1050,10 +1057,37 @@ struct GeneralSyncCard: View {
         do {
             let data = try syncService.exportSyncPackage()
             try data.write(to: url, options: .atomic)
-            transferMessage = localized("SayIt profile exported successfully.")
+            transferMessageIsError = false
+            transferMessage = localized("JSON backup exported successfully.")
         } catch {
+            transferMessageIsError = true
             transferMessage = AppLocalization.format(
-                "SayIt profile export failed: %@",
+                "JSON backup export failed: %@",
+                error.localizedDescription
+            )
+        }
+    }
+
+    private func exportZIPBackup() {
+        guard !isTransferring else { return }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.zip]
+        panel.nameFieldStringValue = defaultExportFileName(fileExtension: "zip")
+        panel.canCreateDirectories = true
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        isTransferring = true
+        defer { isTransferring = false }
+
+        do {
+            try syncService.exportPortableZip(to: url)
+            transferMessageIsError = false
+            transferMessage = localized("ZIP backup exported successfully.")
+        } catch {
+            transferMessageIsError = true
+            transferMessage = AppLocalization.format(
+                "ZIP backup export failed: %@",
                 error.localizedDescription
             )
         }
@@ -1062,26 +1096,40 @@ struct GeneralSyncCard: View {
     private func importSyncPackage() {
         guard !isTransferring else { return }
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.json]
+        panel.allowedContentTypes = [.json, .zip]
         panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
+        panel.canChooseDirectories = true
         panel.canChooseFiles = true
+        panel.prompt = localized("Import Profile")
+        panel.message = localized(
+            "Choose a JSON backup, ZIP backup, or legacy sync snapshot folder. Folder imports are one-time transfers; your sync folder selection stays unchanged."
+        )
 
         guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        let isAccessingSecurityScopedResource = url.startAccessingSecurityScopedResource()
+        defer {
+            if isAccessingSecurityScopedResource {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
 
         isTransferring = true
         defer { isTransferring = false }
 
         do {
-            let data = try Data(contentsOf: url)
-            let result = try syncService.importSyncPackage(from: data)
+            let result = try syncService.importPortable(from: url)
+            transferMessageIsError = false
             transferMessage = AppLocalization.format(
-                "SayIt profile imported: %d settings, %d Usage days, %d Dictionary terms.",
+                "Imported %@: %d settings, %d Usage days, %d Dictionary terms added, %d existing terms merged.",
+                portableSourceName(result.sourceKind),
                 result.settingsApplied,
                 result.usageDaysImported,
-                result.dictionaryAdded
+                result.dictionaryAdded,
+                result.dictionarySkipped
             )
         } catch {
+            transferMessageIsError = true
             transferMessage = AppLocalization.format(
                 "SayIt profile import failed: %@",
                 error.localizedDescription
@@ -1089,12 +1137,27 @@ struct GeneralSyncCard: View {
         }
     }
 
-    private func defaultExportFileName() -> String {
+    private func portableSourceName(_ sourceKind: AppSyncPortableImportSourceKind) -> String {
+        switch sourceKind {
+        case .jsonPackage:
+            return localized("JSON backup")
+        case .directoryPackage:
+            return localized("profile folder")
+        case .directoryLegacy:
+            return localized("legacy sync snapshot folder")
+        case .zipPackage:
+            return localized("ZIP backup")
+        case .zipLegacy:
+            return localized("legacy sync snapshot ZIP")
+        }
+    }
+
+    private func defaultExportFileName(fileExtension: String) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyyMMdd"
         let day = formatter.string(from: Date())
-        return "SayIt-Profile-\(day).json"
+        return "SayIt-Profile-\(day).\(fileExtension)"
     }
 }
 

@@ -129,6 +129,27 @@ final class DictionaryCloudSyncService: ObservableObject {
         )
     }
 
+    /// Imports a portable source (JSON package file, directory, or ZIP). Never sets sync-folder bookmark.
+    func importPortable(from url: URL) throws -> AppSyncPortableImportResult {
+        try AppSyncPortableTransfer.importPortable(
+            from: url,
+            dictionaryStore: dictionaryStore,
+            usageSummaryStore: usageSummaryStore,
+            defaults: defaults
+        )
+    }
+
+    /// Exports a portable ZIP whose root contains only the unified JSON package.
+    func exportPortableZip(to destinationURL: URL) throws {
+        try AppSyncPortableTransfer.exportPortableZip(
+            to: destinationURL,
+            dictionaryStore: dictionaryStore,
+            usageSummaryStore: usageSummaryStore,
+            defaults: defaults,
+            deviceID: deviceId
+        )
+    }
+
     @discardableResult
     func pickSyncDirectory() -> Bool {
         let panel = NSOpenPanel()

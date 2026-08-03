@@ -6,6 +6,29 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+## [1.15.6] - 2026-08-03
+
+### English
+
+#### Added
+- Import supports JSON, ZIP, and legacy sync-snapshot folders.
+- ZIP extraction is hardened against path traversal and symbolic links.
+- Export can produce JSON or ZIP backups.
+
+### 简体中文
+
+#### 新增
+- 导入支持 JSON、ZIP 以及 legacy 同步快照文件夹。
+- ZIP 解压具备路径穿越与符号链接防护。
+- 导出可生成 JSON 或 ZIP 备份。
+
+### 日本語
+
+#### 追加
+- インポートは JSON、ZIP、および legacy 同期スナップショットフォルダに対応しました。
+- ZIP 展開にパストラバーサルとシンボリックリンクへの防護を追加しました。
+- エクスポートで JSON または ZIP バックアップを生成できます。
+
 ## [1.15.5] - 2026-08-03
 
 ### English
