@@ -11,7 +11,7 @@
       "edSignature": "5/SPCXWorSDVFRBY91n4o3KohzEd59wG9Ydk8IbSBEpG4F3RjYBkKsh3pW1QKkKDDEptAkkwGRA1ukyva1csDQ==",
       "releaseURL": "https://github.com/yee94/SayIt/releases/tag/v1.15.7",
       "publishedAt": "2026-08-03T07:50:53Z",
-      "releaseNotesHtml": "<p>SayIt 1.15.7</p>"
+      "releaseNotesHtml": "<h3>English</h3>\n<h4>Added</h4>\n<ul>\n<li>Import supports JSON, ZIP, and legacy sync-snapshot folders; export can produce JSON or ZIP backups.</li>\n<li>ZIP extraction is hardened against path traversal and symbolic links.</li>\n</ul>\n<h4>Fixed</h4>\n<ul>\n<li>Release pipeline and Sparkle feed publishing stability improvements for more reliable app updates.</li>\n</ul>\n<h3>简体中文</h3>\n<h4>新增</h4>\n<ul>\n<li>导入支持 JSON、ZIP 以及 legacy 同步快照文件夹；导出可生成 JSON 或 ZIP 备份。</li>\n<li>ZIP 解压具备路径穿越与符号链接防护。</li>\n</ul>\n<h4>修复</h4>\n<ul>\n<li>发布流水线与 Sparkle feed 发布稳定性修复，应用更新更可靠。</li>\n</ul>\n<h3>日本語</h3>\n<h4>追加</h4>\n<ul>\n<li>インポートは JSON、ZIP、および legacy 同期スナップショットフォルダに対応；エクスポートで JSON または ZIP バックアップを生成できます。</li>\n<li>ZIP 展開にパストラバーサルとシンボリックリンクへの防護を追加しました。</li>\n</ul>\n<h4>修正</h4>\n<ul>\n<li>リリースパイプラインと Sparkle feed の公開安定性を改善し、アプリ更新をより確実にしました。</li>\n</ul>"
     },
     {
       "title": "Version 1.15.1",

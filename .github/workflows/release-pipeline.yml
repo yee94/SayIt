@@ -561,11 +561,42 @@ jobs:
           set -euo pipefail
           ZIP_PATH="build/SayIt-${VERSION}-macOS.zip"
           PAYLOAD_PATH="build/SayIt-${VERSION}-aarch64.app.tar.gz"
+          NOTES_FILE="build/release-notes.md"
+          CHANGELOG_NOTES_FILE="build/changelog-release-notes.md"
           test -f "$ZIP_PATH"
           test -f "$PAYLOAD_PATH"
           test -f "$PAYLOAD_PATH.sig"
           test -f build/latest.json
+
+          # Extract the matching CHANGELOG section for this VERSION (same as legacy release.yml).
+          awk -v version="$VERSION" '
+            $0 ~ "^## \\[" version "\\] - " { in_section=1 }
+            /^## \[/ && in_section && $0 !~ "^## \\[" version "\\] - " { exit }
+            in_section { print }
+          ' CHANGELOG.md > "$CHANGELOG_NOTES_FILE"
+
+          CHANGELOG_TRIMMED="$(tr -d '[:space:]' < "$CHANGELOG_NOTES_FILE")"
+          BODY="$(gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json body --jq '.body // ""' 2>/dev/null || true)"
+          BODY_TRIMMED="$(printf '%s' "$BODY" | tr -d '[:space:]')"
+
+          if [ -n "$CHANGELOG_TRIMMED" ]; then
+            cp "$CHANGELOG_NOTES_FILE" "$NOTES_FILE"
+          elif [ -n "$BODY_TRIMMED" ]; then
+            printf '%s\n' "$BODY" > "$NOTES_FILE"
+          else
+            gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" -f tag_name="$TAG" --jq '.body' > "$NOTES_FILE" 2>/dev/null || true
+          fi
+
+          # Robust fallback: keep the version name when notes are empty.
+          if [ ! -s "$NOTES_FILE" ]; then
+            printf '## SayIt %s\n' "$TAG" > "$NOTES_FILE"
+          fi
+
           if gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release edit "$TAG" \
+              --title "SayIt $TAG" \
+              --notes-file "$NOTES_FILE" \
+              -R "$GITHUB_REPOSITORY"
             gh release upload "$TAG" "$ZIP_PATH" "$PAYLOAD_PATH" "$PAYLOAD_PATH.sig" "$PAYLOAD_PATH.sha256" build/latest.json \
               --clobber \
               -R "$GITHUB_REPOSITORY"
@@ -573,11 +604,7 @@ jobs:
             gh release create "$TAG" "$ZIP_PATH" "$PAYLOAD_PATH" "$PAYLOAD_PATH.sig" "$PAYLOAD_PATH.sha256" build/latest.json \
               --target "$GITHUB_SHA" \
               --title "SayIt $TAG" \
-              --notes "SayIt ${VERSION}
-
-          Updater feeds:
-          - Tauri: https://sayit-update.vercel.app/latest.json
-          - Sparkle: https://sayit-update.xiaobe.top/updates/stable/appcast.xml" \
+              --notes-file "$NOTES_FILE" \
               -R "$GITHUB_REPOSITORY"
           fi
 
@@ -730,6 +757,32 @@ jobs:
             RELEASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
           fi
 
+          # Prefer the GitHub Release body (already filled from CHANGELOG); fall back to
+          # re-extracting the matching CHANGELOG section for this VERSION.
+          RELEASE_BODY="$(
+            gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json body --jq '.body // ""' 2>/dev/null || true
+          )"
+          if [ -z "$(printf '%s' "$RELEASE_BODY" | tr -d '[:space:]')" ]; then
+            RELEASE_BODY="$(
+              awk -v version="$VERSION" '
+                $0 ~ "^## \\[" version "\\] - " { in_section=1 }
+                /^## \[/ && in_section && $0 !~ "^## \\[" version "\\] - " { exit }
+                in_section { print }
+              ' CHANGELOG.md
+            )"
+          fi
+
+          RELEASE_NOTES_BY_LOCALE_FILE="build/release-notes-by-locale.json"
+          export RELEASE_BODY
+          RELEASE_NOTES_HTML="$(
+            python3 .github/render_sparkle_release_notes.py \
+              --localized-output "$RELEASE_NOTES_BY_LOCALE_FILE"
+          )"
+          # Robust fallback: keep the version name when rendered notes are empty.
+          if [ -z "$(printf '%s' "$RELEASE_NOTES_HTML" | tr -d '[:space:]')" ]; then
+            RELEASE_NOTES_HTML="<p>SayIt ${VERSION}</p>"
+          fi
+
           export VERSION TAG CHANNEL RELEASE_BUILD_NUMBER
           export SPARKLE_ED_SIGNATURE="${SPARKLE_ED_SIGNATURE:-}"
           export SPARKLE_ED_LENGTH="${SPARKLE_ED_LENGTH:-0}"
@@ -742,7 +795,7 @@ jobs:
           export EDGEONE_DEPLOY_MODE=github
           export EDGEONE_PROJECT_ID=makers-2gtkiwcbcdiw
           export EDGEONE_REPO_BRANCH=main
-          export RELEASE_NOTES_HTML="<p>SayIt ${VERSION}</p>"
+          export RELEASE_NOTES_HTML
 
           bash .github/scripts/publish_sparkle_edgeone.sh
 
