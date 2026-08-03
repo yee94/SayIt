@@ -222,7 +222,9 @@ final class MeetingDiarizationModelManager: ObservableObject {
                             )
                         )
                     }
-                    try? await Task.sleep(for: .milliseconds(200))
+                    try? await Task.sleep(
+                        for: .milliseconds(DownloadProgressPublishSupport.samplerIntervalMilliseconds)
+                    )
                 }
             }
             defer { sampler.cancel() }
@@ -279,7 +281,15 @@ final class MeetingDiarizationModelManager: ObservableObject {
 
     private func updateDownloadingState(progress: Double, detail: String?) {
         guard state.isDownloading else { return }
-        state = .downloading(progress: min(max(progress, 0), 1), detail: detail)
+        let nextProgress = min(max(progress, 0), 1)
+        if case let .downloading(previousProgress, previousDetail) = state {
+            if previousDetail == detail,
+               abs(nextProgress - previousProgress) < DownloadProgressPublishSupport.minimumProgressDelta,
+               nextProgress < 0.999 {
+                return
+            }
+        }
+        state = .downloading(progress: nextProgress, detail: detail)
     }
 
     private static func preferredHubBaseURL() -> URL {

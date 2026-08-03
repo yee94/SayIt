@@ -83,6 +83,8 @@ struct ModelSettingsView: View {
     @State private var modelOperationToastDismissTask: Task<Void, Never>?
     @State private var presentedModelErrorMessagesByTarget: [String: String] = [:]
 
+    // Coarser than download progress samplers; progress publishes are throttled
+    // separately so this remains a low-frequency safety net.
     let modelStateRefreshTimer = Timer.publish(every: 2.0, on: .main, in: .common).autoconnect()
 
     var selectedEngine: TranscriptionEngine {

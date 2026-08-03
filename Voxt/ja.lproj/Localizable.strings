@@ -850,8 +850,8 @@
 "Dictionary term cannot be empty." = "辞書用語を空にすることはできません。";
 "Replacement match term cannot be empty." = "置換マッチ語を空にすることはできません。";
 "Replacement match term cannot be the same as the dictionary term." = "置換マッチ語を辞書用語と同じにすることはできません。";
-"This term already exists in the dictionary." = "この用語はすでに辞書に存在します。";
-"This replacement match term already exists in the dictionary: %@." = "この置換マッチ語はすでに辞書に存在します: %@。";
+"This term already exists in the dictionary. Differences in case, spacing, or punctuation are treated as the same term. Please use a different term, or edit the existing one instead." = "この用語はすでに辞書にあります（大文字小文字・空白・句読点の違いは同一とみなします）。別の用語にするか、既存の項目を編集してください。";
+"This replacement match term already exists in the dictionary: %@. Differences in case, spacing, or punctuation are treated as the same term. Please use a different match term, or edit the existing entry instead." = "この置換マッチ語はすでに辞書にあります: %@（大文字小文字・空白・句読点の違いは同一とみなします）。別のマッチ語にするか、既存の項目を編集してください。";
 "Suggested from History" = "履歴からの候補";
 "No pending dictionary suggestions." = "保留中の辞書候補はありません。";
 "Seen %d times" = "%d 回出現";

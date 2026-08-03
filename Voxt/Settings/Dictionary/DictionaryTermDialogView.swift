@@ -78,6 +78,9 @@ struct DictionaryTermDialogView: View {
                 Text(errorMessage)
                     .font(.caption)
                     .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityLabel(errorMessage)
             }
 
             SettingsDialogActionRow {

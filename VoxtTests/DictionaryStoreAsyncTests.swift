@@ -128,6 +128,75 @@ final class DictionaryStoreAsyncTests: XCTestCase {
         XCTAssertEqual(persisted.first?.matchCount, 1)
         XCTAssertNotNil(persisted.first?.lastMatchedAt)
     }
+
+    func testUpdateEntryRejectsDuplicateNormalizedTermWithFriendlyError() async throws {
+        let repository = try makeFixture()
+        let first = makeEntry(term: "SayIt")
+        let second = makeEntry(term: "Voxt")
+        try repository.upsert(first)
+        try repository.upsert(second)
+        let store = DictionaryStore(
+            defaults: UserDefaults(suiteName: "DictionaryStoreAsyncTests.\(UUID().uuidString)")!,
+            fileManager: .default,
+            repository: repository
+        )
+        await drainMainQueue()
+
+        XCTAssertThrowsError(
+            try store.updateEntry(
+                id: second.id,
+                term: "sayit",
+                groupID: nil,
+                groupNameSnapshot: nil
+            )
+        ) { error in
+            guard let dictionaryError = error as? DictionaryStoreError,
+                  case .duplicateTerm = dictionaryError
+            else {
+                return XCTFail("Expected DictionaryStoreError.duplicateTerm, got \(error)")
+            }
+            XCTAssertEqual(
+                dictionaryError.errorDescription,
+                AppLocalization.localizedString(
+                    "This term already exists in the dictionary. Differences in case, spacing, or punctuation are treated as the same term. Please use a different term, or edit the existing one instead."
+                )
+            )
+            XCTAssertFalse(error.localizedDescription.localizedCaseInsensitiveContains("SQLite"))
+            XCTAssertFalse(error.localizedDescription.localizedCaseInsensitiveContains("UNIQUE"))
+            XCTAssertTrue(
+                error.localizedDescription.localizedCaseInsensitiveContains("edit")
+                    || error.localizedDescription.contains("编辑")
+                    || error.localizedDescription.contains("編集")
+            )
+        }
+
+        let persisted = try repository.allEntries()
+        XCTAssertEqual(Set(persisted.map(\.term)), Set(["SayIt", "Voxt"]))
+        XCTAssertEqual(Set(store.entries.map(\.term)), Set(["SayIt", "Voxt"]))
+    }
+
+    func testUpdateEntryAllowsCaseOnlyRenameOfSameTerm() async throws {
+        let repository = try makeFixture()
+        let entry = makeEntry(term: "SayIt")
+        try repository.upsert(entry)
+        let store = DictionaryStore(
+            defaults: UserDefaults(suiteName: "DictionaryStoreAsyncTests.\(UUID().uuidString)")!,
+            fileManager: .default,
+            repository: repository
+        )
+        await drainMainQueue()
+
+        try store.updateEntry(
+            id: entry.id,
+            term: "sayit",
+            groupID: nil,
+            groupNameSnapshot: nil
+        )
+        await drainMainQueue()
+
+        XCTAssertEqual(store.entries.map(\.term), ["sayit"])
+        XCTAssertEqual(try repository.allEntries().map(\.term), ["sayit"])
+    }
 }
 
 private final class BlockingDictionaryRepository: DictionaryRepositoryProtocol, @unchecked Sendable {

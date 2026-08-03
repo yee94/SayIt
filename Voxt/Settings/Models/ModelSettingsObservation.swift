@@ -52,7 +52,7 @@ extension ModelSettingsView {
             Publishers.Merge(customLLM, gguf)
         )
         .dropFirst()
-        .debounce(for: .milliseconds(100), scheduler: RunLoop.main)
+        .debounce(for: .milliseconds(250), scheduler: RunLoop.main)
         .eraseToAnyPublisher()
     }
 
@@ -125,7 +125,7 @@ extension ModelSettingsView {
             )
         )
         .dropFirst()
-        .debounce(for: .milliseconds(150), scheduler: RunLoop.main)
+        .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
         .eraseToAnyPublisher()
     }
 

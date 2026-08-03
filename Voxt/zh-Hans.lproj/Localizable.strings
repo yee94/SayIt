@@ -828,8 +828,8 @@
 "Dictionary term cannot be empty." = "词典词汇不能为空。";
 "Replacement match term cannot be empty." = "替换匹配词不能为空。";
 "Replacement match term cannot be the same as the dictionary term." = "替换匹配词不能与词典词汇相同。";
-"This term already exists in the dictionary." = "该词汇已存在于词典中。";
-"This replacement match term already exists in the dictionary: %@." = "该替换匹配词已存在于词典中：%@。";
+"This term already exists in the dictionary. Differences in case, spacing, or punctuation are treated as the same term. Please use a different term, or edit the existing one instead." = "词典中已有相同热词（大小写、空格和标点差异会视为同一词）。请换一个词，或直接编辑已有词条。";
+"This replacement match term already exists in the dictionary: %@. Differences in case, spacing, or punctuation are treated as the same term. Please use a different match term, or edit the existing entry instead." = "替换匹配词「%@」已存在于词典中（大小写、空格和标点差异会视为同一词）。请换一个匹配词，或直接编辑已有词条。";
 "Suggested from History" = "来自历史记录的候选词";
 "No pending dictionary suggestions." = "当前没有待处理的词典候选词。";
 "Seen %d times" = "出现 %d 次";

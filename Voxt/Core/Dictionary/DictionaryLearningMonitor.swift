@@ -112,6 +112,8 @@ enum AutomaticDictionaryLearningMonitor {
     static let observationWindowSeconds: TimeInterval = 30
     static let idleSettleSeconds: TimeInterval = 1.2
     static let maxConsecutiveMissingSnapshotsAfterObservedChange = 3
+    // 最大编辑距离比例：按「归一化后两串较长者」计算（dist / maxLen），
+    // 与 backup 分支 correctionLearner 的差值口径保持一致。
     static let maximumEditRatio = 0.8
     private static let latinOrNumberRegex = try! NSRegularExpression(
         pattern: #"[A-Za-z0-9]+(?:[._+\-'][A-Za-z0-9]+)*"#
@@ -883,6 +885,8 @@ enum AutomaticDictionaryLearningMonitor {
         return trimmed.count >= 2 && trimmed.count <= 12
     }
 
+    /// 编辑距离比例：分母为归一化后两串中较长者（dist / maxLen），
+    /// 与 backup 分支 correctionLearner 的差值口径保持一致。
     private static func editRatio(
         inserted: String,
         baseline: String,
@@ -891,14 +895,22 @@ enum AutomaticDictionaryLearningMonitor {
     ) -> Double {
         let insertedNorm = normalizeVocabularyCandidate(inserted)
         guard !insertedNorm.isEmpty else { return 0 }
-        let baselineNorm = normalizeVocabularyCandidate(baseline)
-        let finalNorm = normalizeVocabularyCandidate(final)
+        let baselineNorm = sanitizeForDistance(baseline)
+        let finalNorm = sanitizeForDistance(final)
         if baselineNorm == finalNorm { return 0 }
-        if max(baselineNorm.count, finalNorm.count) > maxLengthForExactComputation {
+        let maxLength = max(baselineNorm.count, finalNorm.count)
+        if maxLength > maxLengthForExactComputation {
             return 1
         }
         let distance = levenshteinDistance(Array(baselineNorm), Array(finalNorm))
-        return Double(distance) / Double(insertedNorm.count)
+        return Double(distance) / Double(maxLength)
+    }
+
+    /// 与 backup 分支 sanitizeForDistance 对齐：小写并剥离非字母数字字符。
+    private static func sanitizeForDistance(_ text: String) -> String {
+        String(text.lowercased().unicodeScalars.filter {
+            CharacterSet.alphanumerics.contains($0)
+        })
     }
 
     private static func levenshteinDistance(_ lhs: [Character], _ rhs: [Character]) -> Int {

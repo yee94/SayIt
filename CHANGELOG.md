@@ -6,6 +6,35 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+## [1.15.8] - 2026-08-03
+
+### English
+
+#### Improved
+- Model download progress updates are throttled so large local model downloads no longer thrash the model settings UI.
+- Automatic dictionary learning uses a clearer edit-distance ratio (longer normalized string as denominator, alphanumeric sanitize) for more consistent correction candidates.
+
+#### Fixed
+- Editing a dictionary term to a normalized duplicate (case, spacing, or punctuation only) now shows a friendly error instead of a raw SQLite constraint failure.
+
+### 简体中文
+
+#### 改进
+- 模型下载进度发布已节流，大型本地模型下载时不再频繁刷新模型设置界面。
+- 自动词典学习的编辑距离比例更清晰（以归一化后较长串为分母，并做字母数字清洗），纠正候选更一致。
+
+#### 修复
+- 编辑词典词条为仅大小写、空格或标点不同的重复词时，显示友好错误提示，而不再暴露原始 SQLite 约束失败。
+
+### 日本語
+
+#### 改善
+- モデルダウンロード進捗の公開を抑制し、大きなローカルモデルのダウンロード中にモデル設定 UI が頻繁に再描画されないようにしました。
+- 自動辞書学習の編集距離比率をより明確にし（正規化後の長い方を分母、英数字サニタイズ）、訂正候補の一貫性を高めました。
+
+#### 修正
+- 辞書用語を大文字小文字・空白・句読点のみが異なる重複へ編集した場合、生の SQLite 制約エラーではなく分かりやすいメッセージを表示するようにしました。
+
 ## [1.15.7] - 2026-08-03
 
 ### English

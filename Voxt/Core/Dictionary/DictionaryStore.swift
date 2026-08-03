@@ -407,12 +407,14 @@ enum DictionaryStoreError: LocalizedError {
         case .duplicateCategory:
             return AppLocalization.localizedString("This dictionary category already exists.")
         case .duplicateTerm:
-            return AppLocalization.localizedString("This term already exists in the dictionary.")
+            return AppLocalization.localizedString(
+                "This term already exists in the dictionary. Differences in case, spacing, or punctuation are treated as the same term. Please use a different term, or edit the existing one instead."
+            )
         case .replacementMatchesDictionaryTerm:
             return AppLocalization.localizedString("Replacement match term cannot be the same as the dictionary term.")
         case .duplicateReplacementTerm(let term):
             return AppLocalization.format(
-                "This replacement match term already exists in the dictionary: %@.",
+                "This replacement match term already exists in the dictionary: %@. Differences in case, spacing, or punctuation are treated as the same term. Please use a different match term, or edit the existing entry instead.",
                 term
             )
         }
@@ -1000,6 +1002,13 @@ final class DictionaryStore: ObservableObject {
             groupID: groupID,
             excluding: id
         )
+        // Same scope + same normalized term is unique in SQLite
+        // (idx_dictionary_normalized_scope). Reject before write so the UI
+        // gets a friendly message instead of a raw constraint error.
+        if let existingIndex = existingTermIndex(normalizedTerm: prepared.normalized, groupID: groupID),
+           entries[existingIndex].id != id {
+            throw DictionaryStoreError.duplicateTerm
+        }
         guard let index = entries.firstIndex(where: { $0.id == id }) else { return }
         var updatedEntry = entries[index]
         updatedEntry.term = prepared.display
@@ -1635,7 +1644,22 @@ final class DictionaryStore: ObservableObject {
     private func upsertPersistedEntry(_ entry: DictionaryEntry) throws {
         guard persistenceEnabled, let repository else { return }
         invalidatePendingReload()
-        try repository.upsert(entry)
+        do {
+            try repository.upsert(entry)
+        } catch {
+            throw mapPersistenceError(error)
+        }
+    }
+
+    /// Maps low-level SQLite constraint failures to user-facing dictionary errors.
+    private func mapPersistenceError(_ error: Error) -> Error {
+        let description = error.localizedDescription
+        if description.localizedCaseInsensitiveContains("UNIQUE constraint failed"),
+           description.localizedCaseInsensitiveContains("idx_dictionary_normalized_scope")
+            || description.localizedCaseInsensitiveContains("normalizedTerm") {
+            return DictionaryStoreError.duplicateTerm
+        }
+        return error
     }
 
     private func upsertPersistedCategory(_ category: DictionaryCategory) throws {

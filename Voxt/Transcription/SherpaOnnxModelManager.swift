@@ -394,7 +394,9 @@ final class SherpaOnnxModelManager: ObservableObject {
                         for: id
                     )
                 }
-                try? await Task.sleep(for: .milliseconds(200))
+                try? await Task.sleep(
+                    for: .milliseconds(DownloadProgressPublishSupport.samplerIntervalMilliseconds)
+                )
             }
         }
 
@@ -643,6 +645,30 @@ final class SherpaOnnxModelManager: ObservableObject {
         totalFiles: Int,
         for id: SherpaOnnxModelID
     ) {
+        if case let .downloading(
+            previousProgress,
+            previousCompleted,
+            previousTotal,
+            previousCurrentFile,
+            previousCompletedFiles,
+            previousTotalFiles
+        ) = state(for: id),
+           !DownloadProgressPublishSupport.shouldPublishDownloadingUpdate(
+            previousProgress: previousProgress,
+            previousCompleted: previousCompleted,
+            previousTotal: previousTotal,
+            previousCurrentFile: previousCurrentFile,
+            previousCompletedFiles: previousCompletedFiles,
+            previousTotalFiles: previousTotalFiles,
+            nextProgress: progress,
+            nextCompleted: completed,
+            nextTotal: total,
+            nextCurrentFile: currentFile,
+            nextCompletedFiles: completedFiles,
+            nextTotalFiles: totalFiles
+           ) {
+            return
+        }
         setState(
             .downloading(
                 progress: progress,

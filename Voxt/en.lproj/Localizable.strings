@@ -831,8 +831,8 @@
 "Dictionary term cannot be empty." = "Dictionary term cannot be empty.";
 "Replacement match term cannot be empty." = "Replacement match term cannot be empty.";
 "Replacement match term cannot be the same as the dictionary term." = "Replacement match term cannot be the same as the dictionary term.";
-"This term already exists in the dictionary." = "This term already exists in the dictionary.";
-"This replacement match term already exists in the dictionary: %@." = "This replacement match term already exists in the dictionary: %@.";
+"This term already exists in the dictionary. Differences in case, spacing, or punctuation are treated as the same term. Please use a different term, or edit the existing one instead." = "This term already exists in the dictionary. Differences in case, spacing, or punctuation are treated as the same term. Please use a different term, or edit the existing one instead.";
+"This replacement match term already exists in the dictionary: %@. Differences in case, spacing, or punctuation are treated as the same term. Please use a different match term, or edit the existing entry instead." = "This replacement match term already exists in the dictionary: %@. Differences in case, spacing, or punctuation are treated as the same term. Please use a different match term, or edit the existing entry instead.";
 "Suggested from History" = "Suggested from History";
 "No pending dictionary suggestions." = "No pending dictionary suggestions.";
 "Seen %d times" = "Seen %d times";

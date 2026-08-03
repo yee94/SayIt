@@ -355,7 +355,9 @@ final class GGUFTranslationModelManager: ObservableObject {
                         totalFiles: 1
                     )
                 }
-                try? await Task.sleep(for: .milliseconds(200))
+                try? await Task.sleep(
+                    for: .milliseconds(DownloadProgressPublishSupport.samplerIntervalMilliseconds)
+                )
             }
         }
 
@@ -399,6 +401,30 @@ final class GGUFTranslationModelManager: ObservableObject {
         totalFiles: Int
     ) {
         guard activeDownloadModelID == id, downloadStopAction == nil else { return }
+        if case let .downloading(
+            previousProgress,
+            previousCompleted,
+            previousTotal,
+            previousCurrentFile,
+            previousCompletedFiles,
+            previousTotalFiles
+        ) = stateByID[id],
+           !DownloadProgressPublishSupport.shouldPublishDownloadingUpdate(
+            previousProgress: previousProgress,
+            previousCompleted: previousCompleted,
+            previousTotal: previousTotal,
+            previousCurrentFile: previousCurrentFile,
+            previousCompletedFiles: previousCompletedFiles,
+            previousTotalFiles: previousTotalFiles,
+            nextProgress: progress,
+            nextCompleted: completed,
+            nextTotal: total,
+            nextCurrentFile: currentFile,
+            nextCompletedFiles: completedFiles,
+            nextTotalFiles: totalFiles
+           ) {
+            return
+        }
         let nextState = ModelState.downloading(
             progress: progress,
             completed: completed,
