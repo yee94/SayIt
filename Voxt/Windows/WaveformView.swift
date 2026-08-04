@@ -434,6 +434,7 @@ struct WaveformView: View {
         WaveformCompactLeadingStatusIconView(
             isCompleting: isCompleting,
             showsInitializationIcon: showsInitializationIcon,
+            shouldAnimate: shouldAnimate,
             compactLeadingIconImage: compactLeadingIconImage,
             sessionIconMode: sessionIconMode,
             displayMode: displayMode
