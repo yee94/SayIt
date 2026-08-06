@@ -470,10 +470,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private var appleIntelligenceAvailableForCurrentEnvironment: Bool {
-        if #available(macOS 26.0, *) {
-            return TextEnhancer.isAvailable
-        }
-        return false
+        AppleIntelligenceAvailability.current.isAvailable
     }
 
     private var customEnhancementModelAvailable: Bool {
@@ -495,6 +492,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let buildString = ProcessInfo.processInfo.operatingSystemVersionString
             .trimmingCharacters(in: .whitespacesAndNewlines)
         return "\(versionString) (\(buildString))"
+    }
+
+    func refreshTextEnhancerAvailability() {
+        guard #available(macOS 26.0, *) else {
+            enhancer = nil
+            return
+        }
+
+        if TextEnhancer.isAvailable {
+            if enhancer == nil {
+                enhancer = TextEnhancer()
+                VoxtLog.info("Apple Intelligence text enhancer initialized after availability refresh.")
+            }
+        } else {
+            enhancer = nil
+        }
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -532,9 +545,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         synchronizeAppActivationPolicy()
 
-        if #available(macOS 26.0, *), TextEnhancer.isAvailable {
-            enhancer = TextEnhancer()
-        }
+        refreshTextEnhancerAvailability()
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = statusItem?.button {
@@ -656,6 +667,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         presentMainWindowOnLaunchIfNeeded()
         scheduleLLMIdleWarmupIfNeeded()
         VoxtLog.info("SayIt launch completed. engine=\(transcriptionEngine.rawValue), enhancement=\(enhancementMode.rawValue)")
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        refreshTextEnhancerAvailability()
     }
 
     func applyFeatureAvailabilityLifecycle() {
