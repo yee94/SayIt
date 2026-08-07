@@ -119,11 +119,11 @@ enum AppPreferenceKey {
     static let autoCopyWhenNoFocusedInput = "autoCopyWhenNoFocusedInput"
     static let realtimeTextDisplayEnabled = "realtimeTextDisplayEnabled"
     static let alwaysShowRewriteAnswerCard = "alwaysShowRewriteAnswerCard"
-    static let appEnhancementEnabled = "appEnhancementEnabled"
+    nonisolated static let appEnhancementEnabled = "appEnhancementEnabled"
     static let appBranchGroups = "appBranchGroups"
     static let appBranchURLs = "appBranchURLs"
     static let appBranchCustomBrowsers = "appBranchCustomBrowsers"
-    static let featureSettings = "featureSettings"
+    nonisolated static let featureSettings = "featureSettings"
     /// Logical sync field keys for settings snapshot v2 (split from monolithic `featureSettings`).
     static let featureSettingsTranscription = "featureSettings.transcription"
     static let featureSettingsTranslation = "featureSettings.translation"
