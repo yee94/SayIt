@@ -388,8 +388,8 @@ struct NotchHudView: View {
                         .fill(Color.orange)
                         .frame(width: 6, height: 6)
                         .offset(x: errorScatterOffset(at: index) * errorScatterProgress)
-                        .scaleEffect(1 - (0.2 * errorScatterProgress))
-                        .opacity(1 - (0.3 * errorScatterProgress))
+                        .scaleEffect(CGFloat(1) - (0.2 * errorScatterProgress))
+                        .opacity(1.0 - (0.3 * Double(errorScatterProgress)))
                 }
             }
             .transition(.opacity.combined(with: .scale(scale: 0.72)))
