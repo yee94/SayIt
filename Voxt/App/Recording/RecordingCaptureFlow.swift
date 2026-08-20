@@ -541,8 +541,11 @@ extension AppDelegate {
         autoHideAfter seconds: TimeInterval = 2.4
     ) {
         releaseResidualRecordingResources(reason: "recording-start-failure")
-        showOverlayReminder(message, autoHideAfter: seconds)
+        // Reset the session first: resetSessionAfterFailedStart() clears overlay
+        // state and hides the overlay window, so the reminder must come last or
+        // the error message is wiped immediately after being presented.
         resetSessionAfterFailedStart()
+        showOverlayReminder(message, autoHideAfter: seconds)
     }
 
     private func restartCurrentRecordingCaptureForPreferredInputDevice() throws {
