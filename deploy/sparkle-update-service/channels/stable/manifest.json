@@ -1,7 +1,18 @@
 {
   "channel": "stable",
-  "updatedAt": "2026-08-03T08:34:52.965Z",
+  "updatedAt": "2026-08-20T07:54:13.862Z",
   "items": [
+    {
+      "title": "Version 1.16.0",
+      "shortVersionString": "1.16.0",
+      "version": "101500899",
+      "url": "https://github.com/yee94/SayIt/releases/download/v1.16.0/SayIt-1.16.0-macOS.zip",
+      "length": "50058234",
+      "edSignature": "YsjasouP5/KtoxeOJkIGmVDN44BJVkxL8diWLmKPamXiDqJoM/D4ayngdulgJ1DMulO9XLFxvi5w/AHPWXgyDg==",
+      "releaseURL": "https://github.com/yee94/SayIt/releases/tag/v1.16.0",
+      "publishedAt": "2026-08-20T07:53:44Z",
+      "releaseNotesHtml": "<h3>English</h3>\n<h4>Added</h4>\n<ul>\n<li>Meeting file tasks: convert audio or video recordings into searchable meeting transcripts through a managed background task queue, with transcript segment editing, highlight, and a waveform timeline in the meeting detail window.</li>\n<li>Model-aware remote ASR configuration for Aliyun models (inline vocabulary, semantic punctuation, and per-model capability routing).</li>\n</ul>\n<h4>Improved</h4>\n<ul>\n<li>Synced upstream Voxt 1.13.8–1.14.1: Final ASR stop-to-result latency optimization (model pinned across record + Final, reduced wait/trim/token/chunk overhead, family-aware VAD policies).</li>\n<li>Meeting detail uses a virtualized transcript list with retention limits so long meetings stay responsive.</li>\n<li>MOSS live streaming prompts omit dictionary hotwords to keep short live windows light.</li>\n<li>Meeting history list uses cached row heights for smoother scrolling.</li>\n</ul>\n<h4>Fixed</h4>\n<ul>\n<li>Idle CPU usage from stale overlay animations.</li>\n<li>Recording start failures (for example missing provider credentials) now show a readable error message in the overlay for a few seconds instead of flashing away.</li>\n<li>Apple Intelligence model availability detection.</li>\n<li>Replacement dictionary entry refresh.</li>\n<li>Xcode 26 ambiguous-minus compile error in the notch HUD.</li>\n<li>Main window stays on its assigned Space.</li>\n</ul>\n<h3>简体中文</h3>\n<h4>新增</h4>\n<ul>\n<li>会议文件任务：通过后台任务队列将音频或视频录音转换为可检索的会议转写，会议详情窗口支持转写片段编辑、高亮和波形时间轴。</li>\n<li>阿里云模型的按模型远程 ASR 配置（内联热词表、语义标点、按模型能力路由）。</li>\n</ul>\n<h4>改进</h4>\n<ul>\n<li>同步上游 Voxt 1.13.8–1.14.1：Final ASR 停止到出结果的延迟优化（录音与 Final 之间固定模型、削减等待/裁剪/token/分块开销、按模型族的 VAD 策略）。</li>\n<li>会议详情改为虚拟转写列表并支持历史条数封顶，长会议保持流畅。</li>\n<li>MOSS 流式请求不再携带词典热词，短窗口请求更轻。</li>\n<li>会议历史列表使用行高缓存，滚动更流畅。</li>\n</ul>\n<h4>修复</h4>\n<ul>\n<li>修复 overlay 动画残留导致的空闲 CPU 占用。</li>\n<li>录音启动失败（如服务商凭据缺失）现在会在悬浮窗中停留数秒显示可读的错误信息，不再一闪而过。</li>\n<li>修复 Apple Intelligence 模型可用性检测。</li>\n<li>修复替换词典条目刷新。</li>\n<li>修复 notch HUD 在 Xcode 26 下的歧义负号编译错误。</li>\n<li>主窗口保持在指定的 Space 上。</li>\n</ul>\n<h3>日本語</h3>\n<h4>追加</h4>\n<ul>\n<li>会议ファイルタスク：バックグラウンドのタスクキューで音声・動画録音を検索可能な会議文字起こしに変換し、会議詳細ウィンドウでセグメント編集・ハイライト・波形タイムラインを利用できます。</li>\n<li>Aliyun モデル向けのモデル単位のリモート ASR 設定（インライン語彙、セマンティック句読点、モデル別ルーティング）。</li>\n</ul>\n<h4>改善</h4>\n<ul>\n<li>上流 Voxt 1.13.8–1.14.1 を同期：Final ASR の停止から結果までの遅延を最適化（録音と Final 間でモデルを固定、待機/トリム/トークン/チャンクのオーバーヘッドを削減、モデルファミリー別 VAD ポリシー）。</li>\n<li>会議詳細を仮想化された文字起こしリストに切り替え、保持件数制限に対応して長時間会議も快適です。</li>\n<li>MOSS ストリーミングは辞書ホットワードを含めず、短いライブウィンドウを軽量化。</li>\n<li>会議履歴リストは行の高さをキャッシュし、スクロールを改善。</li>\n</ul>\n<h4>修正</h4>\n<ul>\n<li>オーバーレイアニメーションの残留によるアイドル時 CPU 使用率を修正。</li>\n<li>録音開始の失敗（プロバイダー資格情報の欠落など）が、一瞬で消えるのではなく、数秒間読みやすいエラーメッセージをオーバーレイに表示するようにしました。</li>\n<li>Apple Intelligence モデルの利用可能性検出を修正。</li>\n<li>置換辞書エントリの更新を修正。</li>\n<li>notch HUD の Xcode 26 における曖昧なマイナスのコンパイルエラーを修正。</li>\n<li>メインウィンドウが割り当てた Space に留まるようにしました。</li>\n</ul>"
+    },
     {
       "title": "Version 1.15.8",
       "shortVersionString": "1.15.8",
