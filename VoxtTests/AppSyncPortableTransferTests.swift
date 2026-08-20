@@ -2,6 +2,7 @@
 // Offline tests for portable import/export (JSON, legacy folder, ZIP).
 
 import XCTest
+import zlib
 @testable import Voxt
 
 @MainActor
@@ -641,40 +642,92 @@ private extension AppSyncPortableTransferTests {
         XCTAssertEqual(process.terminationStatus, 0, "zip create failed")
     }
 
-    /// Builds a ZIP that may contain unsafe entry names via Python zipfile (allows custom arcnames).
+    /// Builds a ZIP that may contain unsafe entry names by writing raw ZIP bytes
+    /// (store mode, no compression) so the test does not depend on Python zipfile
+    /// or system zip path normalization, neither of which is guaranteed on CI runners.
     func makeMaliciousZipWithEntry(name: String, content: String) throws -> URL {
         let dir = try makeTemporaryDirectory()
         let zipURL = dir.appendingPathComponent("malicious.zip", isDirectory: false)
-        let payloadURL = dir.appendingPathComponent("payload.txt", isDirectory: false)
-        try Data(content.utf8).write(to: payloadURL)
-
-        // Use Python to force arcname (system zip may normalize paths).
-        let script = """
-        import zipfile, sys
-        z = zipfile.ZipFile(sys.argv[1], 'w')
-        z.write(sys.argv[2], arcname=sys.argv[3])
-        z.close()
-        """
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
-        process.arguments = ["-c", script, zipURL.path, payloadURL.path, name]
-        process.standardOutput = Pipe()
-        process.standardError = Pipe()
-        try process.run()
-        process.waitUntilExit()
-        if process.terminationStatus != 0 {
-            // Fallback: try zip with the raw name if python unavailable.
-            let fallback = Process()
-            fallback.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
-            // zip refuses .. sometimes; still produce an archive for invalid cases.
-            fallback.arguments = ["-q", zipURL.path, payloadURL.lastPathComponent]
-            fallback.currentDirectoryURL = dir
-            fallback.standardOutput = Pipe()
-            fallback.standardError = Pipe()
-            try fallback.run()
-            fallback.waitUntilExit()
-        }
+        try Self.makeStoredZip(entries: [(name: name, data: Data(content.utf8))])
+            .write(to: zipURL, options: .atomic)
         return zipURL
+    }
+
+    /// Minimal store-mode ZIP writer: one local file header + data per entry,
+    /// central directory, end-of-central-directory. CRC32 via zlib.
+    private static func makeStoredZip(entries: [(name: String, data: Data)]) -> Data {
+        var body = Data()
+        var central = Data()
+        for entry in entries {
+            let nameBytes = Data(entry.name.utf8)
+            let crc = entry.data.withUnsafeBytes { buffer in
+                crc32(0, buffer.baseAddress?.assumingMemoryBound(to: Bytef.self), UInt32(entry.data.count))
+            }
+            let offset = UInt32(body.count)
+            var lfh = Data()
+            lfh.appendLE(UInt32(0x04034b50))
+            lfh.appendLE(UInt16(20))          // version needed
+            lfh.appendLE(UInt16(0))           // flags
+            lfh.appendLE(UInt16(0))           // method: store
+            lfh.appendLE(UInt16(0))           // mod time
+            lfh.appendLE(UInt16(0x21))        // mod date (1980-01-01)
+            lfh.appendLE(UInt32(crc))
+            lfh.appendLE(UInt32(entry.data.count))
+            lfh.appendLE(UInt32(entry.data.count))
+            lfh.appendLE(UInt16(nameBytes.count))
+            lfh.appendLE(UInt16(0))           // extra len
+            body.append(lfh)
+            body.append(nameBytes)
+            body.append(entry.data)
+
+            var cdh = Data()
+            cdh.appendLE(UInt32(0x02014b50))
+            cdh.appendLE(UInt16(20))          // version made by
+            cdh.appendLE(UInt16(20))          // version needed
+            cdh.appendLE(UInt16(0))           // flags
+            cdh.appendLE(UInt16(0))           // method: store
+            cdh.appendLE(UInt16(0))           // mod time
+            cdh.appendLE(UInt16(0x21))        // mod date
+            cdh.appendLE(UInt32(crc))
+            cdh.appendLE(UInt32(entry.data.count))
+            cdh.appendLE(UInt32(entry.data.count))
+            cdh.appendLE(UInt16(nameBytes.count))
+            cdh.appendLE(UInt16(0))           // extra len
+            cdh.appendLE(UInt16(0))           // comment len
+            cdh.appendLE(UInt16(0))           // disk number
+            cdh.appendLE(UInt16(0))           // internal attrs
+            cdh.appendLE(UInt32(0))           // external attrs
+            cdh.appendLE(offset)
+            cdh.append(nameBytes)
+            central.append(cdh)
+        }
+        var eocd = Data()
+        eocd.appendLE(UInt32(0x06054b50))
+        eocd.appendLE(UInt16(0))
+        eocd.appendLE(UInt16(0))
+        eocd.appendLE(UInt16(entries.count))
+        eocd.appendLE(UInt16(entries.count))
+        eocd.appendLE(UInt32(central.count))
+        eocd.appendLE(UInt32(body.count))
+        eocd.appendLE(UInt16(0))
+        var zip = body
+        zip.append(central)
+        zip.append(eocd)
+        return zip
+    }
+}
+
+private extension Data {
+    mutating func appendLE(_ value: UInt16) {
+        append(UInt8(value & 0xFF))
+        append(UInt8((value >> 8) & 0xFF))
+    }
+
+    mutating func appendLE(_ value: UInt32) {
+        append(UInt8(value & 0xFF))
+        append(UInt8((value >> 8) & 0xFF))
+        append(UInt8((value >> 16) & 0xFF))
+        append(UInt8((value >> 24) & 0xFF))
     }
 }
 
