@@ -96,8 +96,10 @@ class RecordingOverlayWindow: NSPanel {
             self?.contentView?.needsLayout = true
         }
 
+        // Always restore opacity: a re-show racing an in-flight fade-out would
+        // otherwise keep the window at alpha 0 while it reports isVisible == true.
+        alphaValue = 1
         if !isVisible {
-            alphaValue = 1
             orderFrontRegardless()
         }
     }

@@ -289,7 +289,7 @@ extension AppDelegate {
         startSilenceMonitoringIfNeeded()
     }
 
-    func resetSessionAfterFailedStart() {
+    func resetSessionAfterFailedStart(hideOverlay: Bool = true) {
         cancelSessionControlTasks()
         systemAudioMuteController.restoreSystemAudioIfNeeded()
         if transcriptionEngine == .remote {
@@ -327,7 +327,9 @@ extension AppDelegate {
         resetSessionTranslationState()
         resetVoxtNoteSessionRuntimeState()
         overlayState.reset()
-        overlayWindow.hide()
+        if hideOverlay {
+            overlayWindow.hide()
+        }
         scheduleDeepIdleMemoryReclamation()
     }
 
@@ -541,10 +543,11 @@ extension AppDelegate {
         autoHideAfter seconds: TimeInterval = 2.4
     ) {
         releaseResidualRecordingResources(reason: "recording-start-failure")
-        // Reset the session first: resetSessionAfterFailedStart() clears overlay
-        // state and hides the overlay window, so the reminder must come last or
-        // the error message is wiped immediately after being presented.
-        resetSessionAfterFailedStart()
+        // Reset the session first so stale state cannot wipe the reminder, and skip
+        // the reset's overlay hide: a hide immediately followed by the reminder's
+        // show leaves the classic overlay mid-fade-out (alpha animating to 0),
+        // which renders the reminder invisible for its whole presentation window.
+        resetSessionAfterFailedStart(hideOverlay: false)
         showOverlayReminder(message, autoHideAfter: seconds)
     }
 

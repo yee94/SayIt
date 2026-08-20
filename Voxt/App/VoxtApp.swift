@@ -529,6 +529,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         LoggingBootstrap.bootstrap()
+#if DEBUG
+        // Debug builds log verbose overlay/window lifecycle lines so start-failure
+        // diagnostics (overlay show/hide ordering) are visible in current.log.
+        VoxtLog.verboseEnabled = true
+#endif
         _ = noteObsidianSyncCoordinator
         _ = noteRemindersSyncCoordinator
         VoxtLog.info("SayIt launching.")
