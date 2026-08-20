@@ -6,6 +6,68 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+## [1.16.0] - 2026-08-20
+
+### English
+
+#### Added
+- Meeting file tasks: convert audio or video recordings into searchable meeting transcripts through a managed background task queue, with transcript segment editing, highlight, and a waveform timeline in the meeting detail window.
+- Model-aware remote ASR configuration for Aliyun models (inline vocabulary, semantic punctuation, and per-model capability routing).
+
+#### Improved
+- Synced upstream Voxt 1.13.8–1.14.1: Final ASR stop-to-result latency optimization (model pinned across record + Final, reduced wait/trim/token/chunk overhead, family-aware VAD policies).
+- Meeting detail uses a virtualized transcript list with retention limits so long meetings stay responsive.
+- MOSS live streaming prompts omit dictionary hotwords to keep short live windows light.
+- Meeting history list uses cached row heights for smoother scrolling.
+
+#### Fixed
+- Idle CPU usage from stale overlay animations.
+- Recording start failures (for example missing provider credentials) now show a readable error message in the overlay for a few seconds instead of flashing away.
+- Apple Intelligence model availability detection.
+- Replacement dictionary entry refresh.
+- Xcode 26 ambiguous-minus compile error in the notch HUD.
+- Main window stays on its assigned Space.
+
+### 简体中文
+
+#### 新增
+- 会议文件任务：通过后台任务队列将音频或视频录音转换为可检索的会议转写，会议详情窗口支持转写片段编辑、高亮和波形时间轴。
+- 阿里云模型的按模型远程 ASR 配置（内联热词表、语义标点、按模型能力路由）。
+
+#### 改进
+- 同步上游 Voxt 1.13.8–1.14.1：Final ASR 停止到出结果的延迟优化（录音与 Final 之间固定模型、削减等待/裁剪/token/分块开销、按模型族的 VAD 策略）。
+- 会议详情改为虚拟转写列表并支持历史条数封顶，长会议保持流畅。
+- MOSS 流式请求不再携带词典热词，短窗口请求更轻。
+- 会议历史列表使用行高缓存，滚动更流畅。
+
+#### 修复
+- 修复 overlay 动画残留导致的空闲 CPU 占用。
+- 录音启动失败（如服务商凭据缺失）现在会在悬浮窗中停留数秒显示可读的错误信息，不再一闪而过。
+- 修复 Apple Intelligence 模型可用性检测。
+- 修复替换词典条目刷新。
+- 修复 notch HUD 在 Xcode 26 下的歧义负号编译错误。
+- 主窗口保持在指定的 Space 上。
+
+### 日本語
+
+#### 追加
+- 会议ファイルタスク：バックグラウンドのタスクキューで音声・動画録音を検索可能な会議文字起こしに変換し、会議詳細ウィンドウでセグメント編集・ハイライト・波形タイムラインを利用できます。
+- Aliyun モデル向けのモデル単位のリモート ASR 設定（インライン語彙、セマンティック句読点、モデル別ルーティング）。
+
+#### 改善
+- 上流 Voxt 1.13.8–1.14.1 を同期：Final ASR の停止から結果までの遅延を最適化（録音と Final 間でモデルを固定、待機/トリム/トークン/チャンクのオーバーヘッドを削減、モデルファミリー別 VAD ポリシー）。
+- 会議詳細を仮想化された文字起こしリストに切り替え、保持件数制限に対応して長時間会議も快適です。
+- MOSS ストリーミングは辞書ホットワードを含めず、短いライブウィンドウを軽量化。
+- 会議履歴リストは行の高さをキャッシュし、スクロールを改善。
+
+#### 修正
+- オーバーレイアニメーションの残留によるアイドル時 CPU 使用率を修正。
+- 録音開始の失敗（プロバイダー資格情報の欠落など）が、一瞬で消えるのではなく、数秒間読みやすいエラーメッセージをオーバーレイに表示するようにしました。
+- Apple Intelligence モデルの利用可能性検出を修正。
+- 置換辞書エントリの更新を修正。
+- notch HUD の Xcode 26 における曖昧なマイナスのコンパイルエラーを修正。
+- メインウィンドウが割り当てた Space に留まるようにしました。
+
 ## [1.15.8] - 2026-08-03
 
 ### English

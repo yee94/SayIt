@@ -601,7 +601,7 @@
 					"$(PROJECT_DIR)/Voxt/Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 1.15.8;
+				MARKETING_VERSION = 1.16.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.sayit.app.dev;
 				PRODUCT_MODULE_NAME = Voxt;
 				PRODUCT_NAME = "SayIt Dev";
@@ -648,8 +648,8 @@
 					"$(PROJECT_DIR)/Voxt/Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 1.15.8;
-				"MARKETING_VERSION[sdk=macosx*]" = 1.15.8;
+				MARKETING_VERSION = 1.16.0;
+				"MARKETING_VERSION[sdk=macosx*]" = 1.16.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.sayit.app;
 				PRODUCT_MODULE_NAME = Voxt;
 				PRODUCT_NAME = SayIt;
@@ -695,7 +695,7 @@
 					"$(PROJECT_DIR)/Voxt/Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 1.15.8;
+				MARKETING_VERSION = 1.16.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.sayit.app.testhost;
 				PRODUCT_MODULE_NAME = Voxt;
 				PRODUCT_NAME = "$(TARGET_NAME)";
