@@ -2436,9 +2436,9 @@
 "Skip Forward" = "進む";
 "Jump to End" = "末尾へ移動";
 "Playback Speed" = "再生速度";
-"High-priority terms from the current Voxt dictionary and contextual phrases will be sent as instant hotwords for this model." = "現在の Voxt 辞書の優先度が高い用語とコンテキストフレーズを、このモデルの即時ホットワードとして送信します。";
+"High-priority terms from the current SayIt dictionary and contextual phrases will be sent as instant hotwords for this model." = "現在の SayIt 辞書の優先度が高い用語とコンテキストフレーズを、このモデルの即時ホットワードとして送信します。";
 "StepFun ASR Model Settings" = "StepFun ASR モデル設定";
-"High-priority terms from the current Voxt dictionary and contextual phrases will be sent as StepFun hotwords for this model." = "現在の Voxt 辞書の優先度が高い用語とコンテキストフレーズを、このモデルの StepFun ホットワードとして送信します。";
+"High-priority terms from the current SayIt dictionary and contextual phrases will be sent as StepFun hotwords for this model." = "現在の SayIt 辞書の優先度が高い用語とコンテキストフレーズを、このモデルの StepFun ホットワードとして送信します。";
 "This StepFun model does not expose hotwords. Dictionary terms are not sent as a hotword list." = "この StepFun モデルはホットワードに対応していません。辞書語はホットワード一覧として送信されません。";
 "This model also accepts a recognition context prompt generated from the current dictionary and contextual phrases." = "このモデルは、現在の辞書とコンテキストフレーズから生成した認識コンテキスト prompt にも対応します。";
 "Language follows the languages selected in Speech Recognition Language settings." = "言語は「音声認識言語」で選択した言語に従います。";

@@ -252,7 +252,7 @@ extension RemoteProviderConfigurationSheet {
                 .foregroundStyle(.secondary)
 
             if aliyunASRModelCapabilities.supportsInlineVocabulary {
-                Text(AppLocalization.localizedString("High-priority terms from the current Voxt dictionary and contextual phrases will be sent as instant hotwords for this model."))
+                Text(AppLocalization.localizedString("High-priority terms from the current SayIt dictionary and contextual phrases will be sent as instant hotwords for this model."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -349,7 +349,7 @@ extension RemoteProviderConfigurationSheet {
                 .foregroundStyle(.secondary)
 
             if stepFunASRModelCapabilities.supportsHotwords {
-                Text(AppLocalization.localizedString("High-priority terms from the current Voxt dictionary and contextual phrases will be sent as StepFun hotwords for this model."))
+                Text(AppLocalization.localizedString("High-priority terms from the current SayIt dictionary and contextual phrases will be sent as StepFun hotwords for this model."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
