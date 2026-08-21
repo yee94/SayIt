@@ -1,7 +1,18 @@
 {
   "channel": "stable",
-  "updatedAt": "2026-08-21T07:16:11.750Z",
+  "updatedAt": "2026-08-21T07:58:05.751Z",
   "items": [
+    {
+      "title": "Version 1.16.4",
+      "shortVersionString": "1.16.4",
+      "version": "101600400",
+      "url": "https://github.com/yee94/SayIt/releases/download/v1.16.4/SayIt-1.16.4-macOS.zip",
+      "length": "50108734",
+      "edSignature": "6HCU0JqRS3z5+v051t284KYh49o1HiNvx1V6TdS49AsMd1ui7Yfh82qY8j7AAUPgFvKzp1bmWesLrXgbZwFODQ==",
+      "releaseURL": "https://github.com/yee94/SayIt/releases/tag/v1.16.4",
+      "publishedAt": "2026-08-21T07:57:38Z",
+      "releaseNotesHtml": "<h3>English</h3>\n<h4>Fixed</h4>\n<ul>\n<li>Opening the settings window no longer freezes the UI: the launch-at-login status check (a synchronous system service call) now runs off the main thread instead of blocking it for ~0.5s.</li>\n<li>The settings window now opens instantly — it is prepared in the background shortly after launch, and menu actions no longer wait for the menu dismissal animation to finish.</li>\n<li>Sidebar submenu paging animation is faster and snappier.</li>\n</ul>\n<h4>Changed</h4>\n<ul>\n<li>Feature settings now use horizontal tabs within the page instead of a third-level sidebar menu, reducing navigation depth. Switching tabs no longer rebuilds the whole page.</li>\n</ul>\n<h3>简体中文</h3>\n<h4>修复</h4>\n<ul>\n<li>打开设置窗口不再卡住界面：开机自启状态查询（一次同步系统服务调用）改到后台线程执行，不再阻塞主线程约 0.5 秒。</li>\n<li>设置窗口现在秒开——启动后在后台预先准备好窗口，菜单点击也不再等待菜单收起动画结束。</li>\n<li>侧边栏子菜单翻页动画更快更跟手。</li>\n</ul>\n<h4>变更</h4>\n<ul>\n<li>功能配置改为页面内横向标签页，取消侧边栏第三级菜单，层级更浅；切换标签页不再整页重建。</li>\n</ul>\n<h3>日本語</h3>\n<h4>修正</h4>\n<ul>\n<li>設定ウィンドウを開く際に UI が固まる問題を解消：ログイン時起動の状態確認（同期的なシステムサービス呼び出し）をバックグラウンドスレッドで実行し、メインスレッドの約 0.5 秒のブロックを解消しました。</li>\n<li>設定ウィンドウが即座に開くようになりました。起動直後にバックグラウンドでウィンドウを準備し、メニュー操作もメニュー閉じアニメーションの完了を待たなくなりました。</li>\n<li>サイドバーサブメューのページングアニメーションが速くなりました。</li>\n</ul>\n<h4>変更</h4>\n<ul>\n<li>機能設定をサイドバーの第 3 階層メニューからページ内の横方向タブに変更し、階層を削減しました。タブ切替時にページ全体を再構築しなくなりました。</li>\n</ul>"
+    },
     {
       "title": "Version 1.16.3",
       "shortVersionString": "1.16.3",
