@@ -259,15 +259,10 @@ struct SettingsView: View {
             SettingsSidebar(
                 sidebarMode: $sidebarMode,
                 selectedTab: $selectedTab,
-                selectedFeatureTab: $selectedFeatureTab,
                 selectedHistoryFilter: $selectedHistoryFilter,
                 onSelectTab: { tab in
                     navigationRequest = nil
                     switchToRootTab(tab)
-                },
-                onSelectFeatureTab: { tab in
-                    navigationRequest = nil
-                    switchToFeatureTab(tab)
                 },
                 onSelectHistoryFilter: { filter in
                     navigationRequest = nil
@@ -369,7 +364,7 @@ struct SettingsView: View {
 
                         Spacer(minLength: 0)
 
-                        if sidebarMode == .feature,
+                        if selectedTab == .feature,
                            selectedFeatureTab == .files,
                            meetingFileTaskQueue.hasFinishedTasks {
                             Button(settingsLocalized("Clear Finished Tasks")) {
@@ -386,7 +381,7 @@ struct SettingsView: View {
                         }
                     }
                     .frame(
-                        height: sidebarMode == .feature && selectedFeatureTab == .files ? 26 : nil,
+                        height: selectedTab == .feature && selectedFeatureTab == .files ? 26 : nil,
                         alignment: .center
                     )
                 }
@@ -760,11 +755,6 @@ struct SettingsView: View {
 
     private var currentTitle: LocalizedStringKey {
         switch sidebarMode {
-        case .feature:
-            if selectedFeatureTab == .files {
-                return "File Tasks"
-            }
-            return selectedFeatureTab.titleKey
         case .history:
             return selectedHistoryFilter.titleKey
         case .root, .settings:
@@ -773,7 +763,7 @@ struct SettingsView: View {
     }
 
     private var showsFeatureExperimentalBadge: Bool {
-        sidebarMode == .feature && (selectedFeatureTab == .meeting || selectedFeatureTab == .note)
+        selectedTab == .feature && (selectedFeatureTab == .meeting || selectedFeatureTab == .note)
     }
 
     private var showsContentHeader: Bool {
@@ -803,7 +793,7 @@ struct SettingsView: View {
             selectedHistoryFilter = historyFilter
         }
         if target.tab == .feature {
-            sidebarMode = .feature
+            sidebarMode = .settings
             selectedTab = .feature
         } else if target.tab == .history {
             sidebarMode = .history
@@ -820,7 +810,7 @@ struct SettingsView: View {
     private func switchToRootTab(_ tab: SettingsTab) {
         if tab == .feature {
             selectedTab = .feature
-            sidebarMode = .feature
+            sidebarMode = .settings
             if !FeatureSettingsTab.visibleTabs(availability: featureAvailability).contains(selectedFeatureTab) {
                 selectedFeatureTab = .features
             }
@@ -842,7 +832,7 @@ struct SettingsView: View {
 
     private func switchToFeatureTab(_ tab: FeatureSettingsTab) {
         selectedTab = .feature
-        sidebarMode = .feature
+        sidebarMode = .settings
         selectedFeatureTab = tab
     }
 
@@ -852,14 +842,10 @@ struct SettingsView: View {
         selectedHistoryFilter = filter
     }
 
-    /// Pop one sidebar level: feature submenu → settings, otherwise → home.
+    /// Pop one sidebar level and return to home.
     private func returnOneLevel() {
         navigationRequest = nil
         switch sidebarMode {
-        case .feature:
-            // Feature configuration lives under Settings; return there instead of Home.
-            sidebarMode = .settings
-            selectedTab = .feature
         case .history, .settings:
             returnToHome()
         case .root:
@@ -1256,9 +1242,6 @@ struct SettingsView: View {
     }
 
     private static func initialSidebarMode(for tab: SettingsTab) -> SettingsSidebarMode {
-        if tab == .feature {
-            return .feature
-        }
         if tab == .history {
             return .history
         }
@@ -1312,10 +1295,8 @@ private struct HomeShortcutPrompt: View {
 private struct SettingsSidebar: View {
     @Binding var sidebarMode: SettingsSidebarMode
     @Binding var selectedTab: SettingsTab
-    @Binding var selectedFeatureTab: FeatureSettingsTab
     @Binding var selectedHistoryFilter: HistoryFilterTab
     let onSelectTab: (SettingsTab) -> Void
-    let onSelectFeatureTab: (FeatureSettingsTab) -> Void
     let onSelectHistoryFilter: (HistoryFilterTab) -> Void
     let onReturnOneLevel: () -> Void
     let onReturnToHome: () -> Void
@@ -1350,13 +1331,10 @@ private struct SettingsSidebar: View {
             SettingsSidebarMenuPager(
                 sidebarMode: sidebarMode,
                 rootTabs: visibleRootTabs,
-                featureTabs: visibleFeatureTabs,
                 settingsTabs: visibleSettingsTabs,
                 selectedTab: selectedTab,
-                selectedFeatureTab: selectedFeatureTab,
                 selectedHistoryFilter: selectedHistoryFilter,
                 onSelectTab: onSelectTab,
-                onSelectFeatureTab: onSelectFeatureTab,
                 onSelectHistoryFilter: onSelectHistoryFilter
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -1483,10 +1461,6 @@ private struct SettingsSidebar: View {
         SettingsTab.visibleTabs(appEnhancementEnabled: featureAvailability.appEnhancementEnabled)
     }
 
-    private var visibleFeatureTabs: [FeatureSettingsTab] {
-        FeatureSettingsTab.visibleTabs(availability: featureAvailability)
-    }
-
     private var visibleSettingsTabs: [SettingsTab] {
         SettingsTab.settingsTabs
     }
@@ -1495,16 +1469,13 @@ private struct SettingsSidebar: View {
 private struct SettingsSidebarMenuPager: View {
     let sidebarMode: SettingsSidebarMode
     let rootTabs: [SettingsTab]
-    let featureTabs: [FeatureSettingsTab]
     let settingsTabs: [SettingsTab]
     let selectedTab: SettingsTab
-    let selectedFeatureTab: FeatureSettingsTab
     let selectedHistoryFilter: HistoryFilterTab
     let onSelectTab: (SettingsTab) -> Void
-    let onSelectFeatureTab: (FeatureSettingsTab) -> Void
     let onSelectHistoryFilter: (HistoryFilterTab) -> Void
 
-    @State private var visibleSubmenuKind: SettingsSidebarSubmenuKind = .feature
+    @State private var visibleSubmenuKind: SettingsSidebarSubmenuKind = .settings
     @State private var visiblePageIndex: CGFloat = 0
 
     var body: some View {
@@ -1552,13 +1523,13 @@ private struct SettingsSidebarMenuPager: View {
     }
 
     private func animateToSubmenu() {
-        withAnimation(.easeInOut(duration: 0.22)) {
+        withAnimation(.easeInOut(duration: 0.12)) {
             visiblePageIndex = 1
         }
     }
 
     private func animateToRoot() {
-        withAnimation(.easeInOut(duration: 0.22)) {
+        withAnimation(.easeInOut(duration: 0.12)) {
             visiblePageIndex = 0
         }
     }
@@ -1579,27 +1550,10 @@ private struct SettingsSidebarMenuPager: View {
     @ViewBuilder
     private func subMenu(kind: SettingsSidebarSubmenuKind) -> some View {
         switch kind {
-        case .feature:
-            featureMenu
         case .history:
             historyMenu
         case .settings:
             settingsMenu
-        }
-    }
-
-    private var featureMenu: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ForEach(featureTabs) { tab in
-                SettingsSidebarTabButton(
-                    iconKind: tab.sidebarIconKind,
-                    systemImageName: tab.sidebarIconKind == nil ? tab.iconName : nil,
-                    title: tab.titleKey,
-                    badgeText: (tab == .meeting || tab == .note) ? "Experimental" : nil,
-                    isActive: tab == selectedFeatureTab,
-                    action: { onSelectFeatureTab(tab) }
-                )
-            }
         }
     }
 
@@ -1633,7 +1587,6 @@ private struct SettingsSidebarMenuPager: View {
 }
 
 private enum SettingsSidebarSubmenuKind {
-    case feature
     case history
     case settings
 }
@@ -1643,8 +1596,6 @@ private extension SettingsSidebarMode {
         switch self {
         case .root:
             return nil
-        case .feature:
-            return .feature
         case .history:
             return .history
         case .settings:
@@ -1742,7 +1693,7 @@ private struct SettingsSidebarHeader: View {
                     }
                 }
 
-            case .feature, .history, .settings:
+            case .history, .settings:
                 Spacer(minLength: 0)
 
                 HStack(spacing: 4) {

@@ -36,27 +36,37 @@ struct FeatureSettingsView: View {
     @State var scrollToBottomRequestRevision = 0
 
     var body: some View {
-        Group {
-            switch selectedTab {
-            case .features:
-                featuresContent
-            case .transcription:
-                transcriptionContent
-            case .meeting:
-                meetingContent
-            case .files:
-                filesContent
-            case .note:
-                noteContent
-            case .translation:
-                translationContent
-            case .rewrite:
-                rewriteContent
-            case .appEnhancement:
-                AppEnhancementSettingsView(navigationRequest: navigationRequest)
+        VStack(alignment: .leading, spacing: 12) {
+            FeatureSettingsTabBar(
+                tabs: FeatureSettingsTab.visibleTabs(availability: featureSettings.availability),
+                selectedTab: selectedTab,
+                onSelect: { tab in
+                    onSelectFeatureTab?(tab)
+                }
+            )
+
+            Group {
+                switch selectedTab {
+                case .features:
+                    featuresContent
+                case .transcription:
+                    transcriptionContent
+                case .meeting:
+                    meetingContent
+                case .files:
+                    filesContent
+                case .note:
+                    noteContent
+                case .translation:
+                    translationContent
+                case .rewrite:
+                    rewriteContent
+                case .appEnhancement:
+                    AppEnhancementSettingsView(navigationRequest: navigationRequest)
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .id("\(selectedTab.rawValue)-\(interfaceLanguageRaw)")
         .overlay(alignment: .top) {
             if !toastMessage.isEmpty {
                 ModelDebugToast(message: toastMessage) {
@@ -374,5 +384,53 @@ struct FeatureSettingsView: View {
 
     var appleIntelligenceAvailable: Bool {
         appleIntelligenceAvailability.isAvailable
+    }
+}
+
+private struct FeatureSettingsTabBar: View {
+    let tabs: [FeatureSettingsTab]
+    let selectedTab: FeatureSettingsTab
+    let onSelect: (FeatureSettingsTab) -> Void
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 4) {
+                    ForEach(tabs) { tab in
+                        Button {
+                            onSelect(tab)
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: tab.iconName)
+                                    .font(.system(size: 11, weight: .semibold))
+
+                                Text(tab.titleKey)
+                                    .lineLimit(1)
+                            }
+                        }
+                        .buttonStyle(SettingsSegmentedButtonStyle(isSelected: tab == selectedTab))
+                        .id(tab.id)
+                    }
+                }
+                .padding(4)
+            }
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(SettingsUIStyle.subtleFillColor)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(SettingsUIStyle.subtleBorderColor, lineWidth: 1)
+            )
+            .onAppear {
+                proxy.scrollTo(selectedTab.id, anchor: .center)
+            }
+            .onChange(of: selectedTab) { _, tab in
+                withAnimation(.easeInOut(duration: 0.16)) {
+                    proxy.scrollTo(tab.id, anchor: .center)
+                }
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
     }
 }
