@@ -6,6 +6,29 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+## [1.16.1] - 2026-08-21
+
+### English
+
+#### Fixed
+- Capture no longer stalls when the input device changes mid-recording: every transcription engine now watches for audio configuration changes and rebuilds the capture graph in place, preserving the ongoing session, already-captured audio, and open files. A Bluetooth headset that disconnects and reconnects no longer produces truncated or empty transcripts.
+- A runtime watchdog now detects engines that keep running but stop delivering audio (3s silence, 5s for Bluetooth): it restarts the current device, falls back to the system default, and finally surfaces a readable error instead of silently returning empty text.
+- Bluetooth plug/unplug event bursts are debounced (250ms) and no longer trigger capture restart storms; the menu refreshes without interrupting active recordings.
+
+### 简体中文
+
+#### 修复
+- 录音中切换输入设备不再卡死采集：所有转写引擎现在监听音频配置变更并原地重建采集图，保留进行中的会话、已采集音频和打开的文件。蓝牙耳机断连后重连不再产生截断或空转写。
+- 新增运行期看门狗：检测引擎仍在运行但停止送音的场景（静默 3 秒，蓝牙 5 秒），依次尝试重启当前设备、回退系统默认设备，最终以可读错误提示替代静默空结果。
+- 蓝牙插拔事件风暴加入 250ms 去抖，不再触发采集重启风暴；菜单刷新不再打断进行中的录音。
+
+### 日本語
+
+#### 修正
+- 録音中の入力デバイス変更でキャプチャが停止しなくなりました：すべての文字起こしエンジンがオーディオ構成の変更を監視し、進行中のセッション・録音済み音声・開いているファイルを保持したままキャプチャグラフをその場で再構築します。Bluetooth ヘッドセットの切断・再接続でも文字起こしが欠落・空になることはありません。
+- 実行時ウォッチドッグを追加：エンジンが動作していて も音声が届かなくなった状態（3 秒、Bluetooth は 5 秒の無音）を検出し、現在のデバイスの再起動→システムデフォルトへのフォールバック→読みやすいエラー表示を順に試みます。
+- Bluetooth の着脱イベントバーストを 250ms でデバウンスし、キャプチャ再起動の嵐を防止。メニュー更新が録音中の処理を中断しなくなりました。
+
 ## [1.16.0] - 2026-08-20
 
 ### English
