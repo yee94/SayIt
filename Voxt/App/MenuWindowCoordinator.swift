@@ -503,8 +503,31 @@ extension AppDelegate {
             openOnboardingWindow()
             return
         }
-        guard LaunchPresentationPolicy.shouldPresentMainWindowOnLaunch() else { return }
+        guard LaunchPresentationPolicy.shouldPresentMainWindowOnLaunch() else {
+            prewarmMainWindowWhenIdle()
+            return
+        }
         openMainWindow()
+    }
+
+    /// 启动后空闲时预构建主窗口（隐藏状态），把首次打开的整棵 SettingsView
+    /// 构建 + 布局成本挪出用户点击路径。
+    private func prewarmMainWindowWhenIdle() {
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            self?.prewarmMainWindow()
+        }
+    }
+
+    private func prewarmMainWindow() {
+        guard mainWindowController?.window == nil else { return }
+        let navigationRequest = SettingsNavigationRequest(
+            target: SettingsNavigationTarget(tab: .general)
+        )
+        buildMainWindowController(navigationRequest: navigationRequest)
+        // 强制一次完整布局，预热 SwiftUI 视图树，避免首帧布局落在点击路径上。
+        mainWindowController?.window?.contentView?.layoutSubtreeIfNeeded()
+        VoxtLog.info("Main window prewarmed (hidden)")
     }
 
     func openMainWindow() {
@@ -528,6 +551,12 @@ extension AppDelegate {
             return
         }
 
+        buildMainWindowController(navigationRequest: navigationRequest)
+        presentMainWindow()
+    }
+
+    /// 构建主窗口与整棵 SettingsView（不显示）。prewarm 与首开共用。
+    private func buildMainWindowController(navigationRequest: SettingsNavigationRequest) {
         let contentView = SettingsView(
             availableDictionaryHistoryScanModels: {
                 self.availableDictionaryHistoryScanModelOptions()
@@ -596,6 +625,11 @@ extension AppDelegate {
         mainWindowController = controller
         repairMainWindowFrameIfNeeded(window)
         centerMainWindow(window, on: NSScreen.main)
+    }
+
+    /// 显示已构建的主窗口。
+    private func presentMainWindow() {
+        guard let window = mainWindowController?.window else { return }
         setMainWindowVisibility(true)
         bringWindowToFront(window)
         scheduleTrafficLightButtonPositionUpdate(for: window)
@@ -639,12 +673,9 @@ extension AppDelegate {
             }
         }
 
-        guard isStatusMenuOpen else {
-            wrappedAction()
-            return
-        }
-
-        pendingStatusMenuActions.append(wrappedAction)
+        // 立即执行：菜单选中后系统会自动收起菜单，无需等待 menuDidClose
+        // 动画结束，否则会白白叠加 200ms+ 的菜单关闭动画延迟。
+        wrappedAction()
     }
 
     private func positionWindowTrafficLightButtons(_ window: NSWindow) {

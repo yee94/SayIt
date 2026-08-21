@@ -219,14 +219,12 @@ struct GeneralSettingsView: View {
             refreshInputDevices()
 
             Task {
-                let status = AppBehaviorController.launchAtLoginIsEnabled()
-                await MainActor.run {
-                    isSyncingLaunchAtLoginState = true
-                    if status != launchAtLogin {
-                        launchAtLogin = status
-                    }
-                    isSyncingLaunchAtLoginState = false
+                let status = await AppBehaviorController.launchAtLoginIsEnabledAsync()
+                isSyncingLaunchAtLoginState = true
+                if status != launchAtLogin {
+                    launchAtLogin = status
                 }
+                isSyncingLaunchAtLoginState = false
             }
             if autoCheckForUpdates != appUpdateManager.automaticallyChecksForUpdates {
                 autoCheckForUpdates = appUpdateManager.automaticallyChecksForUpdates

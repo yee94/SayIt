@@ -51,6 +51,15 @@ enum AppBehaviorController {
         return SMAppService.mainApp.status == .enabled
     }
 
+    /// 异步读取开机自启状态。
+    /// `SMAppService.status` 是一次到 smd 的同步 XPC 往返，必须离开主线程调用，
+    /// 否则会在 onAppear 的 MainActor Task 里阻塞主线程数百毫秒。
+    static func launchAtLoginIsEnabledAsync() async -> Bool {
+        await Task.detached(priority: .userInitiated) {
+            launchAtLoginIsEnabled()
+        }.value
+    }
+
     @MainActor
     static func activateCurrentApp(ignoringOtherApps: Bool = false) {
         if ignoringOtherApps {
