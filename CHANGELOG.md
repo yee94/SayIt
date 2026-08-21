@@ -6,6 +6,23 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+## [1.16.2] - 2026-08-21
+
+### English
+
+#### Fixed
+- Automatic updates were never offered for 1.16.0 and 1.16.1 because the internal build number (which Sparkle compares) was not incremented. This release restores the build-number sequence, so in-app update now correctly discovers 1.16.2 from 1.15.8 or later. The release pipeline also fails fast if a future release tries to publish a non-increasing build number.
+
+### 简体中文
+
+#### 修复
+- 修复自动更新失效：1.16.0 与 1.16.1 的内部构建号（Sparkle 用它判断新旧）未递增，导致应用内检查更新始终提示已是最新。本版本恢复构建号序列，从 1.15.8 及之后版本均可正常收到 1.16.2 更新。发布流水线同时新增防呆：构建号未递增的发布会直接失败。
+
+### 日本語
+
+#### 修正
+- 自動更新が機能しない問題を修正：1.16.0 と 1.16.1 は内部ビルド番号（Sparkle が新旧比較に使用）が増加していなかったため、アプリ内更新確認では常に最新と表示されていました。本バージョンでビルド番号の序列を復旧し、1.15.8 以降から 1.16.2 の更新が正しく検出されます。また、リリースパイプラインに、ビルド番号が増加していないリリースを即座に失敗させるガードを追加しました。
+
 ## [1.16.1] - 2026-08-21
 
 ### English

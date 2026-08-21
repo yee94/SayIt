@@ -81,6 +81,19 @@ if [[ "$EDGEONE_DEPLOY_MODE" != "upload" ]]; then
   echo "Checked out origin/main for Sparkle channel manifests (branch=${EDGEONE_REPO_BRANCH})."
 fi
 
+# Guard: Sparkle compares build numbers, not short version strings. A release
+# whose sparkle-version does not strictly increase over the channel manifest
+# can never be offered as an update (the running app looks up-to-date). Fail
+# fast instead of publishing a dead feed entry.
+MANIFEST_GUARD="$SERVICE_DIR/channels/${CHANNEL}/manifest.json"
+if [[ -f "$MANIFEST_GUARD" ]]; then
+  PREV_MAX_VERSION="$(jq -r '[.items[].version | tonumber] | max // 0' "$MANIFEST_GUARD")"
+  if (( RELEASE_BUILD_NUMBER <= PREV_MAX_VERSION )); then
+    echo "::error::RELEASE_BUILD_NUMBER=${RELEASE_BUILD_NUMBER} does not exceed the latest published sparkle:version=${PREV_MAX_VERSION} on channel=${CHANNEL}. Bump CURRENT_PROJECT_VERSION in Voxt.xcodeproj/project.pbxproj."
+    exit 1
+  fi
+fi
+
 cd "$SERVICE_DIR"
 node scripts/write-appcast.mjs \
   --channel "$CHANNEL" \
