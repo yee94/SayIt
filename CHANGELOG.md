@@ -6,6 +6,38 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+## [1.16.4] - 2026-08-21
+
+### English
+
+#### Fixed
+- Opening the settings window no longer freezes the UI: the launch-at-login status check (a synchronous system service call) now runs off the main thread instead of blocking it for ~0.5s.
+- The settings window now opens instantly — it is prepared in the background shortly after launch, and menu actions no longer wait for the menu dismissal animation to finish.
+- Sidebar submenu paging animation is faster and snappier.
+
+#### Changed
+- Feature settings now use horizontal tabs within the page instead of a third-level sidebar menu, reducing navigation depth. Switching tabs no longer rebuilds the whole page.
+
+### 简体中文
+
+#### 修复
+- 打开设置窗口不再卡住界面：开机自启状态查询（一次同步系统服务调用）改到后台线程执行，不再阻塞主线程约 0.5 秒。
+- 设置窗口现在秒开——启动后在后台预先准备好窗口，菜单点击也不再等待菜单收起动画结束。
+- 侧边栏子菜单翻页动画更快更跟手。
+
+#### 变更
+- 功能配置改为页面内横向标签页，取消侧边栏第三级菜单，层级更浅；切换标签页不再整页重建。
+
+### 日本語
+
+#### 修正
+- 設定ウィンドウを開く際に UI が固まる問題を解消：ログイン時起動の状態確認（同期的なシステムサービス呼び出し）をバックグラウンドスレッドで実行し、メインスレッドの約 0.5 秒のブロックを解消しました。
+- 設定ウィンドウが即座に開くようになりました。起動直後にバックグラウンドでウィンドウを準備し、メニュー操作もメニュー閉じアニメーションの完了を待たなくなりました。
+- サイドバーサブメューのページングアニメーションが速くなりました。
+
+#### 変更
+- 機能設定をサイドバーの第 3 階層メニューからページ内の横方向タブに変更し、階層を削減しました。タブ切替時にページ全体を再構築しなくなりました。
+
 ## [1.16.3] - 2026-08-21
 
 ### English
