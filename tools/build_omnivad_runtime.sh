@@ -20,7 +20,7 @@ RESOLVED_REF="$(git -C "${SRC_DIR}" rev-parse HEAD)"
 cmake -S "${SRC_DIR}" \
   -B "${BUILD_DIR}" \
   -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_OSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-15.0}"
+  -DCMAKE_OSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-14.6}"
 
 cmake --build "${BUILD_DIR}" --config Release -j"$(sysctl -n hw.ncpu)"
 

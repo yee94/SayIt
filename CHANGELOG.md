@@ -6,6 +6,21 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+### English
+
+#### Changed
+- Lowered the minimum supported macOS version from 15.0 to 14.6 (Sonoma) so Voxt can run on more Macs.
+
+### 简体中文
+
+#### 变更
+- 将最低支持的 macOS 版本从 15.0 下调至 14.6（Sonoma），以便在更多 Mac 上运行。
+
+### 日本語
+
+#### 変更
+- サポートする最低 macOS バージョンを 15.0 から 14.6（Sonoma）に引き下げ、より多くの Mac で動作するようにしました。
+
 ## [1.16.4] - 2026-08-21
 
 ### English
