@@ -55,6 +55,20 @@ class SpeechTranscriber: ObservableObject, TranscriberProtocol {
 
     var onTranscriptionFinished: ((String) -> Void)?
     private(set) var lastStartFailureMessage: String?
+    private var pendingRuntimeFailureMessage: String?
+
+    /// Bumped on every capture-graph rebuild so in-flight tap callbacks from an
+    /// old graph are discarded after Bluetooth reconnect / health recovery.
+    private var captureGraphGeneration = 0
+    private var lastPCMArrivalAt: Date?
+    private var didReceiveCapturePCMCallback = false
+    private var captureHealthWatchdogTask: Task<Void, Never>?
+    private var captureConfigurationChangeObserver: NSObjectProtocol?
+    private var captureRecoveryAttemptsUsed = 0
+    private var isCaptureRecoveryInFlight = false
+    private var activeCaptureDeviceID: AudioDeviceID?
+    private var activeCaptureUsesPreferredInputDevice = false
+    private let captureHealthPlanner = CaptureHealthPlanner()
 
     init() {
         refreshSpeechRecognizer(localeIdentifier: nil)
@@ -77,6 +91,12 @@ class SpeechTranscriber: ObservableObject, TranscriberProtocol {
 
     func discardCompletedAudioArchive() {
         removeCompletedAudioArchiveIfNeeded()
+    }
+
+    func consumePendingRuntimeFailureMessage() -> String? {
+        let message = pendingRuntimeFailureMessage
+        pendingRuntimeFailureMessage = nil
+        return message
     }
 
     func startRecording() {
@@ -109,6 +129,8 @@ class SpeechTranscriber: ObservableObject, TranscriberProtocol {
         }
 
         cleanupSessionState()
+        resetCaptureHealthState()
+        pendingRuntimeFailureMessage = nil
         sampleStore.clear()
         firstPCMReadyGate.reset()
         transcribedText = ""
@@ -163,6 +185,8 @@ class SpeechTranscriber: ObservableObject, TranscriberProtocol {
         }
 
         cleanupSessionState()
+        resetCaptureHealthState()
+        pendingRuntimeFailureMessage = nil
         sampleStore.clear()
         firstPCMReadyGate.reset()
         transcribedText = ""
@@ -237,9 +261,14 @@ class SpeechTranscriber: ObservableObject, TranscriberProtocol {
                 userInfo: [NSLocalizedDescriptionKey: "On-device recognition is unavailable for the selected language."]
             )
         }
-        stopAudioCapture()
+        stopAudioCapture(endHealthMonitoring: false)
         firstPCMReadyGate.reset()
-        try startSpeechRecognition(recognizer: recognizer, settings: settings)
+        try startSpeechRecognition(
+            recognizer: recognizer,
+            settings: settings,
+            forceSystemDefaultInput: false,
+            resetArrivalTracking: true
+        )
         // Mid-session device switch already reported ready; keep capturing without re-gating UI.
         firstPCMReadyGate.noteValidPCM()
     }
@@ -284,11 +313,15 @@ class SpeechTranscriber: ObservableObject, TranscriberProtocol {
         finalizeTimeoutTask = nil
         isRecording = false
         isAwaitingFirstPCM = false
+        endCaptureHealthMonitoring()
         clearRecognitionPipeline(cancelTask: true)
         sampleStore.clear()
     }
 
-    private func stopAudioCapture() {
+    private func stopAudioCapture(endHealthMonitoring: Bool = true) {
+        if endHealthMonitoring {
+            endCaptureHealthMonitoring()
+        }
         if audioEngine.isRunning {
             audioEngine.stop()
         }
@@ -315,9 +348,14 @@ class SpeechTranscriber: ObservableObject, TranscriberProtocol {
 
     private func startSpeechRecognition(
         recognizer: SFSpeechRecognizer,
-        settings: ResolvedDictationSettings
+        settings: ResolvedDictationSettings,
+        forceSystemDefaultInput: Bool = false,
+        resetArrivalTracking: Bool = true,
+        recreateRecognitionPipeline: Bool = true
     ) throws {
-        clearRecognitionPipeline(cancelTask: true)
+        if recreateRecognitionPipeline {
+            clearRecognitionPipeline(cancelTask: true)
+        }
 
         if audioEngine.isRunning {
             audioEngine.stop()
@@ -325,18 +363,27 @@ class SpeechTranscriber: ObservableObject, TranscriberProtocol {
         }
         audioEngine.reset()
 
-        let request = SFSpeechAudioBufferRecognitionRequest()
-        request.shouldReportPartialResults = settings.reportsPartialResults
-        request.taskHint = .dictation
-        request.contextualStrings = settings.contextualPhrases
-        request.requiresOnDeviceRecognition = settings.prefersOnDeviceRecognition
-        if #available(macOS 13.0, *) {
-            request.addsPunctuation = settings.addsPunctuation
+        let request: SFSpeechAudioBufferRecognitionRequest
+        if recreateRecognitionPipeline || recognitionRequest == nil {
+            let newRequest = SFSpeechAudioBufferRecognitionRequest()
+            newRequest.shouldReportPartialResults = settings.reportsPartialResults
+            newRequest.taskHint = .dictation
+            newRequest.contextualStrings = settings.contextualPhrases
+            newRequest.requiresOnDeviceRecognition = settings.prefersOnDeviceRecognition
+            if #available(macOS 13.0, *) {
+                newRequest.addsPunctuation = settings.addsPunctuation
+            }
+            recognitionRequest = newRequest
+            request = newRequest
+        } else {
+            request = recognitionRequest!
         }
-        recognitionRequest = request
 
         let inputNode = audioEngine.inputNode
-        let didApplyPreferredInputDevice = applyPreferredInputDeviceIfNeeded(inputNode: inputNode)
+        let didApplyPreferredInputDevice = forceSystemDefaultInput
+            ? false
+            : applyPreferredInputDeviceIfNeeded(inputNode: inputNode)
+        activeCaptureUsesPreferredInputDevice = didApplyPreferredInputDevice
         let activeInputDeviceID = didApplyPreferredInputDevice ? preferredInputDeviceID : AudioInputDeviceManager.defaultInputDeviceID()
         let nodeOutputFormat = inputNode.outputFormat(forBus: 0)
         let hardwareSampleRate = AudioInputDeviceManager.nominalSampleRate(for: activeInputDeviceID)
@@ -352,6 +399,10 @@ class SpeechTranscriber: ObservableObject, TranscriberProtocol {
             )
         }
 
+        let graphGeneration = beginCaptureHealthMonitoring(
+            activeDeviceID: activeInputDeviceID,
+            resetArrivalTracking: resetArrivalTracking
+        )
         let firstPCMReadyGate = self.firstPCMReadyGate
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: tapFormat) { [weak self] buffer, _ in
             guard let self else { return }
@@ -375,12 +426,16 @@ class SpeechTranscriber: ObservableObject, TranscriberProtocol {
             let normalized = min(rms * 20, 1.0)
 
             Task { @MainActor [weak self] in
-                self?.audioLevel = normalized
+                guard let self else { return }
+                self.noteCapturePCMArrival(graphGeneration: graphGeneration)
+                self.audioLevel = normalized
             }
         }
 
         audioEngine.prepare()
         try audioEngine.start()
+
+        guard recreateRecognitionPipeline || recognitionTask == nil else { return }
 
         recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
             guard let self else { return }
@@ -413,6 +468,190 @@ class SpeechTranscriber: ObservableObject, TranscriberProtocol {
                     self.finishRecognition(with: self.transcribedText)
                 }
             }
+        }
+    }
+
+    // MARK: - Capture health (configuration-change rebuild + zero-buffer watchdog)
+
+    private func noteCapturePCMArrival(graphGeneration: Int) {
+        guard graphGeneration == captureGraphGeneration else { return }
+        lastPCMArrivalAt = Date()
+        if !didReceiveCapturePCMCallback {
+            didReceiveCapturePCMCallback = true
+            startCaptureHealthWatchdogIfNeeded()
+        }
+    }
+
+    @discardableResult
+    private func beginCaptureHealthMonitoring(
+        activeDeviceID: AudioDeviceID?,
+        resetArrivalTracking: Bool
+    ) -> Int {
+        activeCaptureDeviceID = activeDeviceID
+        captureGraphGeneration += 1
+        registerCaptureConfigurationChangeObserverIfNeeded()
+        if resetArrivalTracking {
+            lastPCMArrivalAt = nil
+            didReceiveCapturePCMCallback = false
+            cancelCaptureHealthWatchdog()
+        } else {
+            lastPCMArrivalAt = Date()
+            if didReceiveCapturePCMCallback {
+                startCaptureHealthWatchdogIfNeeded()
+            }
+        }
+        return captureGraphGeneration
+    }
+
+    private func endCaptureHealthMonitoring() {
+        cancelCaptureHealthWatchdog()
+        unregisterCaptureConfigurationChangeObserver()
+        isCaptureRecoveryInFlight = false
+        lastPCMArrivalAt = nil
+        didReceiveCapturePCMCallback = false
+        activeCaptureDeviceID = nil
+    }
+
+    private func resetCaptureHealthState() {
+        endCaptureHealthMonitoring()
+        captureGraphGeneration = 0
+        captureRecoveryAttemptsUsed = 0
+    }
+
+    private func registerCaptureConfigurationChangeObserverIfNeeded() {
+        guard captureConfigurationChangeObserver == nil else { return }
+        let engine = audioEngine
+        captureConfigurationChangeObserver = NotificationCenter.default.addObserver(
+            forName: .AVAudioEngineConfigurationChange,
+            object: engine,
+            queue: nil
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.handleCaptureConfigurationChange()
+            }
+        }
+    }
+
+    private func unregisterCaptureConfigurationChangeObserver() {
+        if let captureConfigurationChangeObserver {
+            NotificationCenter.default.removeObserver(captureConfigurationChangeObserver)
+            self.captureConfigurationChangeObserver = nil
+        }
+    }
+
+    private func cancelCaptureHealthWatchdog() {
+        captureHealthWatchdogTask?.cancel()
+        captureHealthWatchdogTask = nil
+    }
+
+    private func startCaptureHealthWatchdogIfNeeded() {
+        guard captureHealthWatchdogTask == nil else { return }
+        guard isRecording || isAwaitingFirstPCM else { return }
+        captureHealthWatchdogTask = Task { @MainActor [weak self] in
+            while let self, !Task.isCancelled {
+                do {
+                    try await Task.sleep(for: .seconds(1))
+                } catch {
+                    return
+                }
+                guard !Task.isCancelled else { return }
+                self.evaluateCaptureHealthWatchdogTick()
+            }
+        }
+    }
+
+    private func handleCaptureConfigurationChange() {
+        guard isRecording || isAwaitingFirstPCM else { return }
+        guard !isCaptureRecoveryInFlight else { return }
+        VoxtLog.asrWarning(
+            "Speech audio engine configuration changed during capture; rebuilding graph in place."
+        )
+        performCaptureGraphRecovery(fallbackToDefaultDevice: false, reason: "configuration-change")
+    }
+
+    private func evaluateCaptureHealthWatchdogTick() {
+        guard isRecording || isAwaitingFirstPCM else { return }
+        guard !isCaptureRecoveryInFlight else { return }
+        guard didReceiveCapturePCMCallback, let lastPCMArrivalAt else { return }
+
+        let secondsSinceLastBuffer = Date().timeIntervalSince(lastPCMArrivalAt)
+        let activeDeviceIsBluetooth = activeCaptureDeviceID.map(CaptureHealthSupport.isBluetoothInputDevice) ?? false
+        let action = captureHealthPlanner.action(
+            isRecording: isRecording || isAwaitingFirstPCM,
+            callbacksReceived: didReceiveCapturePCMCallback,
+            secondsSinceLastBuffer: secondsSinceLastBuffer,
+            activeDeviceIsBluetooth: activeDeviceIsBluetooth,
+            recoveryAttemptsUsed: captureRecoveryAttemptsUsed
+        )
+        switch action {
+        case .none:
+            return
+        case .restartCurrentDevice:
+            VoxtLog.asrWarning(
+                "Speech capture went silent for \(String(format: "%.2f", secondsSinceLastBuffer))s; restarting current-device graph. attemptsUsed=\(captureRecoveryAttemptsUsed)"
+            )
+            performCaptureGraphRecovery(fallbackToDefaultDevice: false, reason: "health-restart-current")
+        case .fallbackToDefaultDevice:
+            VoxtLog.asrWarning(
+                "Speech capture still silent after restart; falling back to system default input. attemptsUsed=\(captureRecoveryAttemptsUsed)"
+            )
+            performCaptureGraphRecovery(fallbackToDefaultDevice: true, reason: "health-fallback-default")
+        case .reportFailure:
+            VoxtLog.asrError(
+                "Speech capture health recovery budget exhausted. silenceSec=\(String(format: "%.2f", secondsSinceLastBuffer)), attemptsUsed=\(captureRecoveryAttemptsUsed)"
+            )
+            cancelCaptureHealthWatchdog()
+            let message = "Microphone capture stalled. Check your input device and try again."
+            pendingRuntimeFailureMessage = message
+            lastStartFailureMessage = message
+            stopAudioCapture()
+            isRecording = false
+            finishRecognition(with: transcribedText)
+        }
+    }
+
+    private func performCaptureGraphRecovery(fallbackToDefaultDevice: Bool, reason: String) {
+        guard !isCaptureRecoveryInFlight else { return }
+        isCaptureRecoveryInFlight = true
+        defer { isCaptureRecoveryInFlight = false }
+
+        if reason != "configuration-change" {
+            captureRecoveryAttemptsUsed += 1
+        }
+
+        let settings = resolvedDictationSettings()
+        refreshSpeechRecognizer(localeIdentifier: settings.localeIdentifier)
+        guard let recognizer = speechRecognizer else {
+            VoxtLog.asrError("Speech capture graph rebuild failed: recognizer unavailable. reason=\(reason)")
+            return
+        }
+
+        do {
+            // Keep the SFSpeech recognition task/request; only rebuild the AVAudioEngine tap.
+            if audioEngine.isRunning {
+                audioEngine.stop()
+            }
+            audioEngine.inputNode.removeTap(onBus: 0)
+            try startSpeechRecognition(
+                recognizer: recognizer,
+                settings: settings,
+                forceSystemDefaultInput: fallbackToDefaultDevice,
+                resetArrivalTracking: false,
+                recreateRecognitionPipeline: false
+            )
+            lastPCMArrivalAt = Date()
+            VoxtLog.asrWarning(
+                "Speech capture graph rebuilt. reason=\(reason), fallback=\(fallbackToDefaultDevice), attemptsUsed=\(captureRecoveryAttemptsUsed), graphGeneration=\(captureGraphGeneration)"
+            )
+        } catch {
+            VoxtLog.asrError(
+                "Speech capture graph rebuild failed. reason=\(reason), error=\(error.localizedDescription)"
+            )
+            pendingRuntimeFailureMessage = error.localizedDescription
+            lastStartFailureMessage = error.localizedDescription
+            stopAudioCapture()
+            isRecording = false
+            finishRecognition(with: transcribedText)
         }
     }
 

@@ -204,25 +204,45 @@ extension AppDelegate {
     func startObservingAudioInputDevices() {
         audioInputDevicesObserver = AudioInputDeviceManager.makeDevicesObserver { [weak self] in
             Task { @MainActor [weak self] in
-                self?.refreshInputDevicesSnapshot(reason: "hardware change")
+                self?.enqueueHardwareInputDevicesRefresh()
             }
+        }
+    }
+
+    /// Trailing-debounce hardware bursts, then take one snapshot + apply.
+    /// Launch and other non-observer callers use `refreshInputDevicesSnapshot` immediately.
+    private func enqueueHardwareInputDevicesRefresh() {
+        inputDevicesRefreshTask?.cancel()
+        let reason = "hardware change"
+        VoxtLog.info(
+            "Debouncing audio input snapshot. reason=\(reason), delay=\(AudioDeviceEventDebounce.hardwareChangeDebounceInterval)",
+            verbose: true
+        )
+
+        inputDevicesRefreshTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(AudioDeviceEventDebounce.hardwareChangeDebounceInterval))
+            guard !Task.isCancelled else { return }
+            await self?.performInputDevicesSnapshotRefresh(reason: reason)
         }
     }
 
     func refreshInputDevicesSnapshot(reason: String) {
         inputDevicesRefreshTask?.cancel()
+        inputDevicesRefreshTask = Task { [weak self] in
+            await self?.performInputDevicesSnapshotRefresh(reason: reason)
+        }
+    }
+
+    private func performInputDevicesSnapshotRefresh(reason: String) async {
         VoxtLog.info("Refreshing audio input snapshot. reason=\(reason)", verbose: true)
 
-        inputDevicesRefreshTask = Task { [weak self] in
-            let devices = await Task.detached(priority: .utility) {
-                AudioInputDeviceManager.snapshotAvailableInputDevices()
-            }.value
-            guard !Task.isCancelled else { return }
+        let devices = await Task.detached(priority: .utility) {
+            AudioInputDeviceManager.snapshotAvailableInputDevices()
+        }.value
+        guard !Task.isCancelled else { return }
 
-            await MainActor.run {
-                guard let self else { return }
-                self.applyInputDevicesSnapshot(devices, reason: reason)
-            }
+        await MainActor.run {
+            self.applyInputDevicesSnapshot(devices, reason: reason)
         }
     }
 
@@ -250,6 +270,15 @@ extension AppDelegate {
         let currentUIDs = Set(devices.map(\.uid))
         let addedDevices = devices.filter { !previousUIDs.contains($0.uid) }
         let removedDevices = previousDevices.filter { !currentUIDs.contains($0.uid) }
+        let isRecordingActive = isSessionActive && recordingStoppedAt == nil
+        let shouldHandleResolvedState = AudioDeviceEventDebounce.routingDecision(
+            for: AudioDeviceEventDebounce.RoutingInput(
+                previousActiveUID: previousResolvedState.activeUID,
+                newActiveUID: resolvedState.activeUID,
+                isRecordingActive: isRecordingActive,
+                lockedActiveUID: lockedActiveUID
+            )
+        ).shouldTriggerResolvedStateHandling
 
         if !addedDevices.isEmpty || !removedDevices.isEmpty {
             VoxtLog.info(
@@ -276,14 +305,16 @@ extension AppDelegate {
         NotificationCenter.default.post(name: .voxtSelectedInputDeviceDidChange, object: nil)
 
         VoxtLog.info(
-            "Audio input snapshot refreshed. reason=\(reason), devices=\(devices.count), selected=\(resolvedState.activeUID ?? "none"), autoSwitch=\(resolvedState.autoSwitchEnabled)",
+            "Audio input snapshot refreshed. reason=\(reason), devices=\(devices.count), selected=\(resolvedState.activeUID ?? "none"), autoSwitch=\(resolvedState.autoSwitchEnabled), handleResolved=\(shouldHandleResolvedState)",
             verbose: true
         )
-        handleResolvedMicrophoneStateChange(
-            from: previousResolvedState,
-            to: resolvedState,
-            reason: reason
-        )
+        if shouldHandleResolvedState {
+            handleResolvedMicrophoneStateChange(
+                from: previousResolvedState,
+                to: resolvedState,
+                reason: reason
+            )
+        }
         buildMenu()
     }
 

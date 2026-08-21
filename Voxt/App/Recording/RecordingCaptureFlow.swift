@@ -496,8 +496,11 @@ extension AppDelegate {
             return mlxTranscriber?.consumePendingRuntimeFailureMessage()
         case .sherpaOnnx:
             return sherpaOnnxTranscriber?.consumePendingRuntimeFailureMessage()
-        case .remote, .dictation:
+        case .remote:
+            // RemoteASR reports runtime failures via its own onRuntimeFailure channel.
             return nil
+        case .dictation:
+            return speechTranscriber.consumePendingRuntimeFailureMessage()
         }
     }
 

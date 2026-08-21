@@ -178,16 +178,22 @@ extension RemoteASRTranscriber {
         }
     }
 
-    func startStepFunAudioCapture(context: StepFunStreamingContext) throws {
+    func startStepFunAudioCapture(
+        context: StepFunStreamingContext,
+        forceSystemDefaultInput: Bool = false,
+        resetArrivalTracking: Bool = true
+    ) throws {
         if audioEngine.isRunning {
             audioEngine.stop()
         }
         audioEngine.reset()
 
         let inputNode = audioEngine.inputNode
-        let didApplyPreferredInputDevice = preferredInputDeviceID != nil
-            ? applyPreferredInputDeviceIfNeeded(inputNode: inputNode)
-            : false
+        let didApplyPreferredInputDevice = forceSystemDefaultInput
+            ? false
+            : (preferredInputDeviceID != nil
+                ? applyPreferredInputDeviceIfNeeded(inputNode: inputNode)
+                : false)
         let activeInputDeviceID = didApplyPreferredInputDevice ? preferredInputDeviceID : AudioInputDeviceManager.defaultInputDeviceID()
         let inputFormat = inputCaptureTapFormat(
             inputNode: inputNode,
@@ -196,6 +202,10 @@ extension RemoteASRTranscriber {
         )
         streamingInputSampleRate = inputFormat.sampleRate
         inputNode.removeTap(onBus: 0)
+        let graphGeneration = beginStreamingCaptureHealthMonitoring(
+            activeDeviceID: activeInputDeviceID,
+            resetArrivalTracking: resetArrivalTracking
+        )
         let firstPCMReadyGate = self.firstPCMReadyGate
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, _ in
             guard let self else { return }
@@ -210,6 +220,7 @@ extension RemoteASRTranscriber {
                       let context = self.stepFunStreamingContext,
                       !context.isClosed
                 else { return }
+                self.noteStreamingCapturePCMArrival(graphGeneration: graphGeneration)
                 self.audioLevel = self.audioLevelFromPCM16(pcmData)
                 self.sendStepFunAudio(pcmData, context: context)
             }
@@ -225,6 +236,7 @@ extension RemoteASRTranscriber {
     }
 
     func stopStepFunAudioCapture() {
+        endStreamingCaptureHealthMonitoring()
         audioEngine.stop()
         audioEngine.inputNode.removeTap(onBus: 0)
         audioLevel = 0

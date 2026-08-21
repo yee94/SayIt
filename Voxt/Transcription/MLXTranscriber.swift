@@ -1379,6 +1379,18 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
     private var didRetryCaptureStartup = false
     private var activeCaptureUsesPreferredInputDevice = false
     private var loggedSampleExtractionFailure = false
+    /// Bumped on every capture-graph rebuild so in-flight taps from a previous
+    /// device/format can discard themselves instead of appending stale PCM.
+    private var captureGeneration: UInt64 = 0
+    private let captureGenerationLock = NSLock()
+    /// Wall-clock of the most recent tap callback; drives the runtime zero-buffer watchdog.
+    private var lastPCMArrivalAt: Date?
+    private let lastPCMArrivalLock = NSLock()
+    private var captureConfigurationChangeObserver: NSObjectProtocol?
+    private var runtimeCaptureHealthWatchdogTask: Task<Void, Never>?
+    private var captureHealthRecoveryAttemptsUsed = 0
+    private var isRecoveringCaptureHealth = false
+    private let captureHealthPlanner = CaptureHealthPlanner()
     private var activeSessionBehavior = MLXModelManager.transcriptionBehavior(
         for: MLXModelManager.defaultModelRepo
     )
@@ -1508,31 +1520,28 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
             let firstPCMOutcome = await firstPCMReadyGate.wait()
             guard revision == sessionRevision else {
                 isAwaitingFirstPCM = false
-                stopAudioEngine()
-                audioEngine.inputNode.removeTap(onBus: 0)
+                tearDownCaptureGraphKeepingSessionStores()
                 return nil
             }
             switch firstPCMOutcome {
             case .ready:
                 isAwaitingFirstPCM = false
                 isRecording = true
+                scheduleRuntimeCaptureHealthWatchdog(revision: revision)
                 VoxtLog.asr("MLX first PCM ready; recording reported as ready.", verbose: true)
             case .timedOut:
                 isAwaitingFirstPCM = false
-                stopAudioEngine()
-                audioEngine.inputNode.removeTap(onBus: 0)
+                tearDownCaptureGraphKeepingSessionStores()
                 VoxtLog.asrWarning("MLX first PCM wait timed out.")
                 return FirstPCMReadyGate.timeoutUserMessage
             case .cancelled:
                 isAwaitingFirstPCM = false
-                stopAudioEngine()
-                audioEngine.inputNode.removeTap(onBus: 0)
+                tearDownCaptureGraphKeepingSessionStores()
                 VoxtLog.asr("MLX first PCM wait cancelled during capture startup.", verbose: true)
                 return nil
             case .failed(let message):
                 isAwaitingFirstPCM = false
-                stopAudioEngine()
-                audioEngine.inputNode.removeTap(onBus: 0)
+                tearDownCaptureGraphKeepingSessionStores()
                 VoxtLog.asrWarning("MLX first PCM wait failed: \(message)")
                 return message
             }
@@ -1560,19 +1569,25 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
             isAwaitingFirstPCM = false
             firstPCMReadyGate.cancel()
             VoxtLog.asrError("MLXTranscriber start recording failed: \(error)")
-            stopAudioEngine()
-            audioEngine.inputNode.removeTap(onBus: 0)
+            tearDownCaptureGraphKeepingSessionStores()
             discardPreparedSessionModelUse()
             return AppLocalization.localizedString("Failed to start the microphone. Please try again.")
         }
+    }
+
+    /// Stops the engine/tap and drops configuration observers without clearing sample stores.
+    private func tearDownCaptureGraphKeepingSessionStores() {
+        stopRuntimeCaptureHealthWatchdog()
+        unregisterCaptureConfigurationChangeObserver()
+        stopAudioEngine()
+        audioEngine.inputNode.removeTap(onBus: 0)
     }
 
     func stopRecording() {
         firstPCMReadyGate.cancel()
         if isAwaitingFirstPCM {
             isAwaitingFirstPCM = false
-            stopAudioEngine()
-            audioEngine.inputNode.removeTap(onBus: 0)
+            tearDownCaptureGraphKeepingSessionStores()
             discardPreparedSessionModelUse()
             return
         }
@@ -1581,8 +1596,7 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
             return
         }
 
-        stopAudioEngine()
-        audioEngine.inputNode.removeTap(onBus: 0)
+        tearDownCaptureGraphKeepingSessionStores()
         isRecording = false
 
         correctionLoopTask?.cancel()
@@ -1635,6 +1649,7 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
         let preloadTask = preloadTask
         let earlyPrewarmTask = earlyPrewarmTask
         let watchdogTask = captureWatchdogTask
+        let runtimeHealthWatchdogTask = runtimeCaptureHealthWatchdogTask
         let setupTask = liveSessionSetupTask
         let correctionPassTask = activeCorrectionPassTask
         let streamingEventTask = qwenStreamingEventTask
@@ -1643,6 +1658,8 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
         sessionRevision += 1
         firstPCMReadyGate.cancel()
         isAwaitingFirstPCM = false
+        stopRuntimeCaptureHealthWatchdog()
+        unregisterCaptureConfigurationChangeObserver()
         stopAudioEngine()
         audioEngine.inputNode.removeTap(onBus: 0)
         isRecording = false
@@ -1657,6 +1674,7 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
         await preloadTask?.value
         await earlyPrewarmTask?.value
         await watchdogTask?.value
+        await runtimeHealthWatchdogTask?.value
         await setupTask?.value
         _ = await correctionPassTask?.value
         await streamingEventTask?.value
@@ -1681,6 +1699,8 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
         guard !isRecording, !isFinalizingTranscription else { return false }
 
         sessionRevision += 1
+        stopRuntimeCaptureHealthWatchdog()
+        unregisterCaptureConfigurationChangeObserver()
         stopAudioEngine()
         audioEngine.inputNode.removeTap(onBus: 0)
         audioEngine.reset()
@@ -1920,6 +1940,8 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
         earlyPrewarmTask = nil
         captureWatchdogTask?.cancel()
         captureWatchdogTask = nil
+        stopRuntimeCaptureHealthWatchdog()
+        unregisterCaptureConfigurationChangeObserver()
         finalizationTask = nil
         audioLevelDelivery.clear()
         audioLevel = 0
@@ -2104,6 +2126,10 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
         isFinalizingTranscription = false
         didRetryCaptureStartup = false
         activeCaptureUsesPreferredInputDevice = preferredInputDeviceID != nil
+        captureHealthRecoveryAttemptsUsed = 0
+        isRecoveringCaptureHealth = false
+        clearLastPCMArrival()
+        stopRuntimeCaptureHealthWatchdog()
         stableCommittedText = ""
         lastCandidateText = ""
         nextCorrectionAtSeconds = currentCorrectionIntervalSeconds
@@ -2150,6 +2176,9 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
 
     /// Configures the engine, input device, tap and `prepare()` — everything except the
     /// blocking `start()`. Returns the data needed to log once the engine is running.
+    ///
+    /// Always preserves `AudioSampleStore` / first-PCM gate / correction-loop state so mid-session
+    /// rebuilds (device reconnect, configuration change) keep the recording session intact.
     private func configureAudioCaptureGraph(usePreferredInputDevice: Bool? = nil) -> (format: AVAudioFormat, usedPreferredDevice: Bool) {
         if audioEngine.isRunning {
             audioEngine.stop()
@@ -2179,13 +2208,16 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
             )
         }
 
+        let installedGeneration = bumpCaptureGeneration()
         let sampleStore = self.sampleStore
         let voiceActivityFrameStore = self.voiceActivityFrameStore
 
         let firstPCMReadyGate = self.firstPCMReadyGate
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
             guard let self else { return }
+            guard self.currentCaptureGeneration() == installedGeneration else { return }
             sampleStore.noteCallback()
+            self.notePCMArrival()
 
             guard let samples = AudioLevelMeter.monoSamples(from: buffer), !samples.isEmpty else {
                 if !self.loggedSampleExtractionFailure {
@@ -2214,6 +2246,7 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
         }
 
         audioEngine.prepare()
+        registerCaptureConfigurationChangeObserverIfNeeded()
         return (recordingFormat, didApplyPreferredInputDevice)
     }
 
@@ -2229,6 +2262,8 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
     private func startAudioCaptureGraph(usePreferredInputDevice: Bool? = nil) throws {
         let context = configureAudioCaptureGraph(usePreferredInputDevice: usePreferredInputDevice)
         try audioEngine.start()
+        // Give the new graph a full silence grace window before the runtime watchdog fires.
+        notePCMArrival()
         logCaptureStarted(format: context.format, usedPreferredDevice: context.usedPreferredDevice)
     }
 
@@ -2238,6 +2273,7 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
     private func startAudioCaptureGraphWithTimeout(usePreferredInputDevice: Bool? = nil) async throws {
         let context = configureAudioCaptureGraph(usePreferredInputDevice: usePreferredInputDevice)
         try await startConfiguredEngineWithTimeout(timeoutSeconds: Self.captureStartTimeoutSeconds)
+        notePCMArrival()
         logCaptureStarted(format: context.format, usedPreferredDevice: context.usedPreferredDevice)
     }
 
@@ -2278,6 +2314,7 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
         preloadTask = nil
         captureWatchdogTask?.cancel()
         captureWatchdogTask = nil
+        stopRuntimeCaptureHealthWatchdog()
         releaseNativeLiveSession(cancelSession: true)
     }
 
@@ -2989,6 +3026,8 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
         guard revision == sessionRevision, isRecording || isAwaitingFirstPCM else { return }
         guard sampleStore.callbacksReceived() == 0 else { return }
         guard !didRetryCaptureStartup else { return }
+        // Do not race the startup watchdog against a mid-session health recovery.
+        guard !isRecoveringCaptureHealth else { return }
 
         didRetryCaptureStartup = true
         let shouldFallbackToSystemDefault = preferredInputDeviceID != nil && activeCaptureUsesPreferredInputDevice
@@ -3006,6 +3045,225 @@ class MLXTranscriber: ObservableObject, TranscriberProtocol {
         } catch {
             VoxtLog.asrError("MLX audio capture recovery failed: \(error)")
         }
+    }
+
+    // MARK: - Runtime capture health (mid-session silence / device reconnect)
+
+    private func bumpCaptureGeneration() -> UInt64 {
+        captureGenerationLock.lock()
+        defer { captureGenerationLock.unlock() }
+        captureGeneration &+= 1
+        return captureGeneration
+    }
+
+    private func currentCaptureGeneration() -> UInt64 {
+        captureGenerationLock.lock()
+        defer { captureGenerationLock.unlock() }
+        return captureGeneration
+    }
+
+    private func notePCMArrival() {
+        lastPCMArrivalLock.lock()
+        lastPCMArrivalAt = Date()
+        lastPCMArrivalLock.unlock()
+    }
+
+    private func clearLastPCMArrival() {
+        lastPCMArrivalLock.lock()
+        lastPCMArrivalAt = nil
+        lastPCMArrivalLock.unlock()
+    }
+
+    private func secondsSinceLastPCMArrival() -> TimeInterval? {
+        lastPCMArrivalLock.lock()
+        let arrival = lastPCMArrivalAt
+        lastPCMArrivalLock.unlock()
+        guard let arrival else { return nil }
+        return Date().timeIntervalSince(arrival)
+    }
+
+    private func registerCaptureConfigurationChangeObserverIfNeeded() {
+        guard captureConfigurationChangeObserver == nil else { return }
+        let engine = audioEngine
+        captureConfigurationChangeObserver = NotificationCenter.default.addObserver(
+            forName: .AVAudioEngineConfigurationChange,
+            object: engine,
+            queue: nil
+        ) { [weak self] _ in
+            // Never mutate the engine on the notification thread; hop to MainActor.
+            Task { @MainActor [weak self] in
+                self?.handleAudioEngineConfigurationChange()
+            }
+        }
+    }
+
+    private func unregisterCaptureConfigurationChangeObserver() {
+        if let captureConfigurationChangeObserver {
+            NotificationCenter.default.removeObserver(captureConfigurationChangeObserver)
+            self.captureConfigurationChangeObserver = nil
+        }
+    }
+
+    private func handleAudioEngineConfigurationChange() {
+        guard isRecording || isAwaitingFirstPCM else {
+            // Idle graph: drop the observer so a later session re-registers cleanly.
+            // Do not start/stop the engine while nothing is capturing.
+            unregisterCaptureConfigurationChangeObserver()
+            return
+        }
+        guard !isRecoveringCaptureHealth else { return }
+
+        // Own stop/reset/start often posts another configurationChange; hold the re-entry gate.
+        isRecoveringCaptureHealth = true
+        VoxtLog.asrWarning(
+            "MLX audio engine configuration changed while capturing. Rebuilding input graph in place (preserving session samples)."
+        )
+        do {
+            try rebuildCaptureGraphPreservingSession(
+                usePreferredInputDevice: activeCaptureUsesPreferredInputDevice,
+                reason: "configuration-change"
+            )
+            isRecoveringCaptureHealth = false
+        } catch {
+            isRecoveringCaptureHealth = false
+            VoxtLog.asrError("MLX configuration-change capture rebuild failed: \(error)")
+        }
+    }
+
+    /// stop→reset→reinstall tap at the current device format→prepare→start, without clearing
+    /// sample stores, first-PCM readiness, or the correction loop.
+    private func rebuildCaptureGraphPreservingSession(
+        usePreferredInputDevice: Bool,
+        reason: String
+    ) throws {
+        activeCaptureUsesPreferredInputDevice = usePreferredInputDevice
+        try startAudioCaptureGraph(usePreferredInputDevice: usePreferredInputDevice)
+        VoxtLog.asr(
+            "MLX capture graph rebuilt in place. reason=\(reason), routing=\(usePreferredInputDevice ? "preferred" : "system-default"), generation=\(currentCaptureGeneration())",
+            verbose: true
+        )
+    }
+
+    private func scheduleRuntimeCaptureHealthWatchdog(revision: Int) {
+        stopRuntimeCaptureHealthWatchdog()
+        runtimeCaptureHealthWatchdogTask = Task { @MainActor [weak self] in
+            while let self, !Task.isCancelled {
+                do {
+                    try await Task.sleep(for: .seconds(1))
+                } catch {
+                    return
+                }
+                guard !Task.isCancelled else { return }
+                self.evaluateRuntimeCaptureHealth(revision: revision)
+            }
+        }
+    }
+
+    private func stopRuntimeCaptureHealthWatchdog() {
+        runtimeCaptureHealthWatchdogTask?.cancel()
+        runtimeCaptureHealthWatchdogTask = nil
+    }
+
+    private func evaluateRuntimeCaptureHealth(revision: Int) {
+        guard revision == sessionRevision, isRecording else { return }
+        guard !isRecoveringCaptureHealth else { return }
+        guard sampleStore.callbacksReceived() > 0 else { return }
+        guard let secondsSinceLastBuffer = secondsSinceLastPCMArrival() else { return }
+
+        let activeDeviceID = resolvedActiveCaptureDeviceID()
+        let activeDeviceIsBluetooth = activeDeviceID.map(CaptureHealthSupport.isBluetoothInputDevice) ?? false
+        let action = captureHealthPlanner.action(
+            isRecording: isRecording,
+            callbacksReceived: true,
+            secondsSinceLastBuffer: secondsSinceLastBuffer,
+            activeDeviceIsBluetooth: activeDeviceIsBluetooth,
+            recoveryAttemptsUsed: captureHealthRecoveryAttemptsUsed
+        )
+
+        switch action {
+        case .none:
+            return
+        case .restartCurrentDevice:
+            performRuntimeCaptureRecovery(
+                revision: revision,
+                usePreferredInputDevice: activeCaptureUsesPreferredInputDevice,
+                reason: "runtime-silence-restart-current"
+            )
+        case .fallbackToDefaultDevice:
+            // Internal fallback only — do not mutate the user's preferred-device preference.
+            VoxtLog.asrWarning(
+                "MLX runtime capture silence persisted after one rebuild. Falling back to system default input for this session only. preferredDeviceID=\(preferredInputDeviceID.map(String.init(describing:)) ?? "none")"
+            )
+            performRuntimeCaptureRecovery(
+                revision: revision,
+                usePreferredInputDevice: false,
+                reason: "runtime-silence-fallback-default"
+            )
+        case .reportFailure:
+            reportRuntimeCaptureHealthFailure()
+        }
+    }
+
+    private func resolvedActiveCaptureDeviceID() -> AudioDeviceID? {
+        if activeCaptureUsesPreferredInputDevice, let preferredInputDeviceID {
+            return preferredInputDeviceID
+        }
+        return AudioInputDeviceManager.defaultInputDeviceID()
+    }
+
+    private func performRuntimeCaptureRecovery(
+        revision: Int,
+        usePreferredInputDevice: Bool,
+        reason: String
+    ) {
+        guard revision == sessionRevision, isRecording else { return }
+        guard !isRecoveringCaptureHealth else { return }
+
+        isRecoveringCaptureHealth = true
+        captureHealthRecoveryAttemptsUsed += 1
+        VoxtLog.asrWarning(
+            "MLX runtime capture health recovery starting. reason=\(reason), attempt=\(captureHealthRecoveryAttemptsUsed), silenceSec=\(String(format: "%.2f", secondsSinceLastPCMArrival() ?? -1))"
+        )
+
+        do {
+            try rebuildCaptureGraphPreservingSession(
+                usePreferredInputDevice: usePreferredInputDevice,
+                reason: reason
+            )
+            isRecoveringCaptureHealth = false
+        } catch {
+            isRecoveringCaptureHealth = false
+            VoxtLog.asrError("MLX runtime capture health recovery failed: \(error)")
+            // Count the failed attempt toward the budget; next tick may escalate.
+        }
+    }
+
+    private func reportRuntimeCaptureHealthFailure() {
+        guard isRecording else { return }
+        // Reuse the existing RemoteASR stalled-mic copy so localization keys stay shared.
+        let message = AppLocalization.localizedString(
+            "Microphone capture stalled. Check your input device and try again."
+        )
+        VoxtLog.asrError(
+            "MLX runtime capture health recovery budget exhausted. surfacing failure via pendingRuntimeFailureMessage."
+        )
+        // Reuse the same path as inference/runtime failures: stop capture, finish with empty
+        // text, and let RecordingTextRouting consume `pendingRuntimeFailureMessage` for overlay.
+        pendingRuntimeFailureMessage = message
+        tearDownCaptureGraphKeepingSessionStores()
+        isRecording = false
+        correctionLoopTask?.cancel()
+        correctionLoopTask = nil
+        liveSessionSetupTask?.cancel()
+        liveSessionSetupTask = nil
+        qwenStreamingFeedTask?.cancel()
+        qwenStreamingFeedTask = nil
+        drainPendingSamplesIntoQwenLiveSession()
+        nativeStreamingSession?.stop()
+        releaseNativeLiveSession(cancelSession: false)
+        isFinalizingTranscription = false
+        onTranscriptionFinished?("")
+        releaseCompletedSessionResources(revision: sessionRevision)
     }
 
     private func applyCandidate(_ candidate: String, stage: MLXCorrectionPassKind) {

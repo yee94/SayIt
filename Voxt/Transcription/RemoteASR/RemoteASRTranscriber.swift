@@ -81,6 +81,18 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
     let aliyunRealtimeStopDrainDelay: Duration = .milliseconds(180)
     let stepFunPendingAudioByteLimit = 1_024_000
 
+    /// Bumped on every capture-graph rebuild so in-flight tap callbacks from an
+    /// old graph are discarded after Bluetooth reconnect / health recovery.
+    private var captureGraphGeneration = 0
+    private var lastPCMArrivalAt: Date?
+    private var didReceiveCapturePCMCallback = false
+    private var captureHealthWatchdogTask: Task<Void, Never>?
+    private var captureConfigurationChangeObserver: NSObjectProtocol?
+    private var captureRecoveryAttemptsUsed = 0
+    private var isCaptureRecoveryInFlight = false
+    private var activeCaptureDeviceID: AudioDeviceID?
+    private let captureHealthPlanner = CaptureHealthPlanner()
+
     func setPreferredInputDevice(_ deviceID: AudioDeviceID?) {
         preferredInputDeviceID = deviceID
     }
@@ -124,6 +136,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
         cleanupDoubaoStreamingState()
         cleanupAliyunStreamingState()
         cleanupStepFunStreamingState()
+        resetCaptureHealthState()
         sampleStore.clear()
         firstPCMReadyGate.reset()
         isAwaitingFirstPCM = true
@@ -1481,9 +1494,15 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
         }
     }
 
-    private func startAliyunAudioCapture(context: AliyunFunStreamingContext) throws {
+    private func startAliyunAudioCapture(
+        context: AliyunFunStreamingContext,
+        forceSystemDefaultInput: Bool = false,
+        resetArrivalTracking: Bool = true
+    ) throws {
         let inputNode = audioEngine.inputNode
-        let didApplyPreferredInputDevice = applyPreferredInputDeviceIfNeeded(inputNode: inputNode)
+        let didApplyPreferredInputDevice = forceSystemDefaultInput
+            ? false
+            : applyPreferredInputDeviceIfNeeded(inputNode: inputNode)
         let activeInputDeviceID = didApplyPreferredInputDevice ? preferredInputDeviceID : AudioInputDeviceManager.defaultInputDeviceID()
         let inputFormat = inputCaptureTapFormat(
             inputNode: inputNode,
@@ -1492,6 +1511,10 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
         )
         streamingInputSampleRate = inputFormat.sampleRate
         inputNode.removeTap(onBus: 0)
+        let graphGeneration = beginStreamingCaptureHealthMonitoring(
+            activeDeviceID: activeInputDeviceID,
+            resetArrivalTracking: resetArrivalTracking
+        )
         let firstPCMReadyGate = self.firstPCMReadyGate
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, _ in
             guard let self else { return }
@@ -1506,6 +1529,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
                       let ctx = self.aliyunStreamingContext,
                       !ctx.isClosed
                 else { return }
+                self.noteStreamingCapturePCMArrival(graphGeneration: graphGeneration)
                 self.audioLevel = self.audioLevelFromPCM16(pcmData)
                 ctx.ws.send(.data(pcmData)) { error in
                     if let error {
@@ -1524,6 +1548,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
     }
 
     private func stopAliyunAudioCapture() {
+        endStreamingCaptureHealthMonitoring()
         audioEngine.stop()
         audioEngine.inputNode.removeTap(onBus: 0)
         audioLevel = 0
@@ -1717,9 +1742,15 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
         }
     }
 
-    private func startAliyunQwenAudioCapture(context: AliyunQwenStreamingContext) throws {
+    private func startAliyunQwenAudioCapture(
+        context: AliyunQwenStreamingContext,
+        forceSystemDefaultInput: Bool = false,
+        resetArrivalTracking: Bool = true
+    ) throws {
         let inputNode = audioEngine.inputNode
-        let didApplyPreferredInputDevice = applyPreferredInputDeviceIfNeeded(inputNode: inputNode)
+        let didApplyPreferredInputDevice = forceSystemDefaultInput
+            ? false
+            : applyPreferredInputDeviceIfNeeded(inputNode: inputNode)
         let activeInputDeviceID = didApplyPreferredInputDevice ? preferredInputDeviceID : AudioInputDeviceManager.defaultInputDeviceID()
         let inputFormat = inputCaptureTapFormat(
             inputNode: inputNode,
@@ -1728,6 +1759,10 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
         )
         streamingInputSampleRate = inputFormat.sampleRate
         inputNode.removeTap(onBus: 0)
+        let graphGeneration = beginStreamingCaptureHealthMonitoring(
+            activeDeviceID: activeInputDeviceID,
+            resetArrivalTracking: resetArrivalTracking
+        )
         let firstPCMReadyGate = self.firstPCMReadyGate
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, _ in
             guard let self else { return }
@@ -1742,6 +1777,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
                       let ctx = self.aliyunQwenStreamingContext,
                       !ctx.isClosed
                 else { return }
+                self.noteStreamingCapturePCMArrival(graphGeneration: graphGeneration)
                 self.audioLevel = self.audioLevelFromPCM16(pcmData)
                 self.sendAliyunQwenAudioAppend(pcmData, through: ctx.ws) { error in
                     if let error {
@@ -2161,7 +2197,10 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
         }
     }
 
-    private func startDoubaoAudioCapture(usePreferredInputDevice: Bool? = nil) throws {
+    private func startDoubaoAudioCapture(
+        usePreferredInputDevice: Bool? = nil,
+        resetArrivalTracking: Bool = true
+    ) throws {
         if audioEngine.isRunning {
             audioEngine.stop()
         }
@@ -2181,6 +2220,10 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
         )
         streamingInputSampleRate = inputFormat.sampleRate
         inputNode.removeTap(onBus: 0)
+        let graphGeneration = beginStreamingCaptureHealthMonitoring(
+            activeDeviceID: activeInputDeviceID,
+            resetArrivalTracking: resetArrivalTracking
+        )
         let firstPCMReadyGate = self.firstPCMReadyGate
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, _ in
             guard let self else { return }
@@ -2195,6 +2238,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
                       let context = self.doubaoStreamingContext,
                       !context.isClosed
                 else { return }
+                self.noteStreamingCapturePCMArrival(graphGeneration: graphGeneration)
                 self.audioLevel = self.audioLevelFromPCM16(pcmData)
                 self.queueDoubaoAudioData(pcmData, context: context)
             }
@@ -2212,6 +2256,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
     private func stopDoubaoAudioCapture() {
         doubaoCaptureStartupWatchdogTask?.cancel()
         doubaoCaptureStartupWatchdogTask = nil
+        endStreamingCaptureHealthMonitoring()
         audioEngine.stop()
         audioEngine.inputNode.removeTap(onBus: 0)
         audioLevel = 0
@@ -2324,6 +2369,300 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
             return false
         }
         return true
+    }
+
+    // MARK: - Capture health (configuration-change rebuild + zero-buffer watchdog)
+
+    func noteStreamingCapturePCMArrival(graphGeneration: Int) {
+        guard graphGeneration == captureGraphGeneration else { return }
+        let now = Date()
+        lastPCMArrivalAt = now
+        if !didReceiveCapturePCMCallback {
+            didReceiveCapturePCMCallback = true
+            startCaptureHealthWatchdogIfNeeded()
+        }
+    }
+
+    @discardableResult
+    func beginStreamingCaptureHealthMonitoring(
+        activeDeviceID: AudioDeviceID?,
+        resetArrivalTracking: Bool = true
+    ) -> Int {
+        activeCaptureDeviceID = activeDeviceID
+        captureGraphGeneration += 1
+        registerCaptureConfigurationChangeObserverIfNeeded()
+        if resetArrivalTracking {
+            lastPCMArrivalAt = nil
+            didReceiveCapturePCMCallback = false
+            // Watchdog starts after the first PCM callback so startup silence is
+            // still owned by the existing first-PCM / Doubao startup watchdogs.
+            cancelCaptureHealthWatchdog()
+        } else {
+            lastPCMArrivalAt = Date()
+            if didReceiveCapturePCMCallback {
+                startCaptureHealthWatchdogIfNeeded()
+            }
+        }
+        return captureGraphGeneration
+    }
+
+    func endStreamingCaptureHealthMonitoring() {
+        cancelCaptureHealthWatchdog()
+        unregisterCaptureConfigurationChangeObserver()
+        isCaptureRecoveryInFlight = false
+        lastPCMArrivalAt = nil
+        didReceiveCapturePCMCallback = false
+        activeCaptureDeviceID = nil
+    }
+
+    private func resetCaptureHealthState() {
+        cancelCaptureHealthWatchdog()
+        unregisterCaptureConfigurationChangeObserver()
+        captureGraphGeneration = 0
+        lastPCMArrivalAt = nil
+        didReceiveCapturePCMCallback = false
+        captureRecoveryAttemptsUsed = 0
+        isCaptureRecoveryInFlight = false
+        activeCaptureDeviceID = nil
+    }
+
+    private func registerCaptureConfigurationChangeObserverIfNeeded() {
+        guard captureConfigurationChangeObserver == nil else { return }
+        let engine = audioEngine
+        captureConfigurationChangeObserver = NotificationCenter.default.addObserver(
+            forName: .AVAudioEngineConfigurationChange,
+            object: engine,
+            queue: nil
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.handleCaptureConfigurationChange()
+            }
+        }
+    }
+
+    private func unregisterCaptureConfigurationChangeObserver() {
+        if let captureConfigurationChangeObserver {
+            NotificationCenter.default.removeObserver(captureConfigurationChangeObserver)
+            self.captureConfigurationChangeObserver = nil
+        }
+    }
+
+    private func cancelCaptureHealthWatchdog() {
+        captureHealthWatchdogTask?.cancel()
+        captureHealthWatchdogTask = nil
+    }
+
+    private func startCaptureHealthWatchdogIfNeeded() {
+        guard captureHealthWatchdogTask == nil else { return }
+        guard isRecording || isAwaitingFirstPCM else { return }
+        guard hasActiveStreamingCaptureSession else { return }
+        captureHealthWatchdogTask = Task { @MainActor [weak self] in
+            while let self, !Task.isCancelled {
+                do {
+                    try await Task.sleep(for: .seconds(1))
+                } catch {
+                    return
+                }
+                guard !Task.isCancelled else { return }
+                self.evaluateCaptureHealthWatchdogTick()
+            }
+        }
+    }
+
+    private var hasActiveStreamingCaptureSession: Bool {
+        if let context = doubaoStreamingContext, !context.isClosed, context.didStartAudioStream {
+            return true
+        }
+        if let context = aliyunStreamingContext, !context.isClosed, context.didStartAudioStream {
+            return true
+        }
+        if let context = aliyunQwenStreamingContext, !context.isClosed, context.didStartAudioStream {
+            return true
+        }
+        if let context = stepFunStreamingContext, !context.isClosed, context.didStartAudioStream {
+            return true
+        }
+        return false
+    }
+
+    private func handleCaptureConfigurationChange() {
+        guard !stopRequested else { return }
+        guard isRecording || isAwaitingFirstPCM else { return }
+        guard hasActiveStreamingCaptureSession else { return }
+        guard !isCaptureRecoveryInFlight else { return }
+        VoxtLog.asrWarning(
+            "Remote ASR audio engine configuration changed during capture; rebuilding graph in place."
+        )
+        performCaptureGraphRecovery(fallbackToDefaultDevice: false, reason: "configuration-change")
+    }
+
+    private func evaluateCaptureHealthWatchdogTick() {
+        guard !stopRequested else { return }
+        guard isRecording || isAwaitingFirstPCM else { return }
+        guard hasActiveStreamingCaptureSession else { return }
+        guard !isCaptureRecoveryInFlight else { return }
+        guard didReceiveCapturePCMCallback, let lastPCMArrivalAt else { return }
+
+        let secondsSinceLastBuffer = Date().timeIntervalSince(lastPCMArrivalAt)
+        let activeDeviceIsBluetooth: Bool
+        if let activeCaptureDeviceID {
+            activeDeviceIsBluetooth = CaptureHealthSupport.isBluetoothInputDevice(activeCaptureDeviceID)
+        } else {
+            activeDeviceIsBluetooth = false
+        }
+        let action = captureHealthPlanner.action(
+            isRecording: isRecording || isAwaitingFirstPCM,
+            callbacksReceived: didReceiveCapturePCMCallback,
+            secondsSinceLastBuffer: secondsSinceLastBuffer,
+            activeDeviceIsBluetooth: activeDeviceIsBluetooth,
+            recoveryAttemptsUsed: captureRecoveryAttemptsUsed
+        )
+        switch action {
+        case .none:
+            return
+        case .restartCurrentDevice:
+            VoxtLog.asrWarning(
+                "Remote ASR capture went silent for \(String(format: "%.2f", secondsSinceLastBuffer))s; restarting current-device graph. attemptsUsed=\(captureRecoveryAttemptsUsed)"
+            )
+            performCaptureGraphRecovery(fallbackToDefaultDevice: false, reason: "health-restart-current")
+        case .fallbackToDefaultDevice:
+            VoxtLog.asrWarning(
+                "Remote ASR capture still silent after restart; falling back to system default input. attemptsUsed=\(captureRecoveryAttemptsUsed)"
+            )
+            performCaptureGraphRecovery(fallbackToDefaultDevice: true, reason: "health-fallback-default")
+        case .reportFailure:
+            VoxtLog.asrError(
+                "Remote ASR capture health recovery budget exhausted. silenceSec=\(String(format: "%.2f", secondsSinceLastBuffer)), attemptsUsed=\(captureRecoveryAttemptsUsed)"
+            )
+            cancelCaptureHealthWatchdog()
+            notifyRuntimeFailure(
+                NSError(
+                    domain: "SayIt.RemoteASR",
+                    code: -110,
+                    userInfo: [
+                        NSLocalizedDescriptionKey: "Microphone capture stalled. Check your input device and try again."
+                    ]
+                )
+            )
+        }
+    }
+
+    private func performCaptureGraphRecovery(fallbackToDefaultDevice: Bool, reason: String) {
+        guard !isCaptureRecoveryInFlight else { return }
+        isCaptureRecoveryInFlight = true
+        defer { isCaptureRecoveryInFlight = false }
+
+        // Configuration-change rebuilds are free (format freeze); watchdog
+        // recoveries consume the per-session budget from CaptureHealthPlanner.
+        if reason != "configuration-change" {
+            captureRecoveryAttemptsUsed += 1
+        }
+
+        do {
+            try rebuildActiveStreamingCaptureGraph(
+                fallbackToDefaultDevice: fallbackToDefaultDevice,
+                reason: reason
+            )
+            lastPCMArrivalAt = Date()
+            VoxtLog.asrWarning(
+                "Remote ASR capture graph rebuilt. reason=\(reason), fallback=\(fallbackToDefaultDevice), attemptsUsed=\(captureRecoveryAttemptsUsed), graphGeneration=\(captureGraphGeneration)"
+            )
+        } catch {
+            VoxtLog.asrError(
+                "Remote ASR capture graph rebuild failed. reason=\(reason), error=\(error.localizedDescription)"
+            )
+            notifyRuntimeFailure(error)
+        }
+    }
+
+    private func rebuildActiveStreamingCaptureGraph(
+        fallbackToDefaultDevice: Bool,
+        reason: String
+    ) throws {
+        if let context = doubaoStreamingContext, !context.isClosed, context.didStartAudioStream {
+            let usePreferred: Bool
+            if fallbackToDefaultDevice {
+                usePreferred = false
+            } else {
+                usePreferred = doubaoCaptureUsesPreferredInputDevice
+            }
+            // In-place rebuild: keep the remote session and already-queued PCM.
+            // stopDoubaoAudioCapture also cancels the startup watchdog; restart it
+            // only when we still have not seen the first PCM callback.
+            stopDoubaoAudioCaptureWithoutEndingHealthMonitoring()
+            try startDoubaoAudioCapture(
+                usePreferredInputDevice: usePreferred,
+                resetArrivalTracking: false
+            )
+            context.audioCaptureStartCount += 1
+            context.lastAudioCaptureStartReason = reason
+            if context.pcmCallbackCount == 0 {
+                scheduleDoubaoCaptureStartupWatchdog(context)
+            }
+            return
+        }
+
+        if let context = aliyunStreamingContext, !context.isClosed, context.didStartAudioStream {
+            stopAliyunAudioCaptureWithoutEndingHealthMonitoring()
+            try startAliyunAudioCapture(
+                context: context,
+                forceSystemDefaultInput: fallbackToDefaultDevice,
+                resetArrivalTracking: false
+            )
+            return
+        }
+
+        if let context = aliyunQwenStreamingContext, !context.isClosed, context.didStartAudioStream {
+            stopAliyunAudioCaptureWithoutEndingHealthMonitoring()
+            try startAliyunQwenAudioCapture(
+                context: context,
+                forceSystemDefaultInput: fallbackToDefaultDevice,
+                resetArrivalTracking: false
+            )
+            return
+        }
+
+        if let context = stepFunStreamingContext, !context.isClosed, context.didStartAudioStream {
+            stopStepFunAudioCaptureWithoutEndingHealthMonitoring()
+            try startStepFunAudioCapture(
+                context: context,
+                forceSystemDefaultInput: fallbackToDefaultDevice,
+                resetArrivalTracking: false
+            )
+            return
+        }
+
+        throw NSError(
+            domain: "SayIt.RemoteASR",
+            code: -111,
+            userInfo: [NSLocalizedDescriptionKey: "No active remote streaming capture session to rebuild."]
+        )
+    }
+
+    private func stopDoubaoAudioCaptureWithoutEndingHealthMonitoring() {
+        doubaoCaptureStartupWatchdogTask?.cancel()
+        doubaoCaptureStartupWatchdogTask = nil
+        if audioEngine.isRunning {
+            audioEngine.stop()
+        }
+        audioEngine.inputNode.removeTap(onBus: 0)
+        audioLevel = 0
+    }
+
+    private func stopAliyunAudioCaptureWithoutEndingHealthMonitoring() {
+        if audioEngine.isRunning {
+            audioEngine.stop()
+        }
+        audioEngine.inputNode.removeTap(onBus: 0)
+        audioLevel = 0
+    }
+
+    private func stopStepFunAudioCaptureWithoutEndingHealthMonitoring() {
+        if audioEngine.isRunning {
+            audioEngine.stop()
+        }
+        audioEngine.inputNode.removeTap(onBus: 0)
+        audioLevel = 0
     }
 
     private func receiveDoubaoMessages(
@@ -3272,7 +3611,8 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
             openAIPreviewTask,
             intermediateTranscriptionPublishTask,
             doubaoCaptureStartupWatchdogTask,
-            firstPCMReadyWaitTask
+            firstPCMReadyWaitTask,
+            captureHealthWatchdogTask
         ].compactMap { $0 }
         onTranscriptionFinished = nil
         onStartFailure = nil

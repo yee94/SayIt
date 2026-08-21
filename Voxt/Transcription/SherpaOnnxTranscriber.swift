@@ -40,6 +40,18 @@ final class SherpaOnnxTranscriber: ObservableObject, TranscriberProtocol {
     private var isAwaitingFirstPCM = false
     private let targetSampleRate = 16000
 
+    /// Bumped on every capture-graph rebuild so in-flight tap callbacks from an
+    /// old graph are discarded after Bluetooth reconnect / health recovery.
+    private var captureGraphGeneration = 0
+    private var lastPCMArrivalAt: Date?
+    private var didReceiveCapturePCMCallback = false
+    private var captureHealthWatchdogTask: Task<Void, Never>?
+    private var captureConfigurationChangeObserver: NSObjectProtocol?
+    private var captureRecoveryAttemptsUsed = 0
+    private var isCaptureRecoveryInFlight = false
+    private var activeCaptureDeviceID: AudioDeviceID?
+    private let captureHealthPlanner = CaptureHealthPlanner()
+
     init(modelManager: SherpaOnnxModelManager) {
         self.modelManager = modelManager
     }
@@ -67,6 +79,8 @@ final class SherpaOnnxTranscriber: ObservableObject, TranscriberProtocol {
     @discardableResult
     func startRecordingSession() async -> String? {
         guard !isRecording, !isAwaitingFirstPCM else { return nil }
+        resetCaptureHealthState()
+        pendingRuntimeFailureMessage = nil
         firstPCMReadyGate.reset()
         isAwaitingFirstPCM = true
         do {
@@ -117,6 +131,7 @@ final class SherpaOnnxTranscriber: ObservableObject, TranscriberProtocol {
             return
         }
         guard isRecording else { return }
+        endCaptureHealthMonitoring()
         audioEngine.inputNode.removeTap(onBus: 0)
         audioEngine.stop()
         activeAudioFile = nil
@@ -140,6 +155,8 @@ final class SherpaOnnxTranscriber: ObservableObject, TranscriberProtocol {
 
         firstPCMReadyGate.cancel()
         isAwaitingFirstPCM = false
+        endCaptureHealthMonitoring()
+        let healthWatchdog = captureHealthWatchdogTask
         audioEngine.inputNode.removeTap(onBus: 0)
         audioEngine.stop()
         activeAudioFile = nil
@@ -149,6 +166,7 @@ final class SherpaOnnxTranscriber: ObservableObject, TranscriberProtocol {
         isFinalizingTranscription = false
 
         await recognitionTask?.value
+        await healthWatchdog?.value
         offlineRecognitionTask = nil
         if let activeAudioURL {
             try? FileManager.default.removeItem(at: activeAudioURL)
@@ -159,11 +177,12 @@ final class SherpaOnnxTranscriber: ObservableObject, TranscriberProtocol {
 
     func restartCaptureForPreferredInputDevice() throws {
         guard isRecording else { return }
+        endCaptureHealthMonitoring()
         audioEngine.inputNode.removeTap(onBus: 0)
         audioEngine.stop()
-        activeAudioFile = nil
+        // Keep the same CAF file open so mid-session mic switches do not lose audio.
         firstPCMReadyGate.reset()
-        try startAudioCapture()
+        try startAudioCapture(recreateAudioFile: false, resetArrivalTracking: true)
         firstPCMReadyGate.noteValidPCM()
     }
 
@@ -241,6 +260,7 @@ final class SherpaOnnxTranscriber: ObservableObject, TranscriberProtocol {
     }
 
     private func tearDownCaptureWithoutFinalization() {
+        endCaptureHealthMonitoring()
         audioEngine.inputNode.removeTap(onBus: 0)
         audioEngine.stop()
         activeAudioFile = nil
@@ -252,19 +272,36 @@ final class SherpaOnnxTranscriber: ObservableObject, TranscriberProtocol {
         audioLevel = 0
     }
 
-    private func startAudioCapture() throws {
+    private func startAudioCapture(
+        recreateAudioFile: Bool = true,
+        forceSystemDefaultInput: Bool = false,
+        resetArrivalTracking: Bool = true
+    ) throws {
         let inputNode = audioEngine.inputNode
         inputNode.removeTap(onBus: 0)
-        activeCaptureUsesPreferredInputDevice = preferredInputDeviceID != nil
-        applyPreferredInputDeviceIfNeeded(inputNode: inputNode)
+        if forceSystemDefaultInput {
+            activeCaptureUsesPreferredInputDevice = false
+        } else {
+            activeCaptureUsesPreferredInputDevice = preferredInputDeviceID != nil
+            applyPreferredInputDeviceIfNeeded(inputNode: inputNode)
+        }
 
         let format = inputNode.outputFormat(forBus: 0)
-        let audioURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("voxt-sherpa-\(UUID().uuidString).caf")
-        let audioFile = try AVAudioFile(forWriting: audioURL, settings: format.settings)
-        activeAudioURL = audioURL
-        activeAudioFile = audioFile
+        if recreateAudioFile || activeAudioFile == nil {
+            let audioURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("voxt-sherpa-\(UUID().uuidString).caf")
+            let audioFile = try AVAudioFile(forWriting: audioURL, settings: format.settings)
+            activeAudioURL = audioURL
+            activeAudioFile = audioFile
+        }
 
+        let activeInputDeviceID = activeCaptureUsesPreferredInputDevice
+            ? preferredInputDeviceID
+            : AudioInputDeviceManager.defaultInputDeviceID()
+        let graphGeneration = beginCaptureHealthMonitoring(
+            activeDeviceID: activeInputDeviceID,
+            resetArrivalTracking: resetArrivalTracking
+        )
         let firstPCMReadyGate = self.firstPCMReadyGate
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
             guard let self else { return }
@@ -298,7 +335,9 @@ final class SherpaOnnxTranscriber: ObservableObject, TranscriberProtocol {
             let normalized = min(rms * 20, 1.0)
 
             Task { @MainActor [weak self] in
-                self?.audioLevel = normalized
+                guard let self else { return }
+                self.noteCapturePCMArrival(graphGeneration: graphGeneration)
+                self.audioLevel = normalized
             }
         }
 
@@ -309,6 +348,186 @@ final class SherpaOnnxTranscriber: ObservableObject, TranscriberProtocol {
         VoxtLog.asr(
             "Sherpa ONNX audio capture started. sampleRate=\(Int(format.sampleRate)), channels=\(format.channelCount), routing=\(activeCaptureUsesPreferredInputDevice ? "preferred" : "system-default")"
         )
+    }
+
+    // MARK: - Capture health (configuration-change rebuild + zero-buffer watchdog)
+
+    private func noteCapturePCMArrival(graphGeneration: Int) {
+        guard graphGeneration == captureGraphGeneration else { return }
+        lastPCMArrivalAt = Date()
+        if !didReceiveCapturePCMCallback {
+            didReceiveCapturePCMCallback = true
+            startCaptureHealthWatchdogIfNeeded()
+        }
+    }
+
+    @discardableResult
+    private func beginCaptureHealthMonitoring(
+        activeDeviceID: AudioDeviceID?,
+        resetArrivalTracking: Bool
+    ) -> Int {
+        activeCaptureDeviceID = activeDeviceID
+        captureGraphGeneration += 1
+        registerCaptureConfigurationChangeObserverIfNeeded()
+        if resetArrivalTracking {
+            lastPCMArrivalAt = nil
+            didReceiveCapturePCMCallback = false
+            cancelCaptureHealthWatchdog()
+        } else {
+            lastPCMArrivalAt = Date()
+            if didReceiveCapturePCMCallback {
+                startCaptureHealthWatchdogIfNeeded()
+            }
+        }
+        return captureGraphGeneration
+    }
+
+    private func endCaptureHealthMonitoring() {
+        cancelCaptureHealthWatchdog()
+        unregisterCaptureConfigurationChangeObserver()
+        isCaptureRecoveryInFlight = false
+        lastPCMArrivalAt = nil
+        didReceiveCapturePCMCallback = false
+        activeCaptureDeviceID = nil
+    }
+
+    private func resetCaptureHealthState() {
+        endCaptureHealthMonitoring()
+        captureGraphGeneration = 0
+        captureRecoveryAttemptsUsed = 0
+    }
+
+    private func registerCaptureConfigurationChangeObserverIfNeeded() {
+        guard captureConfigurationChangeObserver == nil else { return }
+        let engine = audioEngine
+        captureConfigurationChangeObserver = NotificationCenter.default.addObserver(
+            forName: .AVAudioEngineConfigurationChange,
+            object: engine,
+            queue: nil
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.handleCaptureConfigurationChange()
+            }
+        }
+    }
+
+    private func unregisterCaptureConfigurationChangeObserver() {
+        if let captureConfigurationChangeObserver {
+            NotificationCenter.default.removeObserver(captureConfigurationChangeObserver)
+            self.captureConfigurationChangeObserver = nil
+        }
+    }
+
+    private func cancelCaptureHealthWatchdog() {
+        captureHealthWatchdogTask?.cancel()
+        captureHealthWatchdogTask = nil
+    }
+
+    private func startCaptureHealthWatchdogIfNeeded() {
+        guard captureHealthWatchdogTask == nil else { return }
+        guard isRecording || isAwaitingFirstPCM else { return }
+        captureHealthWatchdogTask = Task { @MainActor [weak self] in
+            while let self, !Task.isCancelled {
+                do {
+                    try await Task.sleep(for: .seconds(1))
+                } catch {
+                    return
+                }
+                guard !Task.isCancelled else { return }
+                self.evaluateCaptureHealthWatchdogTick()
+            }
+        }
+    }
+
+    private func handleCaptureConfigurationChange() {
+        guard isRecording || isAwaitingFirstPCM else { return }
+        guard !isCaptureRecoveryInFlight else { return }
+        VoxtLog.asrWarning(
+            "Sherpa audio engine configuration changed during capture; rebuilding graph in place."
+        )
+        performCaptureGraphRecovery(fallbackToDefaultDevice: false, reason: "configuration-change")
+    }
+
+    private func evaluateCaptureHealthWatchdogTick() {
+        guard isRecording || isAwaitingFirstPCM else { return }
+        guard !isCaptureRecoveryInFlight else { return }
+        guard didReceiveCapturePCMCallback, let lastPCMArrivalAt else { return }
+
+        let secondsSinceLastBuffer = Date().timeIntervalSince(lastPCMArrivalAt)
+        let activeDeviceIsBluetooth = activeCaptureDeviceID.map(CaptureHealthSupport.isBluetoothInputDevice) ?? false
+        let action = captureHealthPlanner.action(
+            isRecording: isRecording || isAwaitingFirstPCM,
+            callbacksReceived: didReceiveCapturePCMCallback,
+            secondsSinceLastBuffer: secondsSinceLastBuffer,
+            activeDeviceIsBluetooth: activeDeviceIsBluetooth,
+            recoveryAttemptsUsed: captureRecoveryAttemptsUsed
+        )
+        switch action {
+        case .none:
+            return
+        case .restartCurrentDevice:
+            VoxtLog.asrWarning(
+                "Sherpa capture went silent for \(String(format: "%.2f", secondsSinceLastBuffer))s; restarting current-device graph. attemptsUsed=\(captureRecoveryAttemptsUsed)"
+            )
+            performCaptureGraphRecovery(fallbackToDefaultDevice: false, reason: "health-restart-current")
+        case .fallbackToDefaultDevice:
+            VoxtLog.asrWarning(
+                "Sherpa capture still silent after restart; falling back to system default input. attemptsUsed=\(captureRecoveryAttemptsUsed)"
+            )
+            performCaptureGraphRecovery(fallbackToDefaultDevice: true, reason: "health-fallback-default")
+        case .reportFailure:
+            VoxtLog.asrError(
+                "Sherpa capture health recovery budget exhausted. silenceSec=\(String(format: "%.2f", secondsSinceLastBuffer)), attemptsUsed=\(captureRecoveryAttemptsUsed)"
+            )
+            cancelCaptureHealthWatchdog()
+            pendingRuntimeFailureMessage = "Microphone capture stalled. Check your input device and try again."
+            // Keep the CAF so stop can still run offline recognition on partial audio.
+            if audioEngine.isRunning {
+                audioEngine.stop()
+            }
+            audioEngine.inputNode.removeTap(onBus: 0)
+            isRecording = false
+            audioLevel = 0
+        }
+    }
+
+    private func performCaptureGraphRecovery(fallbackToDefaultDevice: Bool, reason: String) {
+        guard !isCaptureRecoveryInFlight else { return }
+        isCaptureRecoveryInFlight = true
+        defer { isCaptureRecoveryInFlight = false }
+
+        if reason != "configuration-change" {
+            captureRecoveryAttemptsUsed += 1
+        }
+
+        do {
+            if audioEngine.isRunning {
+                audioEngine.stop()
+            }
+            audioEngine.inputNode.removeTap(onBus: 0)
+            // Keep writing into the same CAF across rebuilds so offline recognition
+            // still sees the full session after Bluetooth reconnect.
+            try startAudioCapture(
+                recreateAudioFile: false,
+                forceSystemDefaultInput: fallbackToDefaultDevice,
+                resetArrivalTracking: false
+            )
+            lastPCMArrivalAt = Date()
+            VoxtLog.asrWarning(
+                "Sherpa capture graph rebuilt. reason=\(reason), fallback=\(fallbackToDefaultDevice), attemptsUsed=\(captureRecoveryAttemptsUsed), graphGeneration=\(captureGraphGeneration)"
+            )
+        } catch {
+            VoxtLog.asrError(
+                "Sherpa capture graph rebuild failed. reason=\(reason), error=\(error.localizedDescription)"
+            )
+            pendingRuntimeFailureMessage = error.localizedDescription
+            if audioEngine.isRunning {
+                audioEngine.stop()
+            }
+            audioEngine.inputNode.removeTap(onBus: 0)
+            isRecording = false
+            audioLevel = 0
+        }
     }
 
     private func runOfflineRecognition(fileURL: URL) {
