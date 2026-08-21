@@ -6,6 +6,23 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+## [1.16.3] - 2026-08-21
+
+### English
+
+#### Fixed
+- Classic bubble overlay now shows “整理中...” during the final organizing stage, matching the notch HUD so users get the same progress feedback in both styles.
+
+### 简体中文
+
+#### 修复
+- 经典小气泡在最终整理阶段也会显示「整理中...」，与刘海屏 HUD 一致，两种样式下都能看到相同的进度反馈。
+
+### 日本語
+
+#### 修正
+- クラシック吹き出しでも最終整理段階で「整理中...」を表示するようにし、ノッチ HUD と同じ進捗フィードバックを両方のスタイルで確認できるようにしました。
+
 ## [1.16.2] - 2026-08-21
 
 ### English

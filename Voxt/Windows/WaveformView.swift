@@ -94,6 +94,9 @@ struct WaveformView: View {
     @State private var stableTranscriptText = ""
     @State private var unstableTranscriptText = ""
     @State private var transcriptStabilizationToken = UUID()
+    /// Once "整理中..." has been shown, never fall back to the live underlined
+    /// transcript for the rest of this presentation cycle.
+    @State private var didEnterOrganizing = false
     @StateObject private var waveformState = RecentAudioWaveformState(
         barCount: 16,
         historyDuration: 0.9,
@@ -116,15 +119,25 @@ struct WaveformView: View {
         return sanitizedDisplayText(transcribedText)
     }
 
+    private var isOrganizing: Bool {
+        isEnhancing || isRequesting || isFinalizingTranscription
+    }
+
     private var usesLiveTranscriptUnderline: Bool {
         trimmedStatusMessage.isEmpty &&
             !isDictionaryLearningFeedback &&
             !isAnswerMode &&
+            !isOrganizing &&
+            !didEnterOrganizing &&
             !liveTranscriptText.isEmpty
     }
 
     private var displayText: String {
         if !trimmedStatusMessage.isEmpty { return trimmedStatusMessage }
+        // Match NotchHudView: show "整理中..." only while organizing; after that
+        // keep the lock so we never flash back to the live underlined transcript.
+        if isOrganizing && !isCompleting { return "整理中..." }
+        if didEnterOrganizing { return "" }
         if usesLiveTranscriptUnderline {
             return stableTranscriptText + unstableTranscriptText
         }
@@ -144,7 +157,7 @@ struct WaveformView: View {
     private var showsLoadingSpinner: Bool {
         // Keep connecting mic size-stable: replace waveform bars with text
         // instead of entering the processing-bars + subtitle layout.
-        !isCompleting && (isEnhancing || isRequesting || isFinalizingTranscription)
+        !isCompleting && isOrganizing
     }
     private var showsConnectingMicrophoneStatus: Bool {
         isConnectingMicrophone && !isRecording && !showsLoadingSpinner && !isDictionaryLearningFeedback
@@ -221,6 +234,7 @@ struct WaveformView: View {
             onSessionTranslationLanguageHoverChanged(hovering)
         }
         .onAppear {
+            didEnterOrganizing = isOrganizing
             updateWaveformStateActivity()
             updateLiveTranscript(liveTranscriptText)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
@@ -236,9 +250,20 @@ struct WaveformView: View {
         }
         .onChange(of: displayMode) {
             updateWaveformStateActivity()
+            if displayMode == .recording && !isOrganizing {
+                didEnterOrganizing = false
+            }
         }
         .onChange(of: isRecording) {
             updateWaveformStateActivity()
+            if isRecording {
+                didEnterOrganizing = false
+            }
+        }
+        .onChange(of: isOrganizing) { _, organizing in
+            if organizing {
+                didEnterOrganizing = true
+            }
         }
         .onChange(of: isModelInitializing) {
             updateWaveformStateActivity()
