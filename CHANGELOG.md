@@ -6,6 +6,23 @@ The format is based on Keep a Changelog.
 
 ## [Unreleased]
 
+## [1.16.6] - 2026-08-21
+
+### English
+
+#### Fixed
+- Starting transcription now targets the selected microphone directly, avoiding a full input-device scan that could delay capture while Continuity Camera microphones synchronize.
+
+### 简体中文
+
+#### 修复
+- 启动识音时会直接绑定已选麦克风，避免全量扫描输入设备导致连续互通麦克风同步等待。
+
+### 日本語
+
+#### 修正
+- 文字起こしの開始時に選択済みマイクへ直接接続し、連係カメラのマイク同期による待機を招く入力デバイス全体のスキャンを回避しました。
+
 ## [1.16.5] - 2026-08-21
 
 ### English

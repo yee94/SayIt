@@ -173,9 +173,8 @@ final class MeetingMicrophoneCapture: @unchecked Sendable {
         verifiesAppliedDevice: Bool
     ) -> Bool {
         guard let preferredInputDeviceID,
-              preferredInputDeviceID != AudioDeviceID(kAudioObjectUnknown),
-              AudioInputDeviceManager.isAvailableInputDevice(preferredInputDeviceID),
-              let audioUnit = inputNode.audioUnit
+               preferredInputDeviceID != AudioDeviceID(kAudioObjectUnknown),
+               let audioUnit = inputNode.audioUnit
         else {
             return false
         }

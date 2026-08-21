@@ -145,10 +145,6 @@ enum AudioInputDeviceManager {
         return devices.first?.id
     }
 
-    static func isAvailableInputDevice(_ deviceID: AudioDeviceID) -> Bool {
-        snapshotAvailableInputDevices().contains(where: { $0.id == deviceID })
-    }
-
     nonisolated static func nominalSampleRate(for deviceID: AudioDeviceID?) -> Double? {
         guard let deviceID,
               deviceID != AudioDeviceID(kAudioObjectUnknown)

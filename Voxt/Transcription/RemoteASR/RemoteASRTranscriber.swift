@@ -2349,8 +2349,7 @@ class RemoteASRTranscriber: NSObject, ObservableObject, TranscriberProtocol {
     @discardableResult
     func applyPreferredInputDeviceIfNeeded(inputNode: AVAudioInputNode) -> Bool {
         guard let preferredInputDeviceID,
-              preferredInputDeviceID != AudioDeviceID(kAudioObjectUnknown),
-              AudioInputDeviceManager.isAvailableInputDevice(preferredInputDeviceID)
+              preferredInputDeviceID != AudioDeviceID(kAudioObjectUnknown)
         else {
             return false
         }

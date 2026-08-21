@@ -666,8 +666,7 @@ class SpeechTranscriber: ObservableObject, TranscriberProtocol {
     @discardableResult
     private func applyPreferredInputDeviceIfNeeded(inputNode: AVAudioInputNode) -> Bool {
         guard let preferredInputDeviceID,
-              preferredInputDeviceID != AudioDeviceID(kAudioObjectUnknown),
-              AudioInputDeviceManager.isAvailableInputDevice(preferredInputDeviceID)
+              preferredInputDeviceID != AudioDeviceID(kAudioObjectUnknown)
         else {
             return false
         }
