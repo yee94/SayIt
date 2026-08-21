@@ -1,7 +1,18 @@
 {
   "channel": "stable",
-  "updatedAt": "2026-08-21T07:01:27.812Z",
+  "updatedAt": "2026-08-21T07:16:11.750Z",
   "items": [
+    {
+      "title": "Version 1.16.3",
+      "shortVersionString": "1.16.3",
+      "version": "101600399",
+      "url": "https://github.com/yee94/SayIt/releases/download/v1.16.3/SayIt-1.16.3-macOS.zip",
+      "length": "50090066",
+      "edSignature": "2QAL0aE7MWkGdigrIyFz2ML4uZYaudMhBoG4U1YUWzt3fMNoxGlgUdvDaUyPWZWLf1NqzJoCeWJztNS0YIBYDQ==",
+      "releaseURL": "https://github.com/yee94/SayIt/releases/tag/v1.16.3",
+      "publishedAt": "2026-08-21T07:15:39Z",
+      "releaseNotesHtml": "<h3>English</h3>\n<h4>Fixed</h4>\n<ul>\n<li>Classic bubble overlay now shows “整理中...” during the final organizing stage, matching the notch HUD so users get the same progress feedback in both styles.</li>\n</ul>\n<h3>简体中文</h3>\n<h4>修复</h4>\n<ul>\n<li>经典小气泡在最终整理阶段也会显示「整理中...」，与刘海屏 HUD 一致，两种样式下都能看到相同的进度反馈。</li>\n</ul>\n<h3>日本語</h3>\n<h4>修正</h4>\n<ul>\n<li>クラシック吹き出しでも最終整理段階で「整理中...」を表示するようにし、ノッチ HUD と同じ進捗フィードバックを両方のスタイルで確認できるようにしました。</li>\n</ul>"
+    },
     {
       "title": "Version 1.16.2",
       "shortVersionString": "1.16.2",
