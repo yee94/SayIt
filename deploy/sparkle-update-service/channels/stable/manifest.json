@@ -1,7 +1,18 @@
 {
   "channel": "stable",
-  "updatedAt": "2026-08-21T07:58:05.751Z",
+  "updatedAt": "2026-08-21T09:39:02.944Z",
   "items": [
+    {
+      "title": "Version 1.16.5",
+      "shortVersionString": "1.16.5",
+      "version": "101600401",
+      "url": "https://github.com/yee94/SayIt/releases/download/v1.16.5/SayIt-1.16.5-macOS.zip",
+      "length": "50156428",
+      "edSignature": "NenwNvXxU9jMhXA8iti5Wu/vvC0GMn4BYy9D/cMnqr/oSfro1b2rYle0ruvJs9lBhKWf9rT9/L9MAtV1/jY0DA==",
+      "releaseURL": "https://github.com/yee94/SayIt/releases/tag/v1.16.5",
+      "publishedAt": "2026-08-21T09:38:30Z",
+      "releaseNotesHtml": "<h3>English</h3>\n<h4>Changed</h4>\n<ul>\n<li>Lowered the minimum supported macOS version from 15.0 to 14.6 (Sonoma) so Voxt can run on more Macs.</li>\n</ul>\n<h3>简体中文</h3>\n<h4>变更</h4>\n<ul>\n<li>将最低支持的 macOS 版本从 15.0 下调至 14.6（Sonoma），以便在更多 Mac 上运行。</li>\n</ul>\n<h3>日本語</h3>\n<h4>変更</h4>\n<ul>\n<li>サポートする最低 macOS バージョンを 15.0 から 14.6（Sonoma）に引き下げ、より多くの Mac で動作するようにしました。</li>\n</ul>"
+    },
     {
       "title": "Version 1.16.4",
       "shortVersionString": "1.16.4",
